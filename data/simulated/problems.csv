@@ -1,0 +1,1001 @@
+problem_id,name,sector,sector_walk_min,boulder,grade,grade_label,styles,height_ft,sit_start,true_quality,true_reach,sector_order,boulder_order
+b0000,Billboard Traverse,The Tailgate,1,The Billboard,0,V0,slab|slopey|technical|traverse|bunchy,19.5,False,1.673,-0.866,5,29
+b0001,Bait and Switch,The Tailgate,1,The Billboard,11,V11,slab|technical|highball,19.5,False,2.461,0.346,5,29
+b0002,Mad Men,The Tailgate,1,The Billboard,4,V4,slab|slopey|mantle|highball,19.5,False,1.907,-0.121,5,29
+b0003,Subliminal,The Tailgate,1,The Billboard,4,V4,slab|slopey|pinchy|highball|bunchy,19.5,False,2.818,-0.944,5,29
+b0004,Your Ad Here,The Tailgate,1,The Billboard,0,V0,slab|crimpy|mantle|highball,19.5,True,3.103,0.125,5,29
+b0005,Jingle,The Tailgate,1,The Billboard,2,V2,technical|mantle|highball,19.5,False,3.266,-0.208,5,29
+b0006,Brand Loyalty,The Tailgate,1,The Billboard,0,V0,slab|crimpy|highball|reachy,19.5,False,3.027,0.786,5,29
+b0007,Pop Quiz,The Schoolhouse,6,The Blackboard,1,V1,slopey|highball|bunchy,16.9,False,1.923,-0.641,9,73
+b0008,Fractions,The Schoolhouse,6,The Blackboard,1,V1,slopey|crimpy|highball,16.9,False,1.612,-0.062,9,73
+b0009,Extra Credit,The Schoolhouse,6,The Blackboard,2,V2,crimpy|highball|bunchy,16.9,True,1.074,-0.699,9,73
+b0010,Penmanship,The Schoolhouse,6,The Blackboard,0,V0,pinchy|dyno|highball,16.9,False,1.392,0.474,9,73
+b0011,Pad Hoarder,The Schoolhouse,6,The Blackboard,10,V10,crimpy|technical|juggy|eliminate|highball,16.9,True,0.0,-0.251,9,73
+b0012,Gold Star,The Schoolhouse,6,The Blackboard,1,V1,crimpy|juggy|highball,16.9,False,2.238,0.42,9,73
+b0013,Long Division,The Schoolhouse,6,The Blackboard,0,V0,crimpy|mantle|technical|highball,16.9,False,2.096,-0.092,9,73
+b0014,Fingernails,The Schoolhouse,6,The Blackboard,9,V9,technical|slopey|highball,16.9,False,0.786,-0.485,9,73
+b0015,Spelling Bee,The Schoolhouse,6,The Blackboard,3,V3,crimpy|technical|compression|highball|bunchy,16.9,True,1.694,-1.0,9,73
+b0016,Chalk Dust,The Schoolhouse,6,The Blackboard,3,V3,crimpy|mantle|highball|reachy,16.9,True,2.504,0.832,9,73
+b0017,Gold Star Sit,The Schoolhouse,6,The Blackboard,2,V2,crimpy|mantle|highball,16.9,True,0.762,0.125,9,73
+b0018,Times Tables,The Schoolhouse,6,The Blackboard,3,V3,pinchy|mantle|highball,16.9,False,1.693,0.001,9,73
+b0019,Blackboard Traverse,The Schoolhouse,6,The Blackboard,3,V3,crimpy|traverse,16.9,False,1.89,-0.17,9,73
+b0020,Erasers,The Schoolhouse,6,The Blackboard,1,V1,crimpy|technical|highball,16.9,True,2.077,-0.17,9,73
+b0021,Cursive,The Schoolhouse,6,The Blackboard,3,V3,compression|mantle|highball|bunchy,16.9,False,2.1,-1.0,9,73
+b0022,Show Your Work,The Schoolhouse,6,The Blackboard,5,V5,crimpy|dyno|highball,16.9,False,2.337,0.337,9,73
+b0023,Sack of Flour,Millrace Caves,8,The Millstone,1,V1,technical|reachy,8.5,True,1.239,1.0,8,63
+b0024,Nose to the Grindstone (No Arête),Millrace Caves,8,The Millstone,8,V8,technical|eliminate,8.5,False,0.531,0.088,8,63
+b0025,Flour Power,Millrace Caves,8,The Millstone,3,V3,slopey|powerful,8.5,False,2.089,-0.315,8,63
+b0026,Mill Wheel,Millrace Caves,8,The Millstone,1,V1,slopey|crimpy|bunchy,8.5,False,1.996,-0.77,8,63
+b0027,Millstone Around Your Neck,Millrace Caves,8,The Millstone,10,V10,crimpy,8.5,False,3.369,-0.329,8,63
+b0028,Wheat From Chaff,Millrace Caves,8,The Millstone,7,V7,slopey,8.5,False,2.1,-0.141,8,63
+b0029,Grain of Salt,Millrace Caves,8,The Millstone,2,V2,slopey|juggy,8.5,False,2.412,-0.353,8,63
+b0030,Grain of Salt Sit,Millrace Caves,8,The Millstone,4,V4,slopey|crimpy|reachy,8.5,True,2.162,0.595,8,63
+b0031,Grist,Millrace Caves,8,The Millstone,0,V0,slopey|juggy|crimpy,8.5,False,2.708,-0.45,8,63
+b0032,Millrace,Millrace Caves,8,The Millstone,2,V2,slopey|crimpy|pinchy,8.5,False,1.249,0.064,8,63
+b0033,Daily Grind,Millrace Caves,8,The Millstone,2,V2,slopey|juggy,8.5,False,2.398,-0.187,8,63
+b0034,Grist for the Mill,Millrace Caves,8,The Millstone,2,V2,slopey|crimpy|pinchy,8.5,False,1.8,0.185,8,63
+b0035,Grinding Gears,Millrace Caves,8,The Millstone,9,V9,slopey|powerful|reachy,8.5,False,2.267,0.57,8,63
+b0036,Run of the Mill,Millrace Caves,8,The Millstone,4,V4,juggy,8.5,False,2.448,-0.128,8,63
+b0037,The Miller's Tale,Millrace Caves,8,The Millstone,1,V1,slopey|compression,8.5,True,1.076,-0.464,8,63
+b0038,Parenthetical,Millrace Caves,8,The Millstone,3,V3,dyno|eliminate|reachy,8.5,True,1.95,0.719,8,63
+b0039,Nose to the Grindstone,Millrace Caves,8,The Millstone,1,V1,slopey,8.5,False,2.102,0.134,8,63
+b0040,Stone Ground,Millrace Caves,8,The Millstone,2,V2,slopey|powerful,8.5,False,1.534,-0.306,8,63
+b0041,Grindstone,Millrace Caves,8,The Millstone,6,V6,slopey|dyno,8.5,False,2.209,0.318,8,63
+b0042,Suet,Hawkwatch,8,The Birdhouse,2,V2,overhang|juggy|technical,8.1,False,1.199,-0.242,7,50
+b0043,Bird Brain,Hawkwatch,8,The Birdhouse,6,V6,overhang|compression|dyno,8.1,True,1.749,-0.046,7,50
+b0044,Early Bird,Hawkwatch,8,The Birdhouse,3,V3,overhang|juggy|compression,8.1,True,1.449,-0.19,7,50
+b0045,Birds of a Feather,Hawkwatch,8,The Birdhouse,8,V8,juggy,8.1,False,0.995,0.266,7,50
+b0046,Birdhouse Traverse,Hawkwatch,8,The Birdhouse,7,V7,compression|traverse,8.1,False,1.585,0.017,7,50
+b0047,Feeder,Hawkwatch,8,The Birdhouse,4,V4,overhang|juggy|bunchy,8.1,True,1.209,-0.828,7,50
+b0048,Little Wren,Hawkwatch,8,The Birdhouse,7,V7,overhang|juggy|reachy,8.1,True,0.857,0.802,7,50
+b0049,Tweet,Hawkwatch,8,The Birdhouse,1,V1,overhang|crimpy|pinchy,8.1,True,2.664,-0.167,7,50
+b0050,Free Bird,Hawkwatch,8,The Birdhouse,8,V8,overhang|mantle|slopey,8.1,True,2.801,-0.342,7,50
+b0051,Pecking Order,Hawkwatch,8,The Birdhouse,3,V3,overhang|compression|technical,8.1,True,1.073,0.015,7,50
+b0052,Nest Egg,Hawkwatch,8,The Birdhouse,5,V5,overhang|technical,8.1,True,1.43,-0.378,7,50
+b0053,Empty Nest,Hawkwatch,8,The Birdhouse,4,V4,overhang|pinchy|juggy,8.1,False,1.352,-0.359,7,50
+b0054,Fit as a Fiddle,Bracken Gully,16,The Fiddlehead,6,V6,crimpy|slopey|bunchy,8.7,False,2.434,-0.554,2,9
+b0055,Second Fiddle,Bracken Gully,16,The Fiddlehead,6,V6,technical,8.7,False,2.68,-0.016,2,9
+b0056,Rosin,Bracken Gully,16,The Fiddlehead,4,V4,dyno|slopey|reachy,8.7,False,1.903,0.661,2,9
+b0057,Fiddlehead Season,Bracken Gully,16,The Fiddlehead,2,V2,mantle|bunchy,8.7,True,2.804,-0.7,2,9
+b0058,Emotional Support Pad,Bracken Gully,16,The Fiddlehead,4,V4,crimpy|technical,8.7,True,1.248,-0.003,2,9
+b0059,The Devil Went Down,Bracken Gully,16,The Fiddlehead,11,V11,crimpy|mantle|pinchy,8.7,False,2.081,-0.01,2,9
+b0060,Unfurling,Bracken Gully,16,The Fiddlehead,0,V0,crimpy|juggy|slopey,8.7,False,2.195,0.094,2,9
+b0061,Fiddle Faddle,Bracken Gully,16,The Fiddlehead,4,V4,mantle|pinchy|reachy,8.7,False,1.91,0.623,2,9
+b0062,Fiddler on the Roof,Bracken Gully,16,The Fiddlehead,3,V3,compression,8.7,False,2.732,-0.174,2,9
+b0063,Dam Busters (No Feet),The Spillway,16,The Floodgate,6,V6,compression|eliminate,12.2,True,0.739,0.076,1,7
+b0064,The Flood of '38,The Spillway,16,The Floodgate,12,V12,crimpy|juggy,12.2,False,2.008,-0.429,1,7
+b0065,Hydroelectric,The Spillway,16,The Floodgate,0,V0,crimpy|powerful|slopey|bunchy,12.2,False,1.889,-0.619,1,7
+b0066,Dam Busters,The Spillway,16,The Floodgate,0,V0,crimpy|pinchy,12.2,False,1.956,-0.233,1,7
+b0067,Steeple Under Water,The Spillway,16,The Floodgate,6,V6,crimpy,12.2,False,2.921,0.306,1,7
+b0068,Dam Fine,The Spillway,16,The Floodgate,0,V0,crimpy|powerful|reachy,12.2,False,1.978,0.584,1,7
+b0069,Water Wings,The Spillway,16,The Floodgate,0,V0,juggy|crimpy|reachy,12.2,True,1.091,0.928,1,7
+b0070,Puddle Jumper,The Spillway,16,The Floodgate,3,V3,crimpy|mantle,12.2,False,2.533,0.239,1,7
+b0071,Overflow,The Spillway,16,The Floodgate,1,V1,crimpy,12.2,True,1.738,0.116,1,7
+b0072,Rubber Duck,The Spillway,16,The Floodgate,0,V0,slopey,12.2,False,2.375,-0.184,1,7
+b0073,Treading Water (No Heel Hooks),The Spillway,16,The Floodgate,7,V7,crimpy|technical|powerful|eliminate|bunchy,12.2,False,0.901,-0.648,1,7
+b0074,Footnote,The Spillway,16,The Floodgate,6,V6,crimpy|pinchy|eliminate,12.2,True,0.905,-0.224,1,7
+b0075,Floodgate Traverse,The Spillway,16,The Floodgate,2,V2,powerful|mantle|traverse,12.2,False,2.546,0.176,1,7
+b0076,Treading Water,The Spillway,16,The Floodgate,7,V7,juggy|pinchy,12.2,False,1.147,0.289,1,7
+b0077,High Water Mark,The Spillway,16,The Floodgate,5,V5,crimpy|powerful,12.2,False,3.728,0.048,1,7
+b0078,Rising Tide,The Spillway,16,The Floodgate,10,V10,technical,12.2,False,0.983,-0.387,1,7
+b0079,The Drowning Pool,The Spillway,16,The Floodgate,9,V9,crimpy|juggy,12.2,False,2.556,0.212,1,7
+b0080,Commute (Crimps Only),The Spillway,16,The Floodgate,5,V5,crimpy|slopey|eliminate,12.2,False,0.0,-0.093,1,7
+b0081,Pump Clock,The Spillway,16,The Floodgate,4,V4,crimpy|slopey|technical|traverse,12.2,True,1.479,0.158,1,7
+b0082,Sandbag,The Spillway,16,The Floodgate,5,V5,crimpy|pinchy|bunchy,12.2,True,1.717,-0.537,1,7
+b0083,Commute,The Spillway,16,The Floodgate,5,V5,crimpy|pinchy|traverse,12.2,True,2.112,0.362,1,7
+b0084,Filler,The Spillway,16,The Floodgate,6,V6,crimpy,12.2,False,0.339,-0.17,1,7
+b0085,Atlantis,The Spillway,16,The Floodgate,8,V8,slopey|mantle|reachy,12.2,False,2.296,1.0,1,7
+b0086,Drought Year,The Spillway,16,The Floodgate,6,V6,crimpy|compression|pinchy,12.2,False,2.568,-0.156,1,7
+b0087,Whirlpool,The Spillway,16,The Floodgate,8,V8,mantle,12.2,False,1.303,-0.313,1,7
+b0088,Low Water,The Spillway,16,The Floodgate,4,V4,crimpy|pinchy,12.2,False,2.471,-0.003,1,7
+b0089,Riptide,The Spillway,16,The Floodgate,0,V0,crimpy|mantle|slopey|reachy,12.2,True,1.432,0.614,1,7
+b0090,Puddle Jumper Sit,The Spillway,16,The Floodgate,4,V4,crimpy|pinchy,12.2,True,1.489,0.142,1,7
+b0091,The Drowned Town,The Spillway,16,The Floodgate,5,V5,crimpy|juggy,12.2,False,2.783,0.336,1,7
+b0092,Overflow (Pinches Only),The Spillway,16,The Floodgate,9,V9,pinchy|juggy|eliminate|bunchy,12.2,True,1.19,-0.759,1,7
+b0093,Deep End,The Spillway,16,The Floodgate,2,V2,juggy|dyno,12.2,False,1.218,-0.116,1,7
+b0094,Leaky Faucet,The Spillway,16,The Floodgate,4,V4,crimpy|technical|bunchy,12.2,False,1.916,-0.654,1,7
+b0095,Velvet Sermon Sit,The Spillway,16,The Floodgate,9,V9,crimpy|pinchy|powerful,12.2,True,2.307,-0.101,1,7
+b0096,Floodlight,The Spillway,16,The Floodgate,3,V3,crimpy|powerful,12.2,False,3.477,-0.226,1,7
+b0097,Undertow,The Spillway,16,The Floodgate,7,V7,crimpy|technical|juggy,12.2,False,1.382,0.256,1,7
+b0098,When the Levee Breaks,The Spillway,16,The Floodgate,5,V5,crimpy|juggy,12.2,True,1.646,0.126,1,7
+b0099,Water Under the Bridge,The Spillway,16,The Floodgate,4,V4,crimpy|powerful|mantle|reachy,12.2,False,2.123,1.0,1,7
+b0100,Flint and Steel,The Cellar Holes,18,The Hearthstone,9,V9,technical|pinchy|bunchy,9.6,False,0.735,-0.586,4,27
+b0101,Hearth and Home,The Cellar Holes,18,The Hearthstone,7,V7,crimpy|dyno|reachy,9.6,False,3.077,0.625,4,27
+b0102,Bump in the Night,The Cellar Holes,18,The Hearthstone,2,V2,juggy|crimpy|bunchy,9.6,False,1.508,-0.594,4,27
+b0103,Hearth Cat,The Cellar Holes,18,The Hearthstone,8,V8,crimpy|technical|bunchy,9.6,True,0.466,-1.0,4,27
+b0104,Poltergeist,The Cellar Holes,18,The Hearthstone,5,V5,juggy|compression,9.6,False,1.295,0.033,4,27
+b0105,Kindling,The Cellar Holes,18,The Hearthstone,4,V4,crimpy|mantle|reachy,9.6,False,2.454,0.619,4,27
+b0106,Poison Ivy,The Cellar Holes,18,The Hearthstone,4,V4,crimpy|pinchy,9.6,False,0.618,-0.066,4,27
+b0107,Smoke Signal (Static),The Cellar Holes,18,The Hearthstone,2,V2,crimpy|mantle|dyno|eliminate|reachy,9.6,False,0.775,0.944,4,27
+b0108,The Hollow Ghost,The Cellar Holes,18,The Hearthstone,13,V13,pinchy|technical|reachy,9.6,False,1.344,1.0,4,27
+b0109,Tinder,The Cellar Holes,18,The Hearthstone,2,V2,crimpy|mantle,9.6,False,0.81,-0.392,4,27
+b0110,Crackle,The Cellar Holes,18,The Hearthstone,2,V2,crimpy|juggy,9.6,False,1.257,0.267,4,27
+b0111,Rulebook,The Cellar Holes,18,The Hearthstone,8,V8,crimpy|dyno|pinchy|eliminate,9.6,False,0.893,-0.238,4,27
+b0112,Home Fires,The Cellar Holes,18,The Hearthstone,3,V3,powerful,9.6,False,2.433,-0.107,4,27
+b0113,Fireside Chat,The Cellar Holes,18,The Hearthstone,8,V8,crimpy|compression|mantle,9.6,False,1.737,-0.36,4,27
+b0114,Gerrymander,The Cellar Holes,18,The Hearthstone,2,V2,crimpy|powerful|pinchy|eliminate|reachy,9.6,False,0.422,0.67,4,27
+b0115,Soot,The Cellar Holes,18,The Hearthstone,1,V1,juggy|compression,9.6,False,1.882,0.012,4,27
+b0116,Embers (No Heel Hooks),The Cellar Holes,18,The Hearthstone,9,V9,powerful|crimpy|eliminate,9.6,False,1.227,0.065,4,27
+b0117,Smoke Signal,The Cellar Holes,18,The Hearthstone,0,V0,crimpy|compression|technical,9.6,False,1.66,0.008,4,27
+b0118,Pot Hook,The Cellar Holes,18,The Hearthstone,4,V4,crimpy,9.6,False,2.139,-0.454,4,27
+b0119,Burnt Offering,The Cellar Holes,18,The Hearthstone,11,V11,crimpy|juggy|technical,9.6,False,2.162,-0.183,4,27
+b0120,Will-o'-the-Wisp,The Cellar Holes,18,The Hearthstone,1,V1,crimpy|powerful|technical,9.6,False,1.274,-0.009,4,27
+b0121,Andirons,The Cellar Holes,18,The Hearthstone,4,V4,crimpy|pinchy,9.6,True,2.37,0.411,4,27
+b0122,Ashes to Ashes,The Cellar Holes,18,The Hearthstone,11,V11,crimpy|dyno|reachy,9.6,False,1.47,0.705,4,27
+b0123,Home Fires (No Feet),The Cellar Holes,18,The Hearthstone,5,V5,crimpy|compression|eliminate,9.6,True,0.374,-0.293,4,27
+b0124,Ghost Story,The Cellar Holes,18,The Hearthstone,0,V0,crimpy|juggy,9.6,False,1.596,0.083,4,27
+b0125,Smoke Signal (Pinches Only),The Cellar Holes,18,The Hearthstone,4,V4,crimpy|pinchy|eliminate,9.6,True,0.461,0.076,4,27
+b0126,Embers,The Cellar Holes,18,The Hearthstone,7,V7,slopey|bunchy,9.6,False,2.545,-0.515,4,27
+b0127,Slow Burn,The Cellar Holes,18,The Hearthstone,6,V6,dyno|technical,9.6,False,2.649,-0.061,4,27
+b0128,Old Flame,The Cellar Holes,18,The Hearthstone,4,V4,crimpy|juggy|reachy,9.6,False,2.808,0.919,4,27
+b0129,Kettle's On,The Cellar Holes,18,The Hearthstone,1,V1,crimpy|pinchy|dyno|reachy,9.6,False,1.931,0.54,4,27
+b0130,Chimney Sweep,The Cellar Holes,18,The Hearthstone,7,V7,slopey|crimpy,9.6,False,1.973,0.433,4,27
+b0131,Toasted Marshmallow,The Cellar Holes,18,The Hearthstone,0,V0,crimpy|bunchy,9.6,False,1.916,-0.621,4,27
+b0132,Barred,Hemlock Hollow,19,The Owl,1,V1,slopey|crimpy|reachy,14.1,False,2.249,0.549,3,20
+b0133,Parliament,Hemlock Hollow,19,The Owl,3,V3,crimpy|juggy,14.1,False,1.754,-0.397,3,20
+b0134,Owl Traverse,Hemlock Hollow,19,The Owl,4,V4,crimpy|powerful|dyno|traverse,14.1,True,0.798,-0.005,3,20
+b0135,Night Owl,Hemlock Hollow,19,The Owl,6,V6,crimpy|technical,14.1,False,2.529,0.432,3,20
+b0136,Nocturne,Hemlock Hollow,19,The Owl,6,V6,mantle,14.1,False,1.709,0.363,3,20
+b0137,Hoot,Hemlock Hollow,19,The Owl,2,V2,crimpy|dyno|slopey,14.1,False,3.309,-0.215,3,20
+b0138,Owl Pellet,Hemlock Hollow,19,The Owl,6,V6,crimpy|powerful,14.1,True,1.773,-0.134,3,20
+b0139,Who Cooks for You,Hemlock Hollow,19,The Owl,0,V0,crimpy|slopey,14.1,False,2.758,0.379,3,20
+b0140,Guy Wire,The Grout Piles,21,The Derrick,3,V3,slopey|technical|highball,17.8,False,3.268,-0.083,6,46
+b0141,Dead Lift,The Grout Piles,21,The Derrick,9,V9,slopey|dyno|crimpy|highball|reachy,17.8,False,2.532,0.802,6,46
+b0142,Heave Ho,The Grout Piles,21,The Derrick,5,V5,dyno|juggy|highball|reachy,17.8,False,2.328,1.0,6,46
+b0143,Hoist,The Grout Piles,21,The Derrick,2,V2,slopey|powerful|crimpy|highball,17.8,False,2.635,-0.137,6,46
+b0144,Load Limit,The Grout Piles,21,The Derrick,2,V2,slopey|pinchy|compression|highball|bunchy,17.8,False,2.108,-1.0,6,46
+b0145,Counterweight,The Grout Piles,21,The Derrick,6,V6,slopey|pinchy|powerful|highball|bunchy,17.8,True,1.997,-0.801,6,46
+b0146,Block and Tackle,The Grout Piles,21,The Derrick,2,V2,technical|highball,17.8,False,2.424,-0.371,6,46
+b0147,Boom,The Grout Piles,21,The Derrick,3,V3,slopey|powerful|crimpy|highball|reachy,17.8,True,3.437,0.682,6,46
+b0148,Swing Load,The Grout Piles,21,The Derrick,3,V3,dyno|mantle|highball|reachy,17.8,False,1.797,0.525,6,46
+b0149,Swing Load (Crimps Only),The Grout Piles,21,The Derrick,3,V3,slopey|crimpy|eliminate|highball,17.8,False,1.746,0.007,6,46
+b0150,Crane Kick,The Grout Piles,21,The Derrick,4,V4,technical|highball|bunchy,17.8,False,3.482,-0.743,6,46
+b0151,Rototiller,Back Forty,24,The Tractor,8,V8,overhang|crimpy|juggy|slopey,8.6,True,2.129,-0.03,0,4
+b0152,Combine,Back Forty,24,The Tractor,2,V2,overhang|compression|slopey,8.6,True,1.88,-0.106,0,4
+b0153,Plow Through,Back Forty,24,The Tractor,7,V7,overhang|crimpy|technical,8.6,True,2.684,-0.265,0,4
+b0154,Diesel,Back Forty,24,The Tractor,8,V8,overhang|juggy,8.6,False,1.53,-0.139,0,4
+b0155,Harrow,Back Forty,24,The Tractor,5,V5,overhang|crimpy|slopey,8.6,False,2.492,-0.484,0,4
+b0156,Power Take-Off,Back Forty,24,The Tractor,5,V5,crimpy|juggy|bunchy,8.6,True,3.09,-1.0,0,4
+b0157,Tractor Traverse,Back Forty,24,The Tractor,4,V4,overhang|crimpy|pinchy|traverse,8.6,True,1.901,-0.447,0,4
+b0158,Rules Lawyer,Back Forty,24,The Tractor,2,V2,pinchy|eliminate,8.6,False,0.923,0.369,0,4
+b0159,Combine (No Arête),Back Forty,24,The Tractor,4,V4,overhang|powerful|technical|eliminate,8.6,True,0.747,0.47,0,4
+b0160,Lateral Thinking,Back Forty,24,The Tractor,6,V6,overhang|powerful|traverse|bunchy,8.6,True,1.263,-0.972,0,4
+b0161,Green Machine,Back Forty,24,The Tractor,9,V9,overhang|crimpy|pinchy,8.6,False,3.06,0.34,0,4
+b0162,Sod Buster,Back Forty,24,The Tractor,3,V3,overhang|dyno|technical,8.6,False,1.482,0.367,0,4
+b0163,Furrow,Back Forty,24,The Tractor,6,V6,overhang|crimpy|pinchy|compression,8.6,True,2.55,-0.033,0,4
+b0164,Hay Baler,Back Forty,24,The Tractor,6,V6,overhang|slopey|bunchy,8.6,True,2.841,-0.719,0,4
+b0165,Square Bale,Back Forty,24,The Haybale,3,V3,slopey|juggy|powerful,14.1,True,2.533,0.439,0,5
+b0166,Hay Fever,Back Forty,24,The Haybale,3,V3,overhang|slopey|juggy|compression|bunchy,14.1,False,2.621,-1.0,0,5
+b0167,Bale Out (Slopers Only),Back Forty,24,The Haybale,6,V6,overhang|slopey|pinchy|powerful|eliminate,14.1,False,0.532,-0.227,0,5
+b0168,The Last Straw,Back Forty,24,The Haybale,12,V12,slopey|compression,14.1,True,3.146,-0.039,0,5
+b0169,Needle in a Haystack,Back Forty,24,The Haybale,3,V3,slopey|compression,14.1,False,3.181,-0.159,0,5
+b0170,Bale Out,Back Forty,24,The Haybale,2,V2,slopey|pinchy,14.1,False,1.681,0.198,0,5
+b0171,Make Hay,Back Forty,24,The Haybale,3,V3,juggy|pinchy|reachy,14.1,False,1.773,0.723,0,5
+b0172,Round Bale,Back Forty,24,The Haybale,4,V4,overhang|slopey|pinchy|compression,14.1,False,1.882,-0.128,0,5
+b0173,Cog,Millrace Caves,8,The Waterwheel,1,V1,technical,8.7,False,1.065,0.419,8,62
+b0174,"Turn, Turn, Turn",Millrace Caves,8,The Waterwheel,4,V4,juggy,8.7,True,1.583,0.333,8,62
+b0175,Overshot,Millrace Caves,8,The Waterwheel,4,V4,mantle|juggy,8.7,False,2.154,-0.235,8,62
+b0176,Undershot,Millrace Caves,8,The Waterwheel,6,V6,crimpy,8.7,True,1.936,-0.036,8,62
+b0177,Angry Pancake,Millrace Caves,8,The Waterwheel,6,V6,juggy|reachy,8.7,False,2.255,0.784,8,62
+b0178,Waterwheel Traverse,Millrace Caves,8,The Waterwheel,3,V3,powerful|traverse|bunchy,8.7,False,0.777,-0.579,8,62
+b0179,Splash Zone,Millrace Caves,8,The Waterwheel,0,V0,slopey|mantle,8.7,False,1.954,-0.242,8,62
+b0180,Paddle,Millrace Caves,8,The Waterwheel,3,V3,crimpy,8.7,False,2.67,0.271,8,62
+b0181,Bucket Brigade,Millrace Caves,8,The Waterwheel,1,V1,mantle|reachy,8.7,False,1.905,0.6,8,62
+b0182,Big Bang,The Grout Piles,21,The Powder House,8,V8,overhang|pinchy,6.4,False,1.809,-0.463,6,40
+b0183,Short Fuse,The Grout Piles,21,The Powder House,5,V5,overhang|powerful|reachy,6.4,True,2.845,0.624,6,40
+b0184,TNT,The Grout Piles,21,The Powder House,8,V8,overhang|powerful|pinchy|reachy,6.4,True,1.333,0.859,6,40
+b0185,Shrapnel,The Grout Piles,21,The Powder House,7,V7,overhang|dyno,6.4,True,1.393,0.44,6,40
+b0186,Boom Goes the Dynamite,The Grout Piles,21,The Powder House,9,V9,overhang|dyno|juggy,6.4,False,1.32,0.401,6,40
+b0187,Powder House Traverse,The Grout Piles,21,The Powder House,7,V7,overhang|juggy|slopey|traverse|bunchy,6.4,False,0.831,-0.747,6,40
+b0188,Blasting Cap,The Grout Piles,21,The Powder House,3,V3,mantle|bunchy,6.4,True,2.807,-0.952,6,40
+b0189,Kaboom,The Grout Piles,21,The Powder House,6,V6,overhang|compression|crimpy,6.4,True,2.408,0.32,6,40
+b0190,Detonator,The Grout Piles,21,The Powder House,9,V9,crimpy|mantle,6.4,False,2.269,0.216,6,40
+b0191,Plunger,The Grout Piles,21,The Powder House,7,V7,overhang|powerful|dyno|reachy,6.4,False,1.559,0.785,6,40
+b0192,Powder Keg,The Grout Piles,21,The Powder House,7,V7,overhang|powerful|bunchy,6.4,False,2.237,-0.549,6,40
+b0193,Fire in the Hole,The Grout Piles,21,The Powder House,7,V7,overhang|powerful,6.4,False,3.446,-0.232,6,40
+b0194,Dynamite,The Grout Piles,21,The Powder House,3,V3,overhang|juggy|dyno|reachy,6.4,False,3.214,0.722,6,40
+b0195,Paper Lantern,Millrace Caves,8,The Doorstop,4,V4,slab|crimpy,6.4,False,2.977,0.093,8,64
+b0196,Hold the Door,Millrace Caves,8,The Doorstop,1,V1,slab|crimpy,6.4,False,3.635,0.032,8,64
+b0197,Who's There,Millrace Caves,8,The Doorstop,8,V8,slab|slopey|compression,6.4,False,2.906,-0.038,8,64
+b0198,Doorstop Traverse,Millrace Caves,8,The Doorstop,8,V8,slab|technical|powerful|traverse|bunchy,6.4,True,1.364,-0.679,8,64
+b0199,Foot in the Door,Millrace Caves,8,The Doorstop,4,V4,slab|juggy|bunchy,6.4,False,3.561,-0.876,8,64
+b0200,Knock Knock,Millrace Caves,8,The Doorstop,1,V1,crimpy,6.4,False,3.245,0.373,8,64
+b0201,Draft Dodger,Millrace Caves,8,The Doorstop,0,V0,slab|technical|crimpy|reachy,6.4,False,1.685,0.666,8,64
+b0202,Dune,Millrace Caves,8,The Doorstop,4,V4,slab|slopey|eliminate,6.4,True,3.177,0.114,8,64
+b0203,After School,The Schoolhouse,6,Detention,8,V8,overhang|technical,8.9,True,1.176,-0.483,9,66
+b0204,Note From Home (Slopers Only),The Schoolhouse,6,Detention,6,V6,overhang|slopey|eliminate,8.9,False,0.408,-0.035,9,66
+b0205,Recess,The Schoolhouse,6,Detention,3,V3,overhang|slopey|dyno|powerful|reachy,8.9,False,1.557,0.655,9,66
+b0206,Expelled,The Schoolhouse,6,Detention,10,V10,overhang|slopey|powerful|compression|bunchy,8.9,True,2.159,-0.655,9,66
+b0207,Principal's Office,The Schoolhouse,6,Detention,9,V9,overhang|slopey|dyno|reachy,8.9,False,1.442,1.0,9,66
+b0208,Suspended,The Schoolhouse,6,Detention,9,V9,overhang|slopey|technical,8.9,True,1.999,-0.236,9,66
+b0209,Hall Pass,The Schoolhouse,6,Detention,7,V7,overhang|slopey|pinchy,8.9,False,2.172,0.1,9,66
+b0210,Detention Traverse,The Schoolhouse,6,Detention,11,V11,overhang|pinchy|compression|traverse,8.9,False,0.853,0.118,9,66
+b0211,Spitball,The Schoolhouse,6,Detention,2,V2,overhang|technical|slopey,8.9,False,0.707,0.425,9,66
+b0212,Note From Home,The Schoolhouse,6,Detention,2,V2,overhang|slopey|compression|reachy,8.9,True,1.051,0.662,9,66
+b0213,Recess (No Jugs),The Schoolhouse,6,Detention,4,V4,overhang|slopey|dyno|juggy|eliminate,8.9,False,0.998,0.475,9,66
+b0214,Inkwell,The Schoolhouse,6,The Desk,7,V7,pinchy|crimpy|reachy,5.1,False,1.91,0.623,9,72
+b0215,Gum Underneath,The Schoolhouse,6,The Desk,1,V1,crimpy|juggy,5.1,True,1.727,-0.016,9,72
+b0216,Carved Initials,The Schoolhouse,6,The Desk,7,V7,technical|reachy,5.1,False,2.365,0.795,9,72
+b0217,Out of the Nest,Hawkwatch,8,The Nest,8,V8,slab|technical|mantle|reachy,11.9,False,1.452,0.73,7,51
+b0218,Fledgling,Hawkwatch,8,The Nest,3,V3,dyno,11.9,False,1.947,0.332,7,51
+b0219,Road Trip,Hawkwatch,8,The Nest,1,V1,mantle|traverse,11.9,False,1.968,0.457,7,51
+b0220,Nest Traverse,Hawkwatch,8,The Nest,3,V3,pinchy|mantle|traverse,11.9,False,2.918,-0.163,7,51
+b0221,Last Bell,The Schoolhouse,6,The Belfry,3,V3,crimpy|powerful|highball,17.0,False,3.149,0.077,9,69
+b0222,Bell Curve,The Schoolhouse,6,The Belfry,4,V4,slopey|highball,17.0,False,3.631,-0.355,9,69
+b0223,Sanctuary!,The Schoolhouse,6,The Belfry,3,V3,crimpy|mantle|highball,17.0,False,2.545,0.255,9,69
+b0224,Tintinnabulation,The Schoolhouse,6,The Belfry,1,V1,technical|highball,17.0,True,3.252,0.34,9,69
+b0225,Saved by the Bell,The Schoolhouse,6,The Belfry,7,V7,mantle|compression|highball,17.0,False,3.469,0.179,9,69
+b0226,Vampire Bat,The Schoolhouse,6,The Belfry,8,V8,crimpy|mantle|juggy|highball|bunchy,17.0,False,2.284,-0.697,9,69
+b0227,Sloper Opera,The Schoolhouse,6,The Belfry,5,V5,powerful|eliminate|highball,17.0,False,1.765,-0.308,9,69
+b0228,Clapper (Crimps Only),The Schoolhouse,6,The Belfry,3,V3,crimpy|juggy|eliminate|highball,17.0,True,1.085,0.218,9,69
+b0229,Death Knell,The Schoolhouse,6,The Belfry,10,V10,technical|dyno|highball,17.0,False,3.048,0.349,9,69
+b0230,Crack in the Bell,The Schoolhouse,6,The Belfry,1,V1,technical|highball,17.0,False,3.149,-0.159,9,69
+b0231,Cowbell,The Schoolhouse,6,The Belfry,3,V3,juggy|technical|highball,17.0,True,3.536,-0.163,9,69
+b0232,For Whom the Bell Tolls,The Schoolhouse,6,The Belfry,8,V8,crimpy|juggy|dyno|highball,17.0,False,4.0,0.366,9,69
+b0233,Pavlov's Dog,The Schoolhouse,6,The Belfry,7,V7,crimpy|technical|highball|bunchy,17.0,False,3.123,-0.656,9,69
+b0234,Bats in the Belfry,The Schoolhouse,6,The Belfry,6,V6,crimpy|dyno|highball|reachy,17.0,False,4.0,0.824,9,69
+b0235,Mud Season,The Schoolhouse,6,The Belfry,5,V5,pinchy|eliminate|highball,17.0,False,1.838,-0.075,9,69
+b0236,Belfry Traverse,The Schoolhouse,6,The Belfry,0,V0,crimpy|pinchy|traverse,17.0,False,2.202,-0.313,9,69
+b0237,Smear Campaign,The Schoolhouse,6,The Belfry,10,V10,crimpy|mantle|eliminate|highball,17.0,False,2.41,0.301,9,69
+b0238,Bell Bottoms,The Schoolhouse,6,The Belfry,0,V0,slopey|powerful|highball,17.0,False,2.15,0.488,9,69
+b0239,Hollow Prophet,The Schoolhouse,6,The Belfry,1,V1,crimpy|pinchy|powerful|highball,17.0,False,3.026,0.017,9,69
+b0240,More Cowbell,The Schoolhouse,6,The Belfry,3,V3,crimpy|mantle|highball,17.0,False,2.839,0.323,9,69
+b0241,Ring the Bell,The Schoolhouse,6,The Belfry,2,V2,crimpy|mantle|highball,17.0,False,4.0,-0.208,9,69
+b0242,Carillon,The Schoolhouse,6,The Belfry,3,V3,mantle|highball|reachy,17.0,False,3.141,0.591,9,69
+b0243,Bell Curve (No Heel Hooks),The Schoolhouse,6,The Belfry,7,V7,powerful|eliminate|highball,17.0,False,1.895,0.472,9,69
+b0244,Rafters,The Schoolhouse,6,The Belfry,6,V6,juggy|highball,17.0,False,2.368,-0.179,9,69
+b0245,Dinner Bell,The Schoolhouse,6,The Belfry,3,V3,crimpy|mantle|highball,17.0,False,2.213,-0.052,9,69
+b0246,The Final Bell,The Schoolhouse,6,The Belfry,12,V12,crimpy|slopey|highball,17.0,False,1.902,0.382,9,69
+b0247,Morning Bell,The Schoolhouse,6,The Belfry,3,V3,crimpy|highball,17.0,True,3.572,-0.218,9,69
+b0248,Wuthering Heights,The Schoolhouse,6,The Belfry,6,V6,crimpy|pinchy|eliminate|highball|reachy,17.0,True,3.789,0.632,9,69
+b0249,Quasimodo,The Schoolhouse,6,The Belfry,5,V5,juggy|highball|bunchy,17.0,False,3.625,-0.703,9,69
+b0250,Belltower Ghost,The Schoolhouse,6,The Belfry,9,V9,slopey|pinchy|highball|reachy,17.0,False,1.663,0.558,9,69
+b0251,Tolling,The Schoolhouse,6,The Belfry,9,V9,crimpy|highball,17.0,False,3.633,-0.158,9,69
+b0252,Ring Finger,The Schoolhouse,6,The Belfry,2,V2,technical|crimpy|highball,17.0,False,2.925,0.002,9,69
+b0253,Jell-O Mold,The Schoolhouse,6,The Belfry,1,V1,crimpy|dyno|eliminate|highball,17.0,False,2.754,-0.031,9,69
+b0254,Rope Pull,The Schoolhouse,6,The Belfry,0,V0,crimpy|powerful|highball,17.0,False,2.394,-0.122,9,69
+b0255,Clapper,The Schoolhouse,6,The Belfry,2,V2,crimpy|compression|highball,17.0,False,3.203,-0.092,9,69
+b0256,Echolocation,The Schoolhouse,6,The Belfry,1,V1,crimpy|compression|highball,17.0,False,2.354,0.108,9,69
+b0257,Semicolon,The Grout Piles,21,The Reject,4,V4,slab|slopey|crimpy|eliminate,6.7,True,0.0,0.498,6,39
+b0258,Forge,The Grout Piles,21,The Anvil,2,V2,crimpy|slopey|dyno|reachy,8.9,False,2.682,1.0,6,37
+b0259,Quench,The Grout Piles,21,The Anvil,2,V2,crimpy|compression|bunchy,8.9,False,1.77,-0.532,6,37
+b0260,Hammer Time,The Grout Piles,21,The Anvil,8,V8,pinchy,8.9,False,3.256,0.33,6,37
+b0261,Blacksmith,The Grout Piles,21,The Anvil,8,V8,crimpy|powerful,8.9,False,0.849,-0.311,6,37
+b0262,Temper Tantrum,The Grout Piles,21,The Anvil,4,V4,juggy|bunchy,8.9,False,2.385,-0.528,6,37
+b0263,Wrought Iron,The Grout Piles,21,The Anvil,7,V7,crimpy|mantle,8.9,True,2.929,-0.396,6,37
+b0264,Hammer and Anvil,The Grout Piles,21,The Anvil,0,V0,crimpy|mantle|dyno,8.9,True,3.476,0.18,6,37
+b0265,Horseshoe,The Grout Piles,21,The Anvil,2,V2,mantle,8.9,False,3.695,-0.259,6,37
+b0266,Strike While It's Hot,The Grout Piles,21,The Anvil,5,V5,pinchy|crimpy,8.9,False,3.097,-0.243,6,37
+b0267,Tongs,The Grout Piles,21,The Anvil,4,V4,crimpy|pinchy|powerful|bunchy,8.9,False,2.549,-0.629,6,37
+b0268,Iron Will,The Grout Piles,21,The Anvil,8,V8,crimpy|pinchy|bunchy,8.9,True,1.532,-1.0,6,37
+b0269,Smithy,The Grout Piles,21,The Anvil,7,V7,crimpy|powerful|dyno|reachy,8.9,False,1.553,0.771,6,37
+b0270,Epitaph,The Grout Piles,21,The Monument,6,V6,pinchy|slopey|highball,17.2,True,3.491,0.18,6,38
+b0271,Plinth (No Jugs),The Grout Piles,21,The Monument,4,V4,dyno|juggy|eliminate|highball,17.2,False,2.823,0.416,6,38
+b0272,Look On My Works,The Grout Piles,21,The Monument,7,V7,crimpy|highball,17.2,False,4.0,0.018,6,38
+b0273,Here Lies,The Grout Piles,21,The Monument,1,V1,mantle|highball,17.2,False,3.205,0.292,6,38
+b0274,Cornerstone,The Grout Piles,21,The Monument,5,V5,dyno|pinchy|highball|reachy,17.2,False,2.726,1.0,6,38
+b0275,Plinth,The Grout Piles,21,The Monument,0,V0,crimpy|highball|bunchy,17.2,False,2.432,-0.811,6,38
+b0276,Ozymandias,The Grout Piles,21,The Monument,9,V9,mantle|pinchy|highball,17.2,True,2.825,-0.076,6,38
+b0277,Rest in Pieces,The Grout Piles,21,The Monument,5,V5,powerful|crimpy|highball|bunchy,17.2,True,2.991,-0.84,6,38
+b0278,Here Lies (Static),The Grout Piles,21,The Monument,1,V1,compression|dyno|eliminate|highball,17.2,True,2.544,-0.122,6,38
+b0279,In Loving Memory,The Grout Piles,21,The Monument,5,V5,crimpy|dyno|highball,17.2,False,3.04,0.335,6,38
+b0280,Obelisk,The Grout Piles,21,The Monument,3,V3,crimpy|technical|highball,17.2,True,4.0,0.446,6,38
+b0281,Granite State,The Grout Piles,21,The Monument,3,V3,dyno|crimpy|highball|reachy,17.2,False,2.76,0.752,6,38
+b0282,Toothbrush Beta,Bracken Gully,16,Mossback,9,V9,crimpy|technical|dyno|reachy,11.3,False,2.158,0.76,2,14
+b0283,Green Thumb,Bracken Gully,16,Mossback,1,V1,crimpy|pinchy|reachy,11.3,False,1.184,0.591,2,14
+b0284,Moss Boss,Bracken Gully,16,Mossback,0,V0,crimpy|mantle,11.3,False,2.862,0.119,2,14
+b0285,Tardigrade,Bracken Gully,16,Mossback,12,V12,crimpy,11.3,True,1.0,-0.067,2,14
+b0286,Sphagnum,Bracken Gully,16,Mossback,0,V0,crimpy|slopey|juggy,11.3,False,1.877,-0.159,2,14
+b0287,Moss Graffiti,Bracken Gully,16,Mossback,9,V9,crimpy|mantle,11.3,False,1.424,-0.168,2,14
+b0288,Wire Brush,Bracken Gully,16,Mossback,0,V0,slopey|bunchy,11.3,False,2.812,-1.0,2,14
+b0289,Moss Piglet Sit,Bracken Gully,16,Mossback,1,V1,dyno|technical|reachy,11.3,True,2.623,0.784,2,14
+b0290,Moss Piglet,Bracken Gully,16,Mossback,1,V1,crimpy|mantle|technical,11.3,False,3.238,0.241,2,14
+b0291,A Rolling Stone Gathers No Moss,Bracken Gully,16,Mossback,9,V9,juggy|crimpy,11.3,False,3.305,0.398,2,14
+b0292,Green Thumb (No Lip),Bracken Gully,16,Mossback,1,V1,crimpy|mantle|eliminate,11.3,False,0.151,0.181,2,14
+b0293,Peat,Bracken Gully,16,Mossback,4,V4,crimpy|mantle|slopey,11.3,True,2.095,0.118,2,14
+b0294,Clean Freak,Bracken Gully,16,Mossback,3,V3,crimpy,11.3,True,2.469,-0.288,2,14
+b0295,Exact Change,The Tailgate,1,The Tollbooth,1,V1,technical|juggy,10.7,False,2.211,-0.357,5,35
+b0296,Phantom Pancake,The Tailgate,1,The Tollbooth,10,V10,slab|technical,10.7,False,1.984,0.254,5,35
+b0297,Toll Road,The Tailgate,1,The Tollbooth,1,V1,slab|slopey|bunchy,10.7,False,1.778,-0.594,5,35
+b0298,Fast Lane,The Tailgate,1,The Tollbooth,4,V4,slopey|technical|reachy,10.7,False,2.31,0.61,5,35
+b0299,Gentleman's Agreement,The Tailgate,1,The Tollbooth,3,V3,slab|pinchy|mantle|eliminate|reachy,10.7,False,1.614,0.817,5,35
+b0300,Troglodyte,Millrace Caves,8,The Grotto,6,V6,overhang|powerful|bunchy,9.1,True,3.008,-0.684,8,61
+b0301,Don't Look Back,Millrace Caves,8,The Grotto,11,V11,overhang|crimpy|slopey,9.1,False,3.81,-0.253,8,61
+b0302,Lantern Light,Millrace Caves,8,The Grotto,3,V3,overhang|powerful,9.1,False,2.822,-0.239,8,61
+b0303,Moonmilk,Millrace Caves,8,The Grotto,2,V2,overhang|crimpy|pinchy|compression,9.1,False,1.658,0.087,8,61
+b0304,"Red Light, Green Light",Millrace Caves,8,The Grotto,8,V8,overhang|technical|eliminate,9.1,True,2.858,-0.065,8,61
+b0305,Shadow Puppets,Millrace Caves,8,The Grotto,5,V5,overhang|pinchy,9.1,False,3.359,-0.32,8,61
+b0306,Cave Painting,Millrace Caves,8,The Grotto,5,V5,overhang|crimpy|slopey|pinchy,9.1,False,2.322,0.055,8,61
+b0307,Styx,Millrace Caves,8,The Grotto,7,V7,overhang|powerful,9.1,True,1.172,-0.134,8,61
+b0308,Shadow Puppets (No Heel Hooks),Millrace Caves,8,The Grotto,6,V6,overhang|crimpy|compression|powerful|eliminate,9.1,False,1.157,0.012,8,61
+b0309,Polished Butter,Millrace Caves,8,The Grotto,1,V1,overhang|crimpy|juggy|traverse,9.1,False,2.644,-0.174,8,61
+b0310,Flowstone,Millrace Caves,8,The Grotto,3,V3,overhang|crimpy|slopey|reachy,9.1,False,2.76,1.0,8,61
+b0311,Stalactite,Millrace Caves,8,The Grotto,4,V4,overhang|crimpy|technical|bunchy,9.1,False,3.494,-0.85,8,61
+b0312,Electric Weasel Eliminate,Millrace Caves,8,The Grotto,8,V8,overhang|crimpy|pinchy|juggy|eliminate,9.1,False,1.411,-0.131,8,61
+b0313,Plato's Cave,Millrace Caves,8,The Grotto,8,V8,crimpy|pinchy|juggy|reachy,9.1,False,3.94,0.911,8,61
+b0314,Dripstone,Millrace Caves,8,The Grotto,7,V7,overhang|dyno,9.1,False,2.781,0.139,8,61
+b0315,Grotto Traverse,Millrace Caves,8,The Grotto,13,V13,overhang|pinchy|dyno|traverse|eliminate,9.1,False,1.195,0.295,8,61
+b0316,Spelunker,Millrace Caves,8,The Grotto,4,V4,overhang|dyno|crimpy|reachy,9.1,False,3.375,0.621,8,61
+b0317,Firelight,Millrace Caves,8,The Grotto,1,V1,overhang|crimpy|compression,9.1,False,1.957,-0.458,8,61
+b0318,Headlamp,Millrace Caves,8,The Grotto,7,V7,overhang|crimpy|powerful,9.1,False,2.736,0.476,8,61
+b0319,Honor System,Millrace Caves,8,The Grotto,13,V13,overhang|mantle|eliminate,9.1,True,2.571,-0.325,8,61
+b0320,Lantern Light Sit,Millrace Caves,8,The Grotto,4,V4,overhang|crimpy|mantle,9.1,True,2.158,-0.079,8,61
+b0321,Echo Chamber,Millrace Caves,8,The Grotto,7,V7,overhang|pinchy|powerful,9.1,True,3.108,0.213,8,61
+b0322,Orpheus,Millrace Caves,8,The Grotto,10,V10,crimpy|dyno|reachy,9.1,False,2.523,0.597,8,61
+b0323,Destroying Angel,Bracken Gully,16,The Toadstool,10,V10,slopey|juggy|technical,14.3,False,1.293,-0.241,2,11
+b0324,Gills,Bracken Gully,16,The Toadstool,7,V7,crimpy,14.3,False,0.671,0.408,2,11
+b0325,Fun Guy,Bracken Gully,16,The Toadstool,2,V2,slopey,14.3,False,1.74,-0.085,2,11
+b0326,Button Mushroom,Bracken Gully,16,The Toadstool,3,V3,technical,14.3,True,3.338,0.403,2,11
+b0327,Puffball,Bracken Gully,16,The Toadstool,5,V5,pinchy|technical|bunchy,14.3,False,2.206,-0.923,2,11
+b0328,Mycelium,Bracken Gully,16,The Toadstool,5,V5,slopey|reachy,14.3,False,1.598,0.506,2,11
+b0329,The Morel of the Story,Bracken Gully,16,The Toadstool,1,V1,pinchy|slopey|reachy,14.3,False,2.187,0.542,2,11
+b0330,Fairy Ring,Bracken Gully,16,The Toadstool,8,V8,slopey|reachy,14.3,False,2.373,0.572,2,11
+b0331,Death Cap,Bracken Gully,16,The Toadstool,12,V12,slopey|juggy,14.3,False,2.344,0.094,2,11
+b0332,Chanterelle,Bracken Gully,16,The Toadstool,6,V6,slopey,14.3,False,1.62,-0.157,2,11
+b0333,Spore Print,Bracken Gully,16,The Toadstool,1,V1,slopey|mantle,14.3,False,1.472,0.139,2,11
+b0334,Life Jacket,The Spillway,16,The Buoy,2,V2,crimpy,11.2,False,2.232,-0.099,1,6
+b0335,Doggy Paddle,The Spillway,16,The Buoy,3,V3,crimpy|mantle,11.2,True,1.435,-0.143,1,6
+b0336,Bobber,The Spillway,16,The Buoy,0,V0,crimpy|mantle|bunchy,11.2,False,2.464,-0.736,1,6
+b0337,Floatie,The Spillway,16,The Buoy,3,V3,dyno|technical|reachy,11.2,False,0.701,1.0,1,6
+b0338,Stump Speech,Bracken Gully,16,The Stump,2,V2,roof|powerful,6.8,True,1.607,-0.219,2,10
+b0339,Turnip,The Cellar Holes,18,The Root Cellar,7,V7,overhang|slopey|powerful|dyno|reachy,5.0,False,1.899,0.878,4,24
+b0340,Beet It,The Cellar Holes,18,The Root Cellar,4,V4,overhang|mantle|slopey,5.0,False,1.415,-0.439,4,24
+b0341,Pickled,The Cellar Holes,18,The Root Cellar,1,V1,overhang|slopey|juggy|bunchy,5.0,False,2.108,-0.614,4,24
+b0342,Canned Goods,The Cellar Holes,18,The Root Cellar,1,V1,overhang|technical|slopey,5.0,False,2.167,0.09,4,24
+b0343,Root Vegetables,The Cellar Holes,18,The Root Cellar,5,V5,overhang|slopey,5.0,False,3.234,-0.323,4,24
+b0344,Pickled (No Feet),The Cellar Holes,18,The Root Cellar,6,V6,overhang|slopey|mantle|compression|eliminate,5.0,True,1.552,0.449,4,24
+b0345,Mason Jar,The Cellar Holes,18,The Root Cellar,6,V6,overhang|mantle,5.0,False,1.157,0.14,4,24
+b0346,Down in the Hole,The Cellar Holes,18,The Root Cellar,13,V13,overhang|slopey|compression|bunchy,5.0,False,2.308,-1.0,4,24
+b0347,Death Grip,Hawkwatch,8,The Perch,13,V13,overhang|powerful,5.0,False,2.351,0.08,7,57
+b0348,Perched,Hawkwatch,8,The Perch,6,V6,pinchy|powerful,5.0,False,2.505,0.035,7,57
+b0349,Karma Police,Hawkwatch,8,The Perch,5,V5,overhang|juggy|mantle|traverse|eliminate,5.0,False,0.575,0.278,7,57
+b0350,Pigeon Toed,Hawkwatch,8,The Perch,1,V1,overhang|juggy,5.0,False,2.521,-0.2,7,57
+b0351,Perch Traverse,Hawkwatch,8,The Perch,4,V4,overhang|powerful|traverse,5.0,False,1.129,0.016,7,57
+b0352,Bottomless,The Cellar Holes,18,The Well,3,V3,dyno|compression,12.6,False,2.191,-0.104,4,26
+b0353,Wishing Well,The Cellar Holes,18,The Well,6,V6,technical,12.6,False,2.656,0.012,4,26
+b0354,Curbside,The Tailgate,1,The Dumpster,8,V8,compression,9.1,False,1.054,-0.4,5,31
+b0355,Trash Panda,The Tailgate,1,The Dumpster,8,V8,dyno|reachy,9.1,False,1.25,0.609,5,31
+b0356,Smells Like Sendin',The Tailgate,1,The Dumpster,5,V5,pinchy|juggy|bunchy,9.1,False,0.192,-1.0,5,31
+b0357,Lid Lifter,The Tailgate,1,The Dumpster,6,V6,compression|bunchy,9.1,False,0.874,-0.592,5,31
+b0358,Dumpster Traverse,The Tailgate,1,The Dumpster,1,V1,juggy|pinchy|traverse|bunchy,9.1,True,0.917,-0.699,5,31
+b0359,Recycling Day,The Tailgate,1,The Dumpster,2,V2,mantle,9.1,False,1.698,0.192,5,31
+b0360,Waste Management,The Tailgate,1,The Dumpster,12,V12,dyno|reachy,9.1,False,1.371,0.735,5,31
+b0361,Dumpster Diving,The Tailgate,1,The Dumpster,1,V1,mantle|juggy,9.1,False,2.121,0.436,5,31
+b0362,Kitty Litter,The Tailgate,1,The Dumpster,0,V0,technical,9.1,False,0.648,-0.142,5,31
+b0363,Side Hustle,The Tailgate,1,The Dumpster,1,V1,juggy|technical|traverse,9.1,False,0.606,0.119,5,31
+b0364,Corn on the Cob,Back Forty,24,The Scarecrow,3,V3,slab|crimpy|mantle|technical|highball|bunchy,16.6,False,3.745,-0.7,0,1
+b0365,Field of Dreams,Back Forty,24,The Scarecrow,8,V8,slab|technical|juggy|highball,16.6,False,1.611,0.484,0,1
+b0366,Children of the Corn,Back Forty,24,The Scarecrow,12,V12,slab|technical|crimpy|highball,16.6,False,1.277,-0.148,0,1
+b0367,If I Only Had a Brain,Back Forty,24,The Scarecrow,6,V6,crimpy|mantle|highball,16.6,False,2.55,0.316,0,1
+b0368,Stalk,Back Forty,24,The Scarecrow,4,V4,slab|crimpy|dyno|highball,16.6,False,1.419,-0.046,0,1
+b0369,Scarecrow Traverse,Back Forty,24,The Scarecrow,5,V5,crimpy|technical|traverse,16.6,True,2.765,0.419,0,1
+b0370,Headless Horseman,Back Forty,24,The Scarecrow,7,V7,slab|crimpy|highball,16.6,False,2.288,0.333,0,1
+b0371,Harvest Moon,Back Forty,24,The Scarecrow,2,V2,slab|crimpy|technical|highball,16.6,False,1.996,-0.486,0,1
+b0372,The Long Way Round,Back Forty,24,The Scarecrow,1,V1,slab|crimpy|slopey|traverse,16.6,True,1.148,0.035,0,1
+b0373,The Long Night,Back Forty,24,The Scarecrow,10,V10,crimpy|technical|mantle|highball|bunchy,16.6,True,1.419,-0.797,0,1
+b0374,Hayride,Back Forty,24,The Scarecrow,0,V0,slab|crimpy|pinchy|highball,16.6,True,2.772,-0.016,0,1
+b0375,Murder of Crows,Back Forty,24,The Scarecrow,0,V0,slab|crimpy|highball,16.6,True,1.899,0.28,0,1
+b0376,Circumnavigation,Back Forty,24,The Scarecrow,2,V2,slab|crimpy|traverse,16.6,True,2.268,0.072,0,1
+b0377,Straw Man,Back Forty,24,The Scarecrow,0,V0,slab|technical|mantle|highball|reachy,16.6,False,2.214,0.525,0,1
+b0378,Corn Maze,Back Forty,24,The Scarecrow,3,V3,slab|crimpy|mantle|highball,16.6,False,2.109,0.127,0,1
+b0379,Crow Bait,Back Forty,24,The Scarecrow,2,V2,slab|crimpy|powerful|mantle|highball,16.6,False,2.113,0.384,0,1
+b0380,Ichabod,Back Forty,24,The Scarecrow,1,V1,slab|crimpy|highball|reachy,16.6,True,1.47,0.701,0,1
+b0381,Pressure Gauge,The Spillway,16,The Retaining Wall,3,V3,crimpy|mantle|bunchy,12.0,False,1.718,-0.793,1,8
+b0382,Load Limit Exceeded,The Spillway,16,The Retaining Wall,10,V10,slab|crimpy|technical,12.0,False,1.344,0.388,1,8
+b0383,The Contrivance,The Spillway,16,The Retaining Wall,3,V3,slab|crimpy|technical|mantle|eliminate,12.0,False,0.0,0.062,1,8
+b0384,Wet Cement (Crimps Only),The Spillway,16,The Retaining Wall,6,V6,slab|crimpy|technical|eliminate,12.0,True,1.97,-0.019,1,8
+b0385,Stress Test,The Spillway,16,The Retaining Wall,5,V5,slab|compression|reachy,12.0,False,1.763,0.608,1,8
+b0386,Hopscotch,The Spillway,16,The Retaining Wall,0,V0,slab|crimpy|technical|pinchy,12.0,False,3.183,0.081,1,8
+b0387,Wet Cement,The Spillway,16,The Retaining Wall,3,V3,slab|crimpy|slopey|dyno|reachy,12.0,False,2.264,0.72,1,8
+b0388,Water Table,The Spillway,16,The Retaining Wall,5,V5,slab|crimpy|technical|slopey,12.0,False,1.378,-0.103,1,8
+b0389,Weep Hole,The Spillway,16,The Retaining Wall,6,V6,slab|crimpy|technical,12.0,False,1.488,0.218,1,8
+b0390,Sidewalk Chalk,The Spillway,16,The Retaining Wall,3,V3,slab|crimpy|technical|slopey,12.0,False,2.889,-0.351,1,8
+b0391,Formwork,The Spillway,16,The Retaining Wall,0,V0,slab|crimpy,12.0,False,2.31,-0.058,1,8
+b0392,Structural Integrity,The Spillway,16,The Retaining Wall,1,V1,slab|crimpy|dyno|slopey,12.0,False,1.804,0.17,1,8
+b0393,Spalling,The Spillway,16,The Retaining Wall,8,V8,crimpy|slopey|technical,12.0,False,1.78,-0.302,1,8
+b0394,Rebar,The Spillway,16,The Retaining Wall,0,V0,crimpy|technical|reachy,12.0,False,2.403,0.607,1,8
+b0395,Crack in the Dam,The Spillway,16,The Retaining Wall,0,V0,slab|crimpy|technical|mantle,12.0,False,1.909,0.104,1,8
+b0396,Expansion Joint,The Spillway,16,The Retaining Wall,0,V0,juggy,12.0,True,2.046,-0.367,1,8
+b0397,The Great Wall,The Spillway,16,The Retaining Wall,0,V0,slab|technical,12.0,False,0.956,-0.002,1,8
+b0398,Concrete Jungle,The Spillway,16,The Retaining Wall,9,V9,slab|crimpy|mantle,12.0,False,2.572,-0.121,1,8
+b0399,Condemned,The Spillway,16,The Retaining Wall,10,V10,slab|crimpy|slopey|powerful,12.0,True,2.183,-0.081,1,8
+b0400,Nitpick,The Spillway,16,The Retaining Wall,2,V2,slab|crimpy|technical|eliminate,12.0,False,1.56,0.123,1,8
+b0401,Twister,The Spillway,16,The Retaining Wall,2,V2,slab|technical|powerful|eliminate,12.0,False,0.768,-0.288,1,8
+b0402,Finger in the Dike,The Spillway,16,The Retaining Wall,5,V5,slab|crimpy|pinchy|slopey|reachy,12.0,False,3.063,0.923,1,8
+b0403,Another Brick,The Spillway,16,The Retaining Wall,1,V1,slab|crimpy,12.0,True,1.3,-0.135,1,8
+b0404,Little Dutch Boy,The Spillway,16,The Retaining Wall,0,V0,slab|technical|pinchy|reachy,12.0,False,2.838,0.56,1,8
+b0405,Load Bearing,The Spillway,16,The Retaining Wall,0,V0,slab|crimpy|technical|mantle|reachy,12.0,False,1.884,0.884,1,8
+b0406,Inspection Due,The Spillway,16,The Retaining Wall,4,V4,slab|crimpy|mantle|reachy,12.0,False,1.642,0.971,1,8
+b0407,Mud Pie,The Schoolhouse,6,The Sandbox,4,V4,slopey|crimpy,6.4,False,2.56,-0.126,9,68
+b0408,Sand Castle,The Schoolhouse,6,The Sandbox,3,V3,slopey|technical|crimpy,6.4,False,1.843,0.04,9,68
+b0409,Buried Treasure,The Schoolhouse,6,The Sandbox,4,V4,slopey|juggy,6.4,False,1.784,-0.342,9,68
+b0410,Shovel and Pail,The Schoolhouse,6,The Sandbox,1,V1,slopey|mantle|compression|bunchy,6.4,True,1.156,-0.57,9,68
+b0411,Sandbox Traverse,The Schoolhouse,6,The Sandbox,4,V4,crimpy|mantle|traverse|reachy,6.4,False,1.239,0.56,9,68
+b0412,Leftovers,The Grout Piles,21,The Offcut,1,V1,slab|crimpy,11.1,True,3.466,-0.258,6,44
+b0413,Dress Code,The Grout Piles,21,The Offcut,3,V3,slab|mantle|juggy|eliminate,11.1,True,0.957,0.01,6,44
+b0414,Chips,The Grout Piles,21,The Offcut,0,V0,slab|technical|bunchy,11.1,False,1.57,-1.0,6,44
+b0415,Scrap,The Grout Piles,21,The Offcut,6,V6,slab|mantle|technical,11.1,False,0.962,-0.418,6,44
+b0416,Scenic View Sit,Hawkwatch,8,The Lookout,3,V3,slopey|crimpy|compression,15.2,True,1.758,0.263,7,53
+b0417,Photo Op,Hawkwatch,8,The Lookout,3,V3,slopey|pinchy|reachy,15.2,False,2.27,0.525,7,53
+b0418,Land Ho,Hawkwatch,8,The Lookout,8,V8,crimpy|technical,15.2,False,1.586,0.238,7,53
+b0419,Telescope (Crimps Only),Hawkwatch,8,The Lookout,3,V3,juggy|crimpy|eliminate,15.2,False,0.0,-0.266,7,53
+b0420,Bird's-Eye View,Hawkwatch,8,The Lookout,9,V9,crimpy|pinchy,15.2,False,0.293,0.261,7,53
+b0421,Quarter for the Binoculars,Hawkwatch,8,The Lookout,7,V7,crimpy,15.2,False,2.784,-0.254,7,53
+b0422,Telescope,Hawkwatch,8,The Lookout,0,V0,crimpy|bunchy,15.2,False,2.133,-0.647,7,53
+b0423,Far Horizon,Hawkwatch,8,The Lookout,5,V5,slopey|pinchy|mantle,15.2,True,1.692,0.05,7,53
+b0424,Panorama,Hawkwatch,8,The Lookout,2,V2,slopey|crimpy,15.2,True,0.849,0.03,7,53
+b0425,Sightline,Hawkwatch,8,The Lookout,6,V6,slopey|pinchy,15.2,True,0.299,-0.12,7,53
+b0426,TBD,Hawkwatch,8,The Lookout,8,V8,slopey|pinchy|reachy,15.2,True,0.121,0.856,7,53
+b0427,Panorama (Crimps Only),Hawkwatch,8,The Lookout,2,V2,crimpy|technical|eliminate,15.2,False,0.253,0.276,7,53
+b0428,Vista,Hawkwatch,8,The Lookout,0,V0,slopey|dyno,15.2,True,1.118,-0.158,7,53
+b0429,Crow's Nest,Hawkwatch,8,The Lookout,3,V3,pinchy,15.2,False,1.57,0.091,7,53
+b0430,Scenic View,Hawkwatch,8,The Lookout,3,V3,crimpy,15.2,False,2.601,0.154,7,53
+b0431,Master Carver,The Grout Piles,21,The Stonecutters,12,V12,roof|crimpy|juggy,7.3,True,1.641,-0.31,6,45
+b0432,Granite Dust,The Grout Piles,21,The Stonecutters,3,V3,roof|crimpy|slopey,7.3,True,2.545,0.21,6,45
+b0433,Polenta,The Grout Piles,21,The Stonecutters,7,V7,roof|crimpy|powerful|dyno,7.3,False,1.266,-0.031,6,45
+b0434,Stonecutter's Lunch,The Grout Piles,21,The Stonecutters,4,V4,crimpy|compression|bunchy,7.3,False,1.399,-0.523,6,45
+b0435,Haggis,The Grout Piles,21,The Stonecutters,4,V4,crimpy|juggy|pinchy,7.3,True,1.252,-0.228,6,45
+b0436,Chisel,The Grout Piles,21,The Stonecutters,1,V1,compression,7.3,True,1.965,-0.097,6,45
+b0437,Plug and Feathers,The Grout Piles,21,The Stonecutters,2,V2,roof|crimpy|powerful,7.3,False,2.294,-0.133,6,45
+b0438,Sad Trombone,The Grout Piles,21,The Stonecutters,4,V4,roof|pinchy|slopey,7.3,True,0.438,0.314,6,45
+b0439,Placeholder,The Grout Piles,21,The Stonecutters,2,V2,juggy,7.3,True,0.318,-0.495,6,45
+b0440,Aberdeen,The Grout Piles,21,The Stonecutters,6,V6,roof|powerful|bunchy,7.3,False,2.214,-0.566,6,45
+b0441,Carrara,The Grout Piles,21,The Stonecutters,8,V8,crimpy|dyno|juggy|reachy,7.3,False,2.273,0.567,6,45
+b0442,Girdle,The Grout Piles,21,The Stonecutters,3,V3,crimpy|dyno|compression|traverse,7.3,False,1.409,0.494,6,45
+b0443,Mallet,The Grout Piles,21,The Stonecutters,4,V4,roof|dyno|reachy,7.3,True,1.866,0.607,6,45
+b0444,Stonecutters Traverse,The Grout Piles,21,The Stonecutters,9,V9,crimpy|pinchy|juggy|traverse,7.3,True,1.671,0.188,6,45
+b0445,Pitching Tool,The Grout Piles,21,The Stonecutters,1,V1,roof|crimpy|pinchy|slopey,7.3,False,1.488,0.451,6,45
+b0446,Piecework,Millrace Caves,8,The Engine Room,5,V5,overhang|powerful|bunchy,8.4,True,2.372,-0.943,8,59
+b0447,Spinning Jenny,Millrace Caves,8,The Engine Room,4,V4,overhang|powerful|compression,8.4,True,1.957,0.02,8,59
+b0448,Industrial Accident,Millrace Caves,8,The Engine Room,13,V13,overhang|compression,8.4,False,0.877,-0.372,8,59
+b0449,Modern Times (Slopers Only),Millrace Caves,8,The Engine Room,10,V10,overhang|pinchy|slopey|eliminate,8.4,True,1.083,-0.259,8,59
+b0450,Union Rules,Millrace Caves,8,The Engine Room,10,V10,overhang|juggy|pinchy|reachy,8.4,True,2.081,0.662,8,59
+b0451,Approach Shoes,Millrace Caves,8,The Engine Room,8,V8,overhang|juggy|traverse,8.4,True,0.08,-0.45,8,59
+b0452,Paperwork,Millrace Caves,8,The Engine Room,4,V4,overhang|pinchy|compression|eliminate,8.4,False,0.33,-0.178,8,59
+b0453,Rust Never Sleeps,Millrace Caves,8,The Engine Room,5,V5,overhang|compression|dyno,8.4,False,1.2,-0.093,8,59
+b0454,Shift Change Sit,Millrace Caves,8,The Engine Room,2,V2,crimpy|pinchy|juggy|bunchy,8.4,True,1.248,-0.655,8,59
+b0455,Gearbox,Millrace Caves,8,The Engine Room,6,V6,overhang|crimpy|slopey|bunchy,8.4,False,2.478,-0.854,8,59
+b0456,Luddite,Millrace Caves,8,The Engine Room,9,V9,overhang|crimpy|dyno,8.4,True,1.787,-0.057,8,59
+b0457,"Lockout, Tagout",Millrace Caves,8,The Engine Room,8,V8,overhang|powerful,8.4,True,0.977,0.025,8,59
+b0458,Ghost in the Machine,Millrace Caves,8,The Engine Room,4,V4,overhang|crimpy|compression,8.4,False,2.727,0.156,8,59
+b0459,Foreman,Millrace Caves,8,The Engine Room,10,V10,overhang|dyno|slopey,8.4,True,1.109,0.306,8,59
+b0460,Do Not Touch,Millrace Caves,8,The Engine Room,1,V1,overhang|powerful|eliminate,8.4,True,0.249,-0.176,8,59
+b0461,Graveyard Shift,Millrace Caves,8,The Engine Room,4,V4,overhang|pinchy,8.4,True,2.33,-0.161,8,59
+b0462,Town Meeting,Millrace Caves,8,The Engine Room,6,V6,overhang|crimpy|compression|powerful|traverse|bunchy,8.4,True,0.786,-0.796,8,59
+b0463,The Machine Stops,Millrace Caves,8,The Engine Room,11,V11,slopey|compression,8.4,False,2.375,0.252,8,59
+b0464,Coffee Break,Millrace Caves,8,The Engine Room,0,V0,overhang|powerful|mantle|reachy,8.4,False,2.307,0.537,8,59
+b0465,Whistle Stop,Millrace Caves,8,The Engine Room,1,V1,overhang|juggy|compression|bunchy,8.4,True,2.228,-0.915,8,59
+b0466,Hard Hat (Pinches Only),Millrace Caves,8,The Engine Room,5,V5,overhang|pinchy|eliminate|bunchy,8.4,False,1.088,-0.593,8,59
+b0467,Assembly Line,Millrace Caves,8,The Engine Room,5,V5,overhang|crimpy|compression,8.4,False,2.387,-0.34,8,59
+b0468,Heavy Machinery,Millrace Caves,8,The Engine Room,13,V13,overhang|crimpy,8.4,False,0.456,0.081,8,59
+b0469,Grammar Police,Millrace Caves,8,The Engine Room,6,V6,overhang|crimpy|juggy|eliminate,8.4,False,0.569,-0.296,8,59
+b0470,Pinch Me,Millrace Caves,8,The Engine Room,9,V9,overhang|slopey|traverse|eliminate,8.4,False,0.0,-0.112,8,59
+b0471,Punch Clock,Millrace Caves,8,The Engine Room,11,V11,overhang|crimpy,8.4,False,2.223,0.411,8,59
+b0472,Shift Change (Pinches Only),Millrace Caves,8,The Engine Room,8,V8,overhang|crimpy|pinchy|eliminate|reachy,8.4,False,1.417,0.682,8,59
+b0473,Night Shift,Millrace Caves,8,The Engine Room,6,V6,dyno|pinchy|reachy,8.4,True,2.357,0.824,8,59
+b0474,Oxford Comma,Millrace Caves,8,The Engine Room,1,V1,overhang|juggy|crimpy|eliminate|reachy,8.4,False,2.031,0.521,8,59
+b0475,Engine Room Traverse,Millrace Caves,8,The Engine Room,2,V2,overhang|crimpy|compression|dyno|traverse,8.4,False,1.984,0.458,8,59
+b0476,Flywheel,Millrace Caves,8,The Engine Room,9,V9,overhang|compression|powerful,8.4,False,2.601,0.262,8,59
+b0477,Smokestack (Crimps Only),Millrace Caves,8,The Engine Room,5,V5,crimpy|juggy|eliminate,8.4,False,1.07,-0.399,8,59
+b0478,Deus ex Machina,Millrace Caves,8,The Engine Room,6,V6,overhang|crimpy|slopey|pinchy|reachy,8.4,False,1.583,0.701,8,59
+b0479,Pistons,Millrace Caves,8,The Engine Room,0,V0,overhang|compression|slopey,8.4,False,1.658,-0.28,8,59
+b0480,Should I Stay or Should I Go,Millrace Caves,8,The Engine Room,6,V6,overhang|crimpy|powerful|traverse|eliminate,8.4,False,0.544,0.036,8,59
+b0481,Drive Shaft,Millrace Caves,8,The Engine Room,5,V5,overhang|dyno|compression|reachy,8.4,True,1.644,0.638,8,59
+b0482,Pressure Valve,Millrace Caves,8,The Engine Room,5,V5,crimpy|slopey|bunchy,8.4,True,1.773,-0.966,8,59
+b0483,Midnight Pilgrim Eliminate Sit,Millrace Caves,8,The Engine Room,9,V9,overhang|dyno|powerful|eliminate,8.4,True,0.179,0.431,8,59
+b0484,Steam Whistle,Millrace Caves,8,The Engine Room,5,V5,overhang|powerful|compression,8.4,True,2.424,-0.049,8,59
+b0485,Safety Third,Millrace Caves,8,The Engine Room,5,V5,overhang|powerful|crimpy,8.4,False,0.941,-0.183,8,59
+b0486,Belt Drive,Millrace Caves,8,The Engine Room,5,V5,overhang|pinchy|slopey,8.4,True,1.634,-0.057,8,59
+b0487,Company Town,Millrace Caves,8,The Engine Room,4,V4,overhang|crimpy,8.4,True,1.11,0.299,8,59
+b0488,Strict Parent,Millrace Caves,8,The Engine Room,2,V2,crimpy|mantle|eliminate,8.4,True,0.191,-0.057,8,59
+b0489,Picket Line,Millrace Caves,8,The Engine Room,6,V6,crimpy|compression|powerful,8.4,False,2.046,-0.011,8,59
+b0490,Shift Change,Millrace Caves,8,The Engine Room,2,V2,overhang|crimpy|juggy|technical,8.4,False,2.27,-0.295,8,59
+b0491,Loophole,Millrace Caves,8,The Engine Room,13,V13,overhang|crimpy|slopey|eliminate|bunchy,8.4,True,0.582,-0.709,8,59
+b0492,Lunch Pail,Millrace Caves,8,The Engine Room,0,V0,overhang|juggy,8.4,False,1.1,-0.483,8,59
+b0493,Time and a Half,Millrace Caves,8,The Engine Room,1,V1,crimpy|juggy,8.4,True,2.099,0.337,8,59
+b0494,Clockwork,Millrace Caves,8,The Engine Room,5,V5,overhang|crimpy|mantle,8.4,True,0.905,-0.239,8,59
+b0495,The Mill Fire of 1891,Millrace Caves,8,The Engine Room,13,V13,overhang|pinchy|crimpy|reachy,8.4,False,1.56,0.614,8,59
+b0496,Hard Hat,Millrace Caves,8,The Engine Room,2,V2,overhang|powerful|dyno,8.4,False,1.085,-0.114,8,59
+b0497,Modern Times,Millrace Caves,8,The Engine Room,3,V3,overhang|crimpy|dyno|juggy|reachy,8.4,True,1.225,0.762,8,59
+b0498,Boiler Room,Millrace Caves,8,The Engine Room,2,V2,overhang|crimpy|dyno|pinchy|reachy,8.4,True,1.786,0.691,8,59
+b0499,Cog in the Machine,Millrace Caves,8,The Engine Room,3,V3,overhang|compression,8.4,True,1.629,-0.254,8,59
+b0500,Shift Change (No Arête),Millrace Caves,8,The Engine Room,8,V8,overhang|crimpy|technical|eliminate,8.4,False,0.344,0.133,8,59
+b0501,Ham Sandwich,Millrace Caves,8,The Engine Room,11,V11,overhang|crimpy|mantle|traverse|bunchy,8.4,True,0.8,-0.683,8,59
+b0502,Smokestack,Millrace Caves,8,The Engine Room,1,V1,overhang|dyno,8.4,False,1.168,0.445,8,59
+b0503,Gaston Martin,Millrace Caves,8,The Engine Room,3,V3,overhang|juggy|traverse|eliminate,8.4,False,0.0,-0.268,8,59
+b0504,Foreman (No Heel Hooks),Millrace Caves,8,The Engine Room,10,V10,crimpy|powerful|pinchy|eliminate,8.4,True,0.679,0.035,8,59
+b0505,Point of No Return (No Lip),The Grout Piles,21,The Headwall,13,V13,mantle|eliminate|highball,18.4,False,1.055,0.017,6,47
+b0506,Second Thoughts,The Grout Piles,21,The Headwall,2,V2,dyno|slopey|highball|reachy,18.4,False,1.82,1.0,6,47
+b0507,Overburden (Crimps Only),The Grout Piles,21,The Headwall,5,V5,technical|crimpy|eliminate|highball|reachy,18.4,True,2.06,0.721,6,47
+b0508,Sheer Folly,The Grout Piles,21,The Headwall,2,V2,crimpy|technical|highball,18.4,False,2.156,0.187,6,47
+b0509,Swan Dive,The Grout Piles,21,The Headwall,11,V11,mantle|highball,18.4,True,2.091,-0.287,6,47
+b0510,Exit Strategy,The Grout Piles,21,The Headwall,4,V4,juggy|highball|bunchy,18.4,False,2.079,-0.966,6,47
+b0511,Topsoil,The Grout Piles,21,The Headwall,0,V0,powerful|highball,18.4,False,2.965,0.339,6,47
+b0512,Drill Marks,The Grout Piles,21,The Headwall,4,V4,crimpy|powerful|highball,18.4,False,2.854,0.328,6,47
+b0513,Benchmark,The Grout Piles,21,The Headwall,3,V3,technical|highball,18.4,False,2.29,-0.215,6,47
+b0514,Bedrock,The Grout Piles,21,The Headwall,5,V5,technical|juggy|highball|reachy,18.4,True,2.34,1.0,6,47
+b0515,Feather Marks,The Grout Piles,21,The Headwall,6,V6,dyno|highball|reachy,18.4,False,2.787,0.586,6,47
+b0516,Point of No Return,The Grout Piles,21,The Headwall,7,V7,mantle|technical|highball,18.4,False,2.083,-0.027,6,47
+b0517,Quarryman's Leap,The Grout Piles,21,The Headwall,6,V6,technical|compression|highball,18.4,False,3.65,-0.5,6,47
+b0518,Core Sample,The Grout Piles,21,The Headwall,1,V1,mantle|slopey|highball,18.4,False,2.411,0.038,6,47
+b0519,Overburden,The Grout Piles,21,The Headwall,0,V0,mantle|technical|highball,18.4,False,2.309,0.088,6,47
+b0520,Deep Cut,The Grout Piles,21,The Headwall,2,V2,technical|mantle|highball,18.4,False,2.294,-0.278,6,47
+b0521,Curb Appeal,The Tailgate,1,The Curb,2,V2,crimpy|compression,5.4,True,2.316,-0.035,5,36
+b0522,Ankle Biter,The Tailgate,1,The Curb,9,V9,dyno|reachy,5.4,False,1.003,0.888,5,36
+b0523,Parallel Parking,The Tailgate,1,The Curb,6,V6,crimpy|pinchy|powerful|reachy,5.4,False,0.714,0.71,5,36
+b0524,Speed Bump,The Tailgate,1,The Curb,4,V4,crimpy|compression,5.4,True,0.722,0.136,5,36
+b0525,Tar Pit,Bracken Gully,16,The Fossil,2,V2,overhang|crimpy|dyno|reachy,6.8,True,1.076,1.0,2,15
+b0526,Bone Wars,Bracken Gully,16,The Fossil,1,V1,overhang|crimpy|powerful|pinchy,6.8,False,1.686,0.22,2,15
+b0527,Cretaceous,Bracken Gully,16,The Fossil,3,V3,overhang|dyno,6.8,False,1.649,0.01,2,15
+b0528,Fossil Traverse,Bracken Gully,16,The Fossil,7,V7,overhang|crimpy|compression|traverse|bunchy,6.8,False,1.314,-0.725,2,15
+b0529,Missing Link,Bracken Gully,16,The Fossil,3,V3,overhang|powerful|reachy,6.8,True,2.153,0.922,2,15
+b0530,Ice Age,Bracken Gully,16,The Fossil,4,V4,overhang|crimpy|technical|dyno|reachy,6.8,True,1.356,1.0,2,15
+b0531,Tar Pit (No Feet),Bracken Gully,16,The Fossil,3,V3,overhang|compression|eliminate,6.8,True,0.972,-0.094,2,15
+b0532,Trilobite,Bracken Gully,16,The Fossil,1,V1,overhang|pinchy|slopey,6.8,False,2.648,-0.133,2,15
+b0533,Pilgrimage,Bracken Gully,16,The Fossil,3,V3,overhang|dyno|powerful|traverse|eliminate,6.8,False,0.102,0.292,2,15
+b0534,Ammonite,Bracken Gully,16,The Fossil,2,V2,overhang|crimpy,6.8,False,2.547,-0.17,2,15
+b0535,Dig Site,Bracken Gully,16,The Fossil,5,V5,overhang|crimpy|pinchy|slopey,6.8,True,1.699,-0.299,2,15
+b0536,Amber,Bracken Gully,16,The Fossil,10,V10,overhang|compression|mantle|bunchy,6.8,False,2.175,-0.507,2,15
+b0537,Extinction Event,Bracken Gully,16,The Fossil,13,V13,overhang|crimpy,6.8,True,1.166,-0.117,2,15
+b0538,Milk Run,Bracken Gully,16,The Fossil,4,V4,overhang|compression|powerful|traverse,6.8,True,0.487,-0.078,2,15
+b0539,Fossil Record,Bracken Gully,16,The Fossil,9,V9,overhang|crimpy|compression|juggy|bunchy,6.8,True,1.826,-1.0,2,15
+b0540,Carbon Dating,Bracken Gully,16,The Fossil,1,V1,overhang|dyno|pinchy|reachy,6.8,False,1.92,0.946,2,15
+b0541,Asteroid,Bracken Gully,16,The Fossil,13,V13,overhang|powerful,6.8,True,1.728,-0.321,2,15
+b0542,Ice Storm,The Schoolhouse,6,The Gymnasium,3,V3,roof|slopey|mantle|technical|traverse|eliminate,14.4,True,0.375,0.252,9,70
+b0543,Square Dancing Unit,The Schoolhouse,6,The Gymnasium,4,V4,roof|slopey|juggy,14.4,False,1.396,0.01,9,70
+b0544,Pep Rally,The Schoolhouse,6,The Gymnasium,7,V7,roof|dyno|reachy,14.4,False,1.804,1.0,9,70
+b0545,Junior Varsity,The Schoolhouse,6,The Gymnasium,4,V4,roof|dyno,14.4,False,1.6,0.167,9,70
+b0546,Bleachers,The Schoolhouse,6,The Gymnasium,8,V8,roof|slopey|pinchy|reachy,14.4,True,1.849,0.769,9,70
+b0547,Varsity Squad,The Schoolhouse,6,The Gymnasium,11,V11,powerful|dyno,14.4,True,1.42,0.143,9,70
+b0548,Halftime,The Schoolhouse,6,The Gymnasium,5,V5,roof|slopey|crimpy|mantle|bunchy,14.4,True,1.25,-0.871,9,70
+b0549,Gym Socks,The Schoolhouse,6,The Gymnasium,3,V3,roof|slopey|mantle|compression,14.4,False,1.659,-0.331,9,70
+b0550,Free Throw,The Schoolhouse,6,The Gymnasium,2,V2,roof|slopey|juggy,14.4,True,1.755,-0.232,9,70
+b0551,Buzzer Beater,The Schoolhouse,6,The Gymnasium,8,V8,roof|slopey|mantle,14.4,False,1.218,0.156,9,70
+b0552,Field Day,The Schoolhouse,6,The Gymnasium,5,V5,roof|pinchy|powerful,14.4,True,0.767,-0.217,9,70
+b0553,Coach's Revenge,The Schoolhouse,6,The Gymnasium,11,V11,compression,14.4,True,3.15,0.328,9,70
+b0554,The Tuesday Crew,The Schoolhouse,6,The Gymnasium,4,V4,roof|slopey|powerful|eliminate,14.4,False,1.753,0.424,9,70
+b0555,Four Square,The Schoolhouse,6,The Gymnasium,3,V3,roof|technical|pinchy|reachy,14.4,True,2.984,0.815,9,70
+b0556,Kickball,The Schoolhouse,6,The Gymnasium,1,V1,roof|slopey|pinchy|bunchy,14.4,False,1.713,-0.584,9,70
+b0557,Sit-and-Reach,The Schoolhouse,6,The Gymnasium,8,V8,roof|juggy|reachy,14.4,False,2.171,0.736,9,70
+b0558,Floor Hockey,The Schoolhouse,6,The Gymnasium,5,V5,roof|slopey,14.4,False,1.373,-0.203,9,70
+b0559,Picked Last,The Schoolhouse,6,The Gymnasium,9,V9,roof|slopey|pinchy|compression,14.4,True,2.193,0.11,9,70
+b0560,Bird Poop,The Schoolhouse,6,The Gymnasium,8,V8,roof|crimpy|bunchy,14.4,True,0.07,-0.811,9,70
+b0561,Take On Me,The Schoolhouse,6,The Gymnasium,11,V11,roof|compression|traverse|eliminate,14.4,True,0.0,-0.003,9,70
+b0562,Gym Socks (No Feet),The Schoolhouse,6,The Gymnasium,3,V3,roof|slopey|compression|eliminate,14.4,False,1.347,0.023,9,70
+b0563,Dodgeball,The Schoolhouse,6,The Gymnasium,7,V7,roof|technical|powerful|bunchy,14.4,True,2.253,-0.905,9,70
+b0564,Parachute Day (No Heel Hooks),The Schoolhouse,6,The Gymnasium,7,V7,powerful|eliminate,14.4,True,1.405,0.014,9,70
+b0565,Locker Room,The Schoolhouse,6,The Gymnasium,5,V5,roof|slopey|pinchy|bunchy,14.4,False,1.631,-0.558,9,70
+b0566,Parachute Day Sit,The Schoolhouse,6,The Gymnasium,4,V4,roof|slopey|compression,14.4,True,2.865,-0.052,9,70
+b0567,Kickball (No Feet),The Schoolhouse,6,The Gymnasium,2,V2,roof|compression|eliminate,14.4,True,0.798,0.064,9,70
+b0568,Egg and Spoon,The Schoolhouse,6,The Gymnasium,3,V3,roof|juggy|compression,14.4,False,2.108,-0.212,9,70
+b0569,Overtime,The Schoolhouse,6,The Gymnasium,8,V8,roof|slopey|juggy|crimpy,14.4,True,1.249,-0.161,9,70
+b0570,Undercling Ding,The Schoolhouse,6,The Gymnasium,4,V4,roof|juggy|compression|traverse,14.4,True,0.0,-0.181,9,70
+b0571,Tetherball,The Schoolhouse,6,The Gymnasium,1,V1,roof|compression,14.4,False,2.271,-0.215,9,70
+b0572,Homecoming,The Schoolhouse,6,The Gymnasium,4,V4,roof|technical,14.4,False,1.335,-0.059,9,70
+b0573,Swirly,The Schoolhouse,6,The Gymnasium,4,V4,roof|slopey,14.4,False,1.132,-0.278,9,70
+b0574,Frozen Pilgrim Sit,The Schoolhouse,6,The Gymnasium,13,V13,roof|slopey|pinchy|juggy,14.4,True,1.719,0.136,9,70
+b0575,Pull-Up Bar,The Schoolhouse,6,The Gymnasium,6,V6,roof|powerful|dyno,14.4,False,1.953,0.33,9,70
+b0576,Tick Magnet,The Schoolhouse,6,The Gymnasium,3,V3,roof|slopey|dyno,14.4,True,0.484,0.471,9,70
+b0577,Sudden Death,The Schoolhouse,6,The Gymnasium,12,V12,roof|slopey|technical,14.4,True,1.222,0.254,9,70
+b0578,Pacer Test,The Schoolhouse,6,The Gymnasium,9,V9,roof|powerful|crimpy,14.4,True,1.862,0.128,9,70
+b0579,Three-Legged Race,The Schoolhouse,6,The Gymnasium,2,V2,roof|slopey|crimpy|juggy,14.4,False,2.076,0.081,9,70
+b0580,Shuttle Run,The Schoolhouse,6,The Gymnasium,5,V5,roof|slopey|juggy|dyno,14.4,False,1.9,-0.185,9,70
+b0581,Gymnasium Traverse,The Schoolhouse,6,The Gymnasium,10,V10,roof|juggy|traverse,14.4,True,2.545,-0.226,9,70
+b0582,Monkey Bars,The Schoolhouse,6,The Gymnasium,6,V6,slopey|pinchy|compression|bunchy,14.4,False,2.056,-0.508,9,70
+b0583,Fire Drill,The Schoolhouse,6,The Gymnasium,5,V5,roof|compression|juggy|bunchy,14.4,True,1.204,-0.904,9,70
+b0584,Bird Poop (Slopers Only),The Schoolhouse,6,The Gymnasium,13,V13,roof|slopey|pinchy|eliminate|bunchy,14.4,True,0.705,-0.518,9,70
+b0585,Benchwarmer,The Schoolhouse,6,The Gymnasium,0,V0,roof|slopey|pinchy,14.4,False,1.604,0.215,9,70
+b0586,Thunder Road,The Schoolhouse,6,The Gymnasium,3,V3,roof|dyno|eliminate|reachy,14.4,False,1.64,0.615,9,70
+b0587,Wedgie,The Schoolhouse,6,The Gymnasium,5,V5,roof|juggy|slopey,14.4,False,1.012,-0.041,9,70
+b0588,Varsity,The Schoolhouse,6,The Gymnasium,6,V6,roof|slopey|mantle,14.4,True,1.568,-0.415,9,70
+b0589,Fire Drill (No Feet),The Schoolhouse,6,The Gymnasium,6,V6,roof|slopey|compression|eliminate|bunchy,14.4,True,0.686,-0.967,9,70
+b0590,Presidential Fitness Test,The Schoolhouse,6,The Gymnasium,8,V8,roof|slopey|technical|dyno|reachy,14.4,False,2.499,0.777,9,70
+b0591,Parachute Day (No Jugs),The Schoolhouse,6,The Gymnasium,4,V4,roof|slopey|juggy|eliminate|bunchy,14.4,True,0.82,-0.527,9,70
+b0592,Rope Climb,The Schoolhouse,6,The Gymnasium,4,V4,slopey|technical,14.4,False,3.378,0.165,9,70
+b0593,Yellowjacket,The Schoolhouse,6,The Gymnasium,6,V6,roof|slopey|powerful,14.4,False,0.545,-0.469,9,70
+b0594,Trophy Case,The Schoolhouse,6,The Gymnasium,8,V8,roof|slopey|juggy|bunchy,14.4,False,1.357,-0.944,9,70
+b0595,Cosmic Biscuit Eliminate Sit,The Schoolhouse,6,The Gymnasium,5,V5,slopey|eliminate|reachy,14.4,True,0.412,0.835,9,70
+b0596,Free Throw (No Heel Hooks),The Schoolhouse,6,The Gymnasium,7,V7,slopey|powerful|eliminate|bunchy,14.4,True,0.084,-1.0,9,70
+b0597,Detention Hall,The Schoolhouse,6,The Gymnasium,10,V10,roof|slopey|mantle,14.4,True,2.732,0.26,9,70
+b0598,The Big Game,The Schoolhouse,6,The Gymnasium,6,V6,roof|slopey|juggy|powerful|reachy,14.4,True,1.271,0.708,9,70
+b0599,Parachute Day,The Schoolhouse,6,The Gymnasium,2,V2,roof|juggy|mantle,14.4,False,2.488,-0.434,9,70
+b0600,Round Door,Bracken Gully,16,The Hobbit Hole,0,V0,overhang|crimpy|compression|bunchy,10.7,True,1.131,-0.546,2,16
+b0601,Riddles in the Dark,Bracken Gully,16,The Hobbit Hole,13,V13,overhang|dyno|juggy|reachy,10.7,False,0.943,1.0,2,16
+b0602,Precious,Bracken Gully,16,The Hobbit Hole,10,V10,overhang|juggy|compression|bunchy,10.7,False,1.838,-0.804,2,16
+b0603,Bag End,Bracken Gully,16,The Hobbit Hole,0,V0,overhang|compression|pinchy,10.7,True,2.086,-0.268,2,16
+b0604,There and Back Again,Bracken Gully,16,The Hobbit Hole,10,V10,mantle|dyno|reachy,10.7,False,0.697,0.612,2,16
+b0605,Second Breakfast,Bracken Gully,16,The Hobbit Hole,5,V5,overhang|crimpy|powerful,10.7,True,1.816,0.093,2,16
+b0606,Hobbit Hole Traverse,Bracken Gully,16,The Hobbit Hole,1,V1,overhang|crimpy|pinchy|traverse,10.7,True,0.569,-0.252,2,16
+b0607,Precious Sit,Bracken Gully,16,The Hobbit Hole,10,V10,overhang|juggy,10.7,True,1.157,-0.335,2,16
+b0608,Elevenses,Bracken Gully,16,The Hobbit Hole,2,V2,overhang|crimpy|compression,10.7,False,1.504,-0.42,2,16
+b0609,Woodpecker,Hawkwatch,8,The Beak,5,V5,crimpy|technical|bunchy,6.7,True,1.391,-0.598,7,58
+b0610,Beak to Beak Sit,Hawkwatch,8,The Beak,3,V3,crimpy|mantle|juggy,6.7,True,1.209,-0.367,7,58
+b0611,Puffin,Hawkwatch,8,The Beak,8,V8,dyno|juggy,6.7,True,1.043,-0.483,7,58
+b0612,Beak to Beak,Hawkwatch,8,The Beak,1,V1,crimpy|mantle|powerful,6.7,False,2.531,0.225,7,58
+b0613,Pecking,Hawkwatch,8,The Beak,2,V2,crimpy|pinchy,6.7,False,1.828,-0.454,7,58
+b0614,Snapper,Hawkwatch,8,The Beak,1,V1,crimpy|mantle|compression,6.7,False,0.843,0.373,7,58
+b0615,Pointy End,Hawkwatch,8,The Beak,0,V0,pinchy,6.7,False,1.725,0.203,7,58
+b0616,Bureaucracy,Hawkwatch,8,The Beak,10,V10,crimpy|dyno|eliminate|reachy,6.7,False,0.487,0.532,7,58
+b0617,Birdseed,Hawkwatch,8,The Beak,2,V2,crimpy|technical,6.7,False,1.984,0.48,7,58
+b0618,Crumble Cake,Back Forty,24,The Cow Pie,9,V9,powerful|crimpy|bunchy,6.0,False,0.557,-0.65,0,3
+b0619,Till the Cows Come Home,Back Forty,24,The Cow Pie,6,V6,dyno|technical|reachy,6.0,False,2.426,0.824,0,3
+b0620,Cow Tipping,Back Forty,24,The Cow Pie,1,V1,crimpy|mantle,6.0,False,0.853,-0.032,0,3
+b0621,Asterisk,Back Forty,24,The Cow Pie,2,V2,crimpy|eliminate,6.0,False,0.786,-0.026,0,3
+b0622,Mad Cow,Back Forty,24,The Cow Pie,10,V10,juggy|dyno|reachy,6.0,False,2.005,0.834,0,3
+b0623,Moo,Back Forty,24,The Cow Pie,1,V1,powerful|juggy|reachy,6.0,True,2.345,0.77,0,3
+b0624,Simon Says,Hawkwatch,8,The Thermal Slab,7,V7,slab|technical|mantle|eliminate,11.8,True,0.78,0.095,7,48
+b0625,Headwind,Hawkwatch,8,The Thermal Slab,2,V2,mantle|technical|bunchy,11.8,False,2.158,-0.506,7,48
+b0626,Kite Flying Sit,Hawkwatch,8,The Thermal Slab,5,V5,slab|slopey|mantle|crimpy,11.8,True,2.5,0.056,7,48
+b0627,Hawk Count (Slopers Only),Hawkwatch,8,The Thermal Slab,8,V8,slab|slopey|crimpy|technical|eliminate,11.8,False,0.843,0.106,7,48
+b0628,Tailwind,Hawkwatch,8,The Thermal Slab,4,V4,slopey|pinchy|crimpy,11.8,False,2.195,0.135,7,48
+b0629,Soaring,Hawkwatch,8,The Thermal Slab,1,V1,slab|slopey|technical|mantle,11.8,False,1.818,0.447,7,48
+b0630,Windward,Hawkwatch,8,The Thermal Slab,1,V1,slab|slopey|technical|compression|bunchy,11.8,False,2.107,-1.0,7,48
+b0631,Golden Lobster (Slopers Only),Hawkwatch,8,The Thermal Slab,4,V4,slab|slopey|juggy|eliminate,11.8,False,0.086,-0.122,7,48
+b0632,Hokey Pokey,Hawkwatch,8,The Thermal Slab,7,V7,slab|mantle|eliminate,11.8,True,1.101,-0.291,7,48
+b0633,Migration,Hawkwatch,8,The Thermal Slab,5,V5,slab|slopey|pinchy,11.8,False,1.663,0.437,7,48
+b0634,Kettle of Hawks,Hawkwatch,8,The Thermal Slab,5,V5,slab|slopey|crimpy|bunchy,11.8,False,2.768,-0.647,7,48
+b0635,Sandpaper,Hawkwatch,8,The Thermal Slab,4,V4,slab|slopey|technical|bunchy,11.8,False,0.173,-0.561,7,48
+b0636,Broad-Winged,Hawkwatch,8,The Thermal Slab,6,V6,technical|reachy,11.8,False,1.188,0.673,7,48
+b0637,Minutiae,Hawkwatch,8,The Thermal Slab,5,V5,mantle|technical|eliminate,11.8,False,0.87,-0.008,7,48
+b0638,Kite Flying,Hawkwatch,8,The Thermal Slab,3,V3,slab|mantle|bunchy,11.8,False,2.683,-0.704,7,48
+b0639,Riding the Thermal,Hawkwatch,8,The Thermal Slab,4,V4,slab|slopey|technical|mantle,11.8,False,2.757,-0.106,7,48
+b0640,Crosswind (No Lip),Hawkwatch,8,The Thermal Slab,8,V8,slab|mantle|eliminate|reachy,11.8,True,0.358,0.507,7,48
+b0641,Light Breeze,Hawkwatch,8,The Thermal Slab,0,V0,slab|crimpy|technical,11.8,False,2.754,0.42,7,48
+b0642,Southbound,Hawkwatch,8,The Thermal Slab,0,V0,slab|slopey|crimpy|mantle|bunchy,11.8,False,1.353,-0.554,7,48
+b0643,Hawk Count,Hawkwatch,8,The Thermal Slab,0,V0,slab|slopey|crimpy,11.8,False,1.334,0.007,7,48
+b0644,Peregrine,Hawkwatch,8,The Thermal Slab,9,V9,slab|juggy|reachy,11.8,True,2.388,0.992,7,48
+b0645,Red-Tailed,Hawkwatch,8,The Thermal Slab,5,V5,slab|technical,11.8,False,1.025,0.254,7,48
+b0646,Flyway,Hawkwatch,8,The Thermal Slab,2,V2,slab|crimpy,11.8,False,1.357,0.294,7,48
+b0647,Thermal Slab Traverse (Crimps Only),Hawkwatch,8,The Thermal Slab,0,V0,slab|crimpy|technical|eliminate,11.8,False,0.923,0.103,7,48
+b0648,Headwind (No Heel Hooks),Hawkwatch,8,The Thermal Slab,4,V4,slab|slopey|powerful|eliminate,11.8,False,0.0,-0.433,7,48
+b0649,Crosswind,Hawkwatch,8,The Thermal Slab,0,V0,slab|dyno,11.8,False,2.127,0.387,7,48
+b0650,Downdraft,Hawkwatch,8,The Thermal Slab,4,V4,slab|mantle|crimpy,11.8,False,2.206,-0.126,7,48
+b0651,Glide Path,Hawkwatch,8,The Thermal Slab,4,V4,slab|mantle,11.8,False,1.878,-0.343,7,48
+b0652,Golden Lobster,Hawkwatch,8,The Thermal Slab,1,V1,slab|slopey|crimpy|technical,11.8,False,2.562,-0.002,7,48
+b0653,Leeward,Hawkwatch,8,The Thermal Slab,3,V3,slab|mantle,11.8,False,1.903,0.036,7,48
+b0654,Sharp-Shinned,Hawkwatch,8,The Thermal Slab,8,V8,slab|slopey|mantle,11.8,False,0.914,-0.467,7,48
+b0655,Stoop,Hawkwatch,8,The Thermal Slab,9,V9,crimpy|technical,11.8,False,1.463,0.097,7,48
+b0656,Updraft,Hawkwatch,8,The Thermal Slab,5,V5,slab|juggy|crimpy|reachy,11.8,False,2.335,0.563,7,48
+b0657,Thermal Slab Traverse,Hawkwatch,8,The Thermal Slab,0,V0,slab|slopey|crimpy|traverse,11.8,False,1.061,-0.474,7,48
+b0658,Kestrel,Hawkwatch,8,The Thermal Slab,0,V0,slab|slopey|crimpy,11.8,False,0.26,0.024,7,48
+b0659,Terms of Service,Hawkwatch,8,The Thermal Slab,2,V2,slab|slopey|mantle|crimpy|eliminate,11.8,False,0.628,0.223,7,48
+b0660,Golden Lobster (Crimps Only),Hawkwatch,8,The Thermal Slab,3,V3,slopey|technical|crimpy|eliminate|reachy,11.8,False,0.164,0.513,7,48
+b0661,Gust,Hawkwatch,8,The Thermal Slab,2,V2,slopey,11.8,False,2.496,0.356,7,48
+b0662,Lift,Hawkwatch,8,The Thermal Slab,0,V0,slab|slopey|technical,11.8,False,1.703,-0.024,7,48
+b0663,Lazy Sermon,Hawkwatch,8,The Thermal Slab,5,V5,slab|slopey|pinchy,11.8,False,0.0,-0.069,7,48
+b0664,Kite Flying (Slopers Only),Hawkwatch,8,The Thermal Slab,10,V10,slab|slopey|mantle|eliminate,11.8,False,0.864,0.418,7,48
+b0665,Know Thyself,Hemlock Hollow,19,Socrates,7,V7,crimpy|powerful|dyno,15.3,False,2.434,0.018,3,19
+b0666,Feral Banana,Hemlock Hollow,19,Socrates,7,V7,crimpy|bunchy,15.3,False,2.577,-0.532,3,19
+b0667,Socratic Method,Hemlock Hollow,19,Socrates,0,V0,crimpy|slopey|technical,15.3,False,1.943,0.097,3,19
+b0668,Apology,Hemlock Hollow,19,Socrates,3,V3,crimpy|dyno,15.3,False,1.526,0.257,3,19
+b0669,Agora,Hemlock Hollow,19,Socrates,10,V10,crimpy|compression,15.3,False,1.674,0.018,3,19
+b0670,I Know Nothing,Hemlock Hollow,19,Socrates,0,V0,crimpy|juggy,15.3,True,4.0,0.178,3,19
+b0671,The Hemlock Cup,Hemlock Hollow,19,Socrates,10,V10,pinchy|technical,15.3,False,2.331,0.342,3,19
+b0672,The Unexamined Life,Hemlock Hollow,19,Socrates,2,V2,crimpy|technical|bunchy,15.3,False,3.205,-1.0,3,19
+b0673,Symposium,Hemlock Hollow,19,Socrates,8,V8,crimpy|mantle,15.3,False,1.677,-0.369,3,19
+b0674,Gadfly,Hemlock Hollow,19,Socrates,2,V2,crimpy|pinchy,15.3,False,2.081,-0.411,3,19
+b0675,Barn Door,The Cellar Holes,18,The Barn,7,V7,roof|powerful,13.4,True,1.896,-0.21,4,23
+b0676,Barn Raising,The Cellar Holes,18,The Barn,5,V5,roof|mantle|powerful,13.4,False,3.38,0.004,4,23
+b0677,Hayloft,The Cellar Holes,18,The Barn,5,V5,roof|compression|bunchy,13.4,False,1.943,-0.504,4,23
+b0678,Born in a Barn,The Cellar Holes,18,The Barn,4,V4,juggy|compression|bunchy,13.4,False,1.571,-0.507,4,23
+b0679,Barn Cats Sit,The Cellar Holes,18,The Barn,4,V4,roof|juggy|reachy,13.4,True,0.749,0.754,4,23
+b0680,Pitchfork,The Cellar Holes,18,The Barn,5,V5,roof|slopey|bunchy,13.4,False,0.93,-0.733,4,23
+b0681,Barn Owl,The Cellar Holes,18,The Barn,5,V5,roof|dyno|juggy|reachy,13.4,False,1.903,0.677,4,23
+b0682,Barn Burner,The Cellar Holes,18,The Barn,11,V11,technical,13.4,False,1.954,0.209,4,23
+b0683,Barn Traverse,The Cellar Holes,18,The Barn,2,V2,juggy|traverse,13.4,False,0.12,-0.344,4,23
+b0684,Barnstormer,The Cellar Holes,18,The Barn,5,V5,roof|powerful|bunchy,13.4,False,1.451,-0.738,4,23
+b0685,Barn Raising (Slopers Only),The Cellar Holes,18,The Barn,8,V8,roof|slopey|technical|eliminate,13.4,True,0.0,-0.376,4,23
+b0686,Barn Cats,The Cellar Holes,18,The Barn,3,V3,roof|juggy,13.4,False,1.641,-0.197,4,23
+b0687,Eagle Eye,Hawkwatch,8,The Aerie,9,V9,crimpy|dyno|technical|reachy,11.5,False,1.337,1.0,7,55
+b0688,Eaglet,Hawkwatch,8,The Aerie,4,V4,slopey|reachy,11.5,False,1.183,0.664,7,55
+b0689,Talons,Hawkwatch,8,The Aerie,1,V1,crimpy|technical,11.5,False,0.855,0.246,7,55
+b0690,Icarus,Hawkwatch,8,The Aerie,12,V12,technical|pinchy,11.5,False,2.256,-0.108,7,55
+b0691,High Nest,Hawkwatch,8,The Aerie,2,V2,technical|bunchy,11.5,False,1.858,-0.775,7,55
+b0692,Deer Tick,Hawkwatch,8,The Aerie,4,V4,crimpy,11.5,False,0.59,-0.037,7,55
+b0693,Wings of Wax,Hawkwatch,8,The Aerie,4,V4,crimpy|juggy|reachy,11.5,False,1.785,0.627,7,55
+b0694,Golden Eagle,Hawkwatch,8,The Aerie,4,V4,juggy|crimpy|bunchy,11.5,False,1.043,-0.515,7,55
+b0695,Choss Monster,Hawkwatch,8,The Aerie,8,V8,crimpy,11.5,False,0.276,0.168,7,55
+b0696,Too Close to the Sun,Hawkwatch,8,The Aerie,11,V11,powerful|reachy,11.5,False,1.436,1.0,7,55
+b0697,Daedalus,Hawkwatch,8,The Aerie,10,V10,crimpy|compression,11.5,False,1.714,0.174,7,55
+b0698,Screech,Hawkwatch,8,The Aerie,4,V4,crimpy|compression|powerful,11.5,False,0.804,-0.183,7,55
+b0699,The Eagle Has Landed,Hawkwatch,8,The Aerie,0,V0,dyno|technical|reachy,11.5,False,0.954,0.712,7,55
+b0700,Narnia,Bracken Gully,16,The Lamp Post,5,V5,crimpy|mantle|highball,16.9,True,1.134,0.381,2,12
+b0701,Snow in the Lamplight,Bracken Gully,16,The Lamp Post,0,V0,slopey|pinchy|highball,16.9,False,2.163,-0.141,2,12
+b0702,Zoomies,The Tailgate,1,Pickles' Rock,7,V7,overhang|pinchy,11.2,True,1.013,0.22,5,34
+b0703,"Good Girl, Pickles",The Tailgate,1,Pickles' Rock,0,V0,overhang|slopey|crimpy,11.2,False,1.537,0.42,5,34
+b0704,Fetch,The Tailgate,1,Pickles' Rock,6,V6,overhang|slopey|powerful|crimpy,11.2,True,2.968,0.308,5,34
+b0705,Pickles' Rock Traverse,The Tailgate,1,Pickles' Rock,4,V4,overhang|slopey|compression|traverse|bunchy,11.2,True,2.426,-0.657,5,34
+b0706,Wicked Arete Sit,The Tailgate,1,Pickles' Rock,4,V4,overhang|slopey|compression|bunchy,11.2,True,2.067,-0.868,5,34
+b0707,Squirrel!,The Tailgate,1,Pickles' Rock,4,V4,overhang|slopey|pinchy|powerful,11.2,False,1.193,0.355,5,34
+b0708,Belly Rub,The Tailgate,1,Pickles' Rock,7,V7,overhang|slopey|compression|bunchy,11.2,True,1.513,-0.915,5,34
+b0709,Splitting Maul (Crimps Only),The Cellar Holes,18,The Woodshed,4,V4,roof|crimpy|compression|eliminate,7.5,False,0.355,-0.319,4,25
+b0710,Glass Owl,The Cellar Holes,18,The Woodshed,11,V11,powerful|compression,7.5,False,2.041,0.208,4,25
+b0711,Something Nasty in the Woodshed,The Cellar Holes,18,The Woodshed,3,V3,roof|juggy,7.5,True,2.912,-0.074,4,25
+b0712,Splitting Maul,The Cellar Holes,18,The Woodshed,3,V3,roof|crimpy|powerful,7.5,True,1.316,0.12,4,25
+b0713,Axe to Grind,The Cellar Holes,18,The Woodshed,5,V5,roof|crimpy|dyno|mantle|reachy,7.5,True,1.678,0.955,4,25
+b0714,Scenic Route,Hawkwatch,8,The Raptor,1,V1,overhang|powerful|juggy|traverse,20.4,False,1.434,0.013,7,52
+b0715,Shuffle,Hawkwatch,8,The Raptor,4,V4,overhang|crimpy|slopey|traverse|eliminate,20.4,False,1.13,0.021,7,52
+b0716,Clever Girl,Hawkwatch,8,The Raptor,4,V4,slopey|highball,20.4,False,2.222,-0.156,7,52
+b0717,Mosquito Bait,Hawkwatch,8,The Raptor,7,V7,overhang|crimpy|compression|pinchy|highball,20.4,False,0.521,-0.213,7,52
+b0718,Apex,Hawkwatch,8,The Raptor,1,V1,crimpy|slopey|highball,20.4,False,0.724,-0.072,7,52
+b0719,Around the World,Hawkwatch,8,The Raptor,2,V2,crimpy|compression|juggy|traverse,20.4,True,1.494,-0.435,7,52
+b0720,Sickle Claw,Hawkwatch,8,The Raptor,6,V6,overhang|juggy|powerful|highball|reachy,20.4,False,1.899,0.747,7,52
+b0721,Hunting Party,Hawkwatch,8,The Raptor,1,V1,overhang|crimpy|compression|highball|bunchy,20.4,True,1.584,-0.92,7,52
+b0722,Raptor Traverse,Hawkwatch,8,The Raptor,10,V10,overhang|slopey|compression|traverse,20.4,False,1.926,-0.115,7,52
+b0723,Bird of Prey,Hawkwatch,8,The Raptor,9,V9,overhang|crimpy|dyno|highball,20.4,True,1.928,0.204,7,52
+b0724,Hatchling,Hawkwatch,8,The Raptor,3,V3,overhang|crimpy|powerful|highball|bunchy,20.4,True,1.71,-0.717,7,52
+b0725,Tadpole,Millrace Caves,8,The Bullfrog,4,V4,compression|powerful|bunchy,6.5,True,2.404,-0.57,8,60
+b0726,Leapfrog,Millrace Caves,8,The Bullfrog,6,V6,pinchy,6.5,False,1.713,-0.37,8,60
+b0727,Kiss the Frog,Millrace Caves,8,The Bullfrog,5,V5,juggy|crimpy,6.5,False,1.434,0.051,8,60
+b0728,Frog Prince,Millrace Caves,8,The Bullfrog,10,V10,juggy|technical,6.5,True,1.742,0.144,8,60
+b0729,Frog in Your Throat,Millrace Caves,8,The Bullfrog,4,V4,powerful|crimpy,6.5,False,1.391,0.058,8,60
+b0730,Pond Scum,Millrace Caves,8,The Bullfrog,4,V4,pinchy|compression,6.5,False,1.308,0.012,8,60
+b0731,Bullfrog Traverse,Millrace Caves,8,The Bullfrog,0,V0,juggy|crimpy|traverse,6.5,False,1.971,0.23,8,60
+b0732,Croak,Millrace Caves,8,The Bullfrog,9,V9,dyno,6.5,False,2.85,0.079,8,60
+b0733,Jeremiah,Millrace Caves,8,The Bullfrog,4,V4,crimpy|bunchy,6.5,True,3.041,-0.522,8,60
+b0734,Lily Pad,Millrace Caves,8,The Bullfrog,0,V0,compression,6.5,False,2.24,0.44,8,60
+b0735,Ribbit,Millrace Caves,8,The Bullfrog,3,V3,juggy,6.5,False,1.976,0.23,8,60
+b0736,Mystery Meat,The Schoolhouse,6,The Cafeteria,2,V2,overhang|crimpy|slopey,9.5,True,2.292,-0.422,9,71
+b0737,Lunch Money,The Schoolhouse,6,The Cafeteria,6,V6,overhang|crimpy|juggy|powerful|reachy,9.5,False,1.405,1.0,9,71
+b0738,Hairnet,The Schoolhouse,6,The Cafeteria,9,V9,overhang|compression|pinchy|bunchy,9.5,False,1.332,-0.965,9,71
+b0739,Food Coma,The Schoolhouse,6,The Cafeteria,9,V9,overhang|technical|powerful,9.5,True,1.998,-0.292,9,71
+b0740,Lorem Ipsum,The Schoolhouse,6,The Cafeteria,8,V8,overhang|powerful|slopey|bunchy,9.5,False,0.617,-0.626,9,71
+b0741,Trade You,The Schoolhouse,6,The Cafeteria,6,V6,overhang|juggy|compression,9.5,True,1.416,-0.189,9,71
+b0742,Food Fight,The Schoolhouse,6,The Cafeteria,7,V7,overhang|juggy,9.5,False,2.359,0.138,9,71
+b0743,Chocolate Milk,The Schoolhouse,6,The Cafeteria,8,V8,overhang|mantle,9.5,False,1.694,0.097,9,71
+b0744,Tater Tots,The Schoolhouse,6,The Cafeteria,0,V0,overhang|crimpy|powerful|juggy,9.5,True,1.822,-0.374,9,71
+b0745,Gravy Train,The Schoolhouse,6,The Cafeteria,5,V5,overhang|juggy|eliminate,9.5,True,0.0,-0.358,9,71
+b0746,Pizza Friday,The Schoolhouse,6,The Cafeteria,2,V2,overhang|powerful|juggy,9.5,True,1.605,0.145,9,71
+b0747,Sloppy Joe,The Schoolhouse,6,The Cafeteria,4,V4,overhang|crimpy|compression|slopey,9.5,True,1.806,-0.315,9,71
+b0748,Lunch Lady,The Schoolhouse,6,The Cafeteria,5,V5,overhang|crimpy|dyno,9.5,True,1.996,0.468,9,71
+b0749,Fish Stick Friday,The Schoolhouse,6,The Cafeteria,5,V5,overhang|crimpy|compression|technical,9.5,False,1.313,0.275,9,71
+b0750,An Apple a Day,The Schoolhouse,6,The Apple,3,V3,crimpy|compression,9.7,False,2.578,-0.375,9,74
+b0751,An Apple a Day (No Heel Hooks),The Schoolhouse,6,The Apple,4,V4,crimpy|powerful|eliminate,9.7,True,2.336,0.436,9,74
+b0752,Original Sin,The Schoolhouse,6,The Apple,10,V10,crimpy|technical|powerful,9.7,False,3.727,-0.059,9,74
+b0753,Honeycrisp,The Schoolhouse,6,The Apple,7,V7,crimpy|powerful|dyno|reachy,9.7,True,3.819,0.561,9,74
+b0754,Six Feet Under,The Grout Piles,21,The Tombstone,13,V13,slab|slopey|highball,16.5,True,2.247,0.008,6,41
+b0755,I'm Your Huckleberry,The Grout Piles,21,The Tombstone,8,V8,slab|mantle|highball,16.5,False,2.653,-0.362,6,41
+b0756,Boot Hill,The Grout Piles,21,The Tombstone,7,V7,slab|technical|mantle|highball,16.5,False,1.794,0.107,6,41
+b0757,Bring a Brush,The Grout Piles,21,The Tombstone,5,V5,slab|mantle|highball,16.5,True,0.345,-0.466,6,41
+b0758,The Undertaker,The Grout Piles,21,The Tombstone,11,V11,slab|technical|crimpy|highball,16.5,False,2.87,-0.076,6,41
+b0759,Final Resting Place,The Grout Piles,21,The Tombstone,9,V9,slab|mantle|highball,16.5,False,2.035,-0.099,6,41
+b0760,Grave Matters,The Grout Piles,21,The Tombstone,0,V0,slab|crimpy|slopey|highball,16.5,False,2.224,0.247,6,41
+b0761,Tombstone Traverse,The Grout Piles,21,The Tombstone,6,V6,crimpy|technical|traverse|bunchy,16.5,True,1.975,-0.636,6,41
+b0762,Crab Walk,The Grout Piles,21,The Tombstone,10,V10,slab|technical|traverse,16.5,True,0.238,-0.415,6,41
+b0763,Mother May I,The Grout Piles,21,The Tombstone,0,V0,slab|slopey|eliminate|highball,16.5,False,0.511,0.285,6,41
+b0764,Dead Ringer,The Grout Piles,21,The Tombstone,1,V1,slab|mantle|technical|highball,16.5,False,2.082,-0.081,6,41
+b0765,Dead Man's Hand,The Grout Piles,21,The Tombstone,3,V3,slab|mantle|technical|highball,16.5,False,1.283,-0.021,6,41
+b0766,Pine Sap,The Grout Piles,21,The Tombstone,1,V1,slab|crimpy|highball,16.5,False,0.682,0.224,6,41
+b0767,Shootout,The Grout Piles,21,The Tombstone,8,V8,slab|crimpy|technical|highball|reachy,16.5,True,1.399,0.674,6,41
+b0768,Headstone,The Grout Piles,21,The Tombstone,5,V5,slab|pinchy|crimpy|highball,16.5,True,2.389,0.135,6,41
+b0769,Doc Holliday,The Grout Piles,21,The Tombstone,0,V0,slab|crimpy|highball,16.5,True,1.685,0.094,6,41
+b0770,Endurance Test,The Grout Piles,21,The Tombstone,1,V1,slab|juggy|traverse|bunchy,16.5,True,1.192,-0.771,6,41
+b0771,Last Rites,The Grout Piles,21,The Tombstone,3,V3,slab|slopey|mantle|highball,16.5,False,1.119,0.458,6,41
+b0772,Daisies,The Grout Piles,21,The Tombstone,0,V0,slab|mantle|technical|highball,16.5,False,2.872,-0.343,6,41
+b0773,Seed Thief,Hawkwatch,8,The Chickadee,1,V1,overhang|slopey|compression,7.7,False,1.464,0.024,7,54
+b0774,Chickadee Traverse,Hawkwatch,8,The Chickadee,2,V2,overhang|slopey|compression|traverse,7.7,False,2.283,-0.073,7,54
+b0775,Chick-a-Dee-Dee-Dee,Hawkwatch,8,The Chickadee,2,V2,overhang|pinchy|juggy,7.7,False,3.217,0.464,7,54
+b0776,Fluff Ball,Hawkwatch,8,The Chickadee,1,V1,overhang|crimpy|compression,7.7,False,2.023,0.159,7,54
+b0777,Black Cap,Hawkwatch,8,The Chickadee,0,V0,crimpy,7.7,False,1.753,-0.07,7,54
+b0778,House Rules,The Grout Piles,21,The Rubble,4,V4,mantle|eliminate,9.1,False,0.175,0.348,6,42
+b0779,Rubble Rouser,The Grout Piles,21,The Rubble,1,V1,pinchy,9.1,False,1.708,0.197,6,42
+b0780,Meh,The Grout Piles,21,The Rubble,7,V7,mantle|powerful,9.1,False,0.0,-0.382,6,42
+b0781,Pile On,The Grout Piles,21,The Rubble,1,V1,mantle|slopey|reachy,9.1,False,1.601,0.522,6,42
+b0782,Under the Hood,The Tailgate,1,The Tailpipe,6,V6,roof|pinchy|juggy,5.4,True,1.944,0.234,5,30
+b0783,Creeper,The Tailgate,1,The Tailpipe,10,V10,roof|dyno|reachy,5.4,True,2.065,0.737,5,30
+b0784,Grease Monkey,The Tailgate,1,The Tailpipe,5,V5,roof|powerful,5.4,False,1.359,0.207,5,30
+b0785,Fuzzy Dice,The Tailgate,1,The Tailpipe,3,V3,pinchy|powerful,5.4,False,2.1,0.075,5,30
+b0786,Pub Crawl,The Tailgate,1,The Tailpipe,6,V6,roof|pinchy|crimpy|traverse|bunchy,5.4,False,1.471,-0.574,5,30
+b0787,Conga Line,The Tailgate,1,The Tailpipe,5,V5,roof|compression|traverse|bunchy,5.4,False,0.853,-0.962,5,30
+b0788,Pedant,The Tailgate,1,The Tailpipe,5,V5,roof|crimpy|juggy|eliminate,5.4,True,0.233,-0.242,5,30
+b0789,Tailpipe Traverse,The Tailgate,1,The Tailpipe,3,V3,roof|mantle|pinchy|traverse|reachy,5.4,False,1.851,0.664,5,30
+b0790,Check Engine Light,The Tailgate,1,The Tailpipe,9,V9,roof|slopey|juggy,5.4,False,1.185,-0.289,5,30
+b0791,Catalytic Converter,The Tailgate,1,The Tailpipe,12,V12,roof|pinchy,5.4,True,0.783,-0.404,5,30
+b0792,Oil Change,The Tailgate,1,The Tailpipe,5,V5,compression|juggy,5.4,False,1.654,-0.402,5,30
+b0793,Popeye,The Tailgate,1,The Tailpipe,8,V8,juggy|traverse|bunchy,5.4,False,1.221,-0.842,5,30
+b0794,Carbon Monoxide,The Tailgate,1,The Tailpipe,11,V11,roof|compression|technical,5.4,True,1.973,-0.359,5,30
+b0795,Lichen It,The Tailgate,1,The Tailpipe,5,V5,roof|dyno|reachy,5.4,False,0.604,0.56,5,30
+b0796,Bottle Opener,The Tailgate,1,The Cooler,5,V5,mantle,11.3,False,1.461,-0.051,5,32
+b0797,Potato Salad,The Tailgate,1,The Cooler,8,V8,crimpy|bunchy,11.3,True,2.135,-0.502,5,32
+b0798,Cold One,The Tailgate,1,The Cooler,6,V6,slab|compression|mantle,11.3,False,2.35,0.177,5,32
+b0799,Food Poisoning,The Tailgate,1,The Cooler,9,V9,slab|technical|mantle,11.3,False,2.222,-0.143,5,32
+b0800,Warm Soda,The Tailgate,1,The Cooler,4,V4,slab|crimpy|technical|reachy,11.3,True,1.466,0.682,5,32
+b0801,Juice Box,The Tailgate,1,The Cooler,1,V1,crimpy|technical|bunchy,11.3,False,2.295,-0.805,5,32
+b0802,Ice Pack,The Tailgate,1,The Cooler,1,V1,slab|slopey,11.3,False,1.6,-0.182,5,32
+b0803,Tailgate Party,The Tailgate,1,The Cooler,4,V4,slab|technical|slopey,11.3,False,2.336,-0.341,5,32
+b0804,Mayo in the Sun,The Tailgate,1,The Cooler,0,V0,slab|technical,11.3,False,1.56,0.176,5,32
+b0805,Last Clementine,The Tailgate,1,The Cooler,4,V4,technical|mantle,11.3,False,1.043,-0.283,5,32
+b0806,Compass Rose,Hawkwatch,8,The Weathervane,4,V4,slab|technical|crimpy,11.7,False,3.046,0.171,7,49
+b0807,Rooster,Hawkwatch,8,The Weathervane,0,V0,slab|crimpy|powerful|bunchy,11.7,False,2.489,-0.532,7,49
+b0808,Spin Cycle,Hawkwatch,8,The Weathervane,3,V3,slab|mantle,11.7,True,1.809,-0.118,7,49
+b0809,True North,Hawkwatch,8,The Weathervane,13,V13,crimpy|technical|slopey,11.7,False,2.366,0.125,7,49
+b0810,Southpaw,Hawkwatch,8,The Weathervane,0,V0,slab|crimpy|dyno,11.7,False,0.641,0.345,7,49
+b0811,Which Way the Wind Blows Sit,Hawkwatch,8,The Weathervane,5,V5,slab|crimpy|technical|juggy,11.7,True,2.015,-0.092,7,49
+b0812,Which Way the Wind Blows,Hawkwatch,8,The Weathervane,3,V3,slab|crimpy|mantle,11.7,False,2.821,0.013,7,49
+b0813,Due East,Hawkwatch,8,The Weathervane,0,V0,slab|slopey|crimpy,11.7,False,1.791,-0.232,7,49
+b0814,Due West,Hawkwatch,8,The Weathervane,4,V4,crimpy|mantle,11.7,False,1.631,-0.309,7,49
+b0815,Lick It,Back Forty,24,The Salt Lick,0,V0,crimpy|pinchy|bunchy,12.6,False,1.438,-0.721,0,2
+b0816,Salt Lick,Back Forty,24,The Salt Lick,1,V1,technical|bunchy,12.6,False,2.167,-1.0,0,2
+b0817,Wardrobe Traverse,Bracken Gully,16,The Wardrobe,13,V13,overhang|crimpy|juggy|compression|traverse|bunchy,7.2,False,1.564,-0.746,2,13
+b0818,Fur Coats,Bracken Gully,16,The Wardrobe,2,V2,overhang|juggy|bunchy,7.2,True,2.119,-0.533,2,13
+b0819,Dawn Treader,Bracken Gully,16,The Wardrobe,1,V1,overhang|powerful,7.2,True,0.565,-0.482,2,13
+b0820,Mothballs,Bracken Gully,16,The Wardrobe,2,V2,overhang|dyno|reachy,7.2,True,2.172,0.638,2,13
+b0821,The Stone Table,Bracken Gully,16,The Wardrobe,12,V12,overhang|dyno|mantle|reachy,7.2,False,0.0,0.816,2,13
+b0822,Turkish Delight,Bracken Gully,16,The Wardrobe,6,V6,overhang|compression|pinchy|bunchy,7.2,True,1.249,-0.643,2,13
+b0823,Cair Paravel,Bracken Gully,16,The Wardrobe,5,V5,overhang|crimpy|dyno,7.2,True,0.726,0.007,2,13
+b0824,Deeper Magic,Bracken Gully,16,The Wardrobe,0,V0,overhang|crimpy,7.2,False,1.472,-0.395,2,13
+b0825,Lactic Acid Trip,Bracken Gully,16,The Wardrobe,7,V7,overhang|crimpy|pinchy|traverse,7.2,False,0.0,-0.466,2,13
+b0826,Lamp Post,Bracken Gully,16,The Wardrobe,2,V2,overhang|crimpy|compression|pinchy|reachy,7.2,True,2.547,0.665,2,13
+b0827,Pump Up the Jam,Bracken Gully,16,The Wardrobe,9,V9,overhang|pinchy|traverse,7.2,False,1.304,-0.416,2,13
+b0828,Mr. Tumnus,Bracken Gully,16,The Wardrobe,9,V9,overhang|crimpy|compression,7.2,False,1.59,0.292,2,13
+b0829,Through the Wardrobe,Bracken Gully,16,The Wardrobe,3,V3,overhang|crimpy|compression,7.2,True,2.277,-0.427,2,13
+b0830,Always Winter,Bracken Gully,16,The Wardrobe,1,V1,overhang|crimpy|juggy,7.2,True,1.93,0.492,2,13
+b0831,The White Witch,Bracken Gully,16,The Wardrobe,5,V5,overhang|powerful,7.2,True,1.042,0.085,2,13
+b0832,Hush Traverse,Hemlock Hollow,19,The Hush,2,V2,roof|pinchy|traverse,10.9,True,1.34,-0.036,3,18
+b0833,Silent Night,Hemlock Hollow,19,The Hush,10,V10,roof|crimpy|slopey|reachy,10.9,True,1.517,0.561,3,18
+b0834,Shh,Hemlock Hollow,19,The Hush,3,V3,roof|powerful|mantle,10.9,True,0.336,-0.106,3,18
+b0835,Quiet Hours,Hemlock Hollow,19,The Hush,5,V5,roof|slopey,10.9,False,0.555,-0.095,3,18
+b0836,Library Voice,Hemlock Hollow,19,The Hush,7,V7,compression,10.9,False,2.076,-0.438,3,18
+b0837,Sound of Silence,Hemlock Hollow,19,The Hush,5,V5,roof|crimpy|slopey|reachy,10.9,True,2.263,1.0,3,18
+b0838,Fine Print,Hemlock Hollow,19,The Hush,7,V7,roof|crimpy|dyno|slopey|eliminate,10.9,False,0.245,0.123,3,18
+b0839,Contrived Comfort,Hemlock Hollow,19,The Hush,3,V3,roof|crimpy|pinchy|juggy|eliminate,10.9,True,0.973,-0.315,3,18
+b0840,Slow and Steady,Hemlock Hollow,19,The Snapping Turtle,9,V9,overhang|slopey|dyno|reachy,7.3,True,1.866,0.619,3,22
+b0841,Tortoise and Hare,Hemlock Hollow,19,The Snapping Turtle,4,V4,slopey|dyno,7.3,False,1.506,0.422,3,22
+b0842,Turtle Power,Hemlock Hollow,19,The Snapping Turtle,3,V3,overhang|slopey|crimpy,7.3,False,2.63,0.344,3,22
+b0843,Snapping Turtle Traverse,Hemlock Hollow,19,The Snapping Turtle,5,V5,overhang|slopey|crimpy|traverse,7.3,True,2.936,0.493,3,22
+b0844,Turtles All the Way Down,Hemlock Hollow,19,The Snapping Turtle,4,V4,powerful|juggy,7.3,False,2.574,0.129,3,22
+b0845,Snap Decision,Hemlock Hollow,19,The Snapping Turtle,13,V13,overhang|slopey|pinchy,7.3,False,2.733,0.075,3,22
+b0846,Snapper's Revenge,Hemlock Hollow,19,The Snapping Turtle,11,V11,overhang|slopey|dyno|powerful,7.3,False,2.273,-0.043,3,22
+b0847,Shell Shock,Hemlock Hollow,19,The Snapping Turtle,1,V1,overhang|compression|bunchy,7.3,True,2.433,-1.0,3,22
+b0848,Rush Hour,Hemlock Hollow,19,The Snapping Turtle,5,V5,compression|juggy|traverse,7.3,True,1.665,0.362,3,22
+b0849,Turtle Power Sit,Hemlock Hollow,19,The Snapping Turtle,3,V3,overhang|mantle|dyno,7.3,True,0.927,0.002,3,22
+b0850,Birches,The Cellar Holes,18,The Stone Wall,1,V1,slab|mantle,8.5,False,1.604,0.122,4,28
+b0851,Fire and Ice (No Lip),The Cellar Holes,18,The Stone Wall,9,V9,slab|crimpy|mantle|eliminate|bunchy,8.5,False,1.72,-0.84,4,28
+b0852,Mending Wall,The Cellar Holes,18,The Stone Wall,0,V0,slab|technical|bunchy,8.5,False,2.321,-0.622,4,28
+b0853,Stone Fence,The Cellar Holes,18,The Stone Wall,0,V0,slab|technical,8.5,False,2.522,-0.068,4,28
+b0854,Nothing Gold Can Stay,The Cellar Holes,18,The Stone Wall,6,V6,slab|mantle|technical|reachy,8.5,False,1.693,0.71,4,28
+b0855,Dry Stack,The Cellar Holes,18,The Stone Wall,10,V10,slab|mantle|technical,8.5,False,0.843,0.333,4,28
+b0856,Boundary Line,The Cellar Holes,18,The Stone Wall,7,V7,slab|powerful|bunchy,8.5,True,0.611,-0.873,4,28
+b0857,Acquainted With the Night,The Cellar Holes,18,The Stone Wall,11,V11,slab|slopey|technical,8.5,False,0.401,-0.162,4,28
+b0858,Fieldstone,The Cellar Holes,18,The Stone Wall,1,V1,slab|crimpy,8.5,False,1.409,-0.172,4,28
+b0859,Miles to Go,The Cellar Holes,18,The Stone Wall,7,V7,slab|mantle|crimpy,8.5,False,1.765,0.358,4,28
+b0860,The Road Not Taken,The Cellar Holes,18,The Stone Wall,9,V9,slab|technical,8.5,False,2.018,-0.236,4,28
+b0861,Fire and Ice,The Cellar Holes,18,The Stone Wall,3,V3,slab|technical,8.5,True,1.738,0.103,4,28
+b0862,Stopping by Woods,The Cellar Holes,18,The Stone Wall,7,V7,slab|powerful|pinchy,8.5,True,1.828,-0.17,4,28
+b0863,After Apple-Picking,The Cellar Holes,18,The Stone Wall,3,V3,slab|technical,8.5,False,1.514,-0.02,4,28
+b0864,Good Fences,The Cellar Holes,18,The Stone Wall,0,V0,slab|technical,8.5,False,2.328,0.428,4,28
+b0865,Frost Heave,The Cellar Holes,18,The Stone Wall,2,V2,slab|technical|crimpy|bunchy,8.5,True,1.137,-0.973,4,28
+b0866,Glacial Erratic,The Cellar Holes,18,The Stone Wall,5,V5,slab|mantle|slopey|bunchy,8.5,False,1.38,-0.674,4,28
+b0867,Stone Wall Traverse,The Cellar Holes,18,The Stone Wall,1,V1,slab|crimpy|slopey|traverse|eliminate,8.5,False,1.164,0.256,4,28
+b0868,"Out, Out",The Cellar Holes,18,The Stone Wall,12,V12,slab|powerful|juggy,8.5,False,2.063,0.137,4,28
+b0869,Before I Sleep,The Cellar Holes,18,The Stone Wall,1,V1,slab|mantle|pinchy|reachy,8.5,True,1.749,0.963,4,28
+b0870,Skinny Dip,The Grout Piles,21,The Swimming Hole,4,V4,overhang|powerful,9.7,True,1.921,0.171,6,43
+b0871,Cold Plunge,The Grout Piles,21,The Swimming Hole,7,V7,overhang|technical,9.7,True,2.466,-0.001,6,43
+b0872,Rope Swing,The Grout Piles,21,The Swimming Hole,3,V3,overhang|slopey,9.7,False,1.481,-0.019,6,43
+b0873,Cool Off,The Grout Piles,21,The Swimming Hole,7,V7,overhang|juggy|reachy,9.7,False,1.077,0.587,6,43
+b0874,Errata,The Grout Piles,21,The Swimming Hole,2,V2,overhang|compression|eliminate,9.7,True,1.336,-0.18,6,43
+b0875,Deep Water,The Grout Piles,21,The Swimming Hole,12,V12,overhang|dyno|slopey|reachy,9.7,False,2.012,1.0,6,43
+b0876,Polar Bear Club,The Grout Piles,21,The Swimming Hole,6,V6,overhang|powerful|slopey,9.7,False,1.885,0.402,6,43
+b0877,Leeches,The Grout Piles,21,The Swimming Hole,3,V3,overhang|compression|bunchy,9.7,False,1.192,-0.977,6,43
+b0878,Cannonball Run,The Grout Piles,21,The Swimming Hole,3,V3,overhang|compression,9.7,True,0.83,0.401,6,43
+b0879,Split Ends,Hawkwatch,8,Old Baldy,1,V1,slopey|dyno|reachy,15.7,False,2.213,0.529,7,56
+b0880,Wig Out,Hawkwatch,8,Old Baldy,5,V5,slopey|powerful|pinchy,15.7,False,2.079,0.268,7,56
+b0881,Sidestep,Hawkwatch,8,Old Baldy,13,V13,slopey|mantle|traverse,15.7,False,1.203,-0.034,7,56
+b0882,Cowlick,Hawkwatch,8,Old Baldy,0,V0,slopey|crimpy,15.7,True,2.147,-0.217,7,56
+b0883,Rapunzel,Hawkwatch,8,Old Baldy,8,V8,slopey|mantle,15.7,False,1.993,0.001,7,56
+b0884,Sweeney Todd,Hawkwatch,8,Old Baldy,3,V3,slopey|powerful|crimpy,15.7,False,2.578,-0.327,7,56
+b0885,Grand Tour,Hawkwatch,8,Old Baldy,4,V4,slopey|technical|traverse,15.7,False,2.027,-0.0,7,56
+b0886,Hairpin,Hawkwatch,8,Old Baldy,8,V8,slopey|crimpy|pinchy,15.7,True,1.079,-0.374,7,56
+b0887,Business in Front,Hawkwatch,8,Old Baldy,0,V0,slopey|technical,15.7,True,2.387,0.338,7,56
+b0888,By a Hair,Hawkwatch,8,Old Baldy,6,V6,crimpy|pinchy,15.7,False,0.856,-0.288,7,56
+b0889,Buzz Cut,Hawkwatch,8,Old Baldy,2,V2,crimpy,15.7,False,2.864,-0.171,7,56
+b0890,Hair Today,Hawkwatch,8,Old Baldy,4,V4,slopey|pinchy|dyno,15.7,False,2.936,0.057,7,56
+b0891,Party in the Back,Hawkwatch,8,Old Baldy,5,V5,slopey|crimpy,15.7,False,2.271,-0.071,7,56
+b0892,Close Shave,Hawkwatch,8,Old Baldy,6,V6,slopey|crimpy,15.7,False,2.53,-0.311,7,56
+b0893,Hair Trigger,Hawkwatch,8,Old Baldy,4,V4,slopey|crimpy,15.7,True,1.509,0.078,7,56
+b0894,Close Shave (No Arête),Hawkwatch,8,Old Baldy,10,V10,mantle|technical|eliminate,15.7,False,1.538,0.281,7,56
+b0895,Bald Spot,Hawkwatch,8,Old Baldy,2,V2,slopey|technical,15.7,False,2.939,-0.015,7,56
+b0896,Delilah,Hawkwatch,8,Old Baldy,11,V11,technical,15.7,False,2.857,-0.254,7,56
+b0897,Barbershop Quartet,Hawkwatch,8,Old Baldy,3,V3,slopey,15.7,False,2.825,0.06,7,56
+b0898,Sideways Glance,Hawkwatch,8,Old Baldy,5,V5,slopey|technical|traverse,15.7,True,0.713,-0.135,7,56
+b0899,Detour,Hawkwatch,8,Old Baldy,8,V8,slopey|technical|powerful|traverse,15.7,False,2.077,-0.41,7,56
+b0900,Ibid.,Hawkwatch,8,Old Baldy,5,V5,slopey|compression|eliminate,15.7,False,2.515,0.052,7,56
+b0901,Sunburnt Scalp,Hawkwatch,8,Old Baldy,3,V3,technical|crimpy,15.7,True,3.427,-0.101,7,56
+b0902,Cue Ball,Hawkwatch,8,Old Baldy,1,V1,slopey|technical,15.7,False,3.185,0.138,7,56
+b0903,Shiny Dome,Hawkwatch,8,Old Baldy,3,V3,slopey|crimpy|powerful,15.7,False,2.992,0.13,7,56
+b0904,Midlife Crisis,Hawkwatch,8,Old Baldy,10,V10,slopey|dyno,15.7,False,2.498,-0.244,7,56
+b0905,Rusty Lobster,Hawkwatch,8,Old Baldy,8,V8,slopey|pinchy|crimpy,15.7,False,4.0,-0.379,7,56
+b0906,Bad Hair Day,Hawkwatch,8,Old Baldy,5,V5,dyno|reachy,15.7,False,2.241,1.0,7,56
+b0907,Hairline Fracture (Static),Hawkwatch,8,Old Baldy,1,V1,slopey|dyno|eliminate|reachy,15.7,False,2.057,0.839,7,56
+b0908,Toupee or Not Toupee,Hawkwatch,8,Old Baldy,9,V9,slopey|powerful,15.7,True,2.117,0.303,7,56
+b0909,Bitter Owl,Hawkwatch,8,Old Baldy,3,V3,slopey|juggy,15.7,False,3.879,0.474,7,56
+b0910,Mullet,Hawkwatch,8,Old Baldy,3,V3,slopey|compression|juggy,15.7,True,2.48,0.169,7,56
+b0911,Hairline Fracture,Hawkwatch,8,Old Baldy,0,V0,slopey|dyno|crimpy|reachy,15.7,False,1.644,1.0,7,56
+b0912,Comb-Over,Hawkwatch,8,Old Baldy,5,V5,technical,15.7,False,3.879,-0.166,7,56
+b0913,Hair of the Dog,Hawkwatch,8,Old Baldy,6,V6,slopey|mantle,15.7,False,2.224,0.349,7,56
+b0914,Bucket Hat,Hawkwatch,8,Old Baldy,3,V3,juggy|dyno,15.7,False,3.694,0.414,7,56
+b0915,Male Pattern Boldness,Hawkwatch,8,Old Baldy,10,V10,crimpy|pinchy|bunchy,15.7,False,0.918,-0.596,7,56
+b0916,The Floor Is Lava,Hawkwatch,8,Old Baldy,1,V1,slopey|eliminate|bunchy,15.7,False,1.91,-0.791,7,56
+b0917,Bucket Hat Sit,Hawkwatch,8,Old Baldy,5,V5,slopey|juggy,15.7,True,2.233,0.137,7,56
+b0918,Filibuster,Hawkwatch,8,Old Baldy,2,V2,crimpy|eliminate,15.7,False,1.252,-0.312,7,56
+b0919,Samson,Hawkwatch,8,Old Baldy,11,V11,slopey|pinchy|reachy,15.7,False,3.272,0.581,7,56
+b0920,Grand Tour (No Heel Hooks),Hawkwatch,8,Old Baldy,7,V7,slopey|powerful|juggy|eliminate|reachy,15.7,False,2.322,0.738,7,56
+b0921,Old Baldy Traverse,Hawkwatch,8,Old Baldy,4,V4,technical|traverse,15.7,False,4.0,0.028,7,56
+b0922,Shiny Dome (Crimps Only),Hawkwatch,8,Old Baldy,6,V6,crimpy|eliminate,15.7,True,1.099,0.189,7,56
+b0923,Sunscreen,Hawkwatch,8,Old Baldy,0,V0,slopey,15.7,False,4.0,0.415,7,56
+b0924,Night on Bald Mountain,Hawkwatch,8,Old Baldy,9,V9,technical|pinchy,15.7,True,4.0,0.158,7,56
+b0925,Comb-Over (Slopers Only),Hawkwatch,8,Old Baldy,7,V7,slopey|pinchy|dyno|eliminate|bunchy,15.7,True,1.817,-1.0,7,56
+b0926,Split Ends (Slopers Only),Hawkwatch,8,Old Baldy,3,V3,slopey|eliminate,15.7,False,1.286,-0.035,7,56
+b0927,Sunscreen (Slopers Only),Hawkwatch,8,Old Baldy,1,V1,slopey|powerful|crimpy|eliminate|reachy,15.7,True,2.046,0.763,7,56
+b0928,Forearm Flood,Hawkwatch,8,Old Baldy,1,V1,slopey|powerful|traverse,15.7,False,3.259,-0.321,7,56
+b0929,Sideshow,Hawkwatch,8,Old Baldy,3,V3,slopey|pinchy|traverse|eliminate|reachy,15.7,False,0.867,0.581,7,56
+b0930,Stay on the Trail,The Tailgate,1,Gus's Rock,1,V1,slab|pinchy|reachy,8.6,False,1.888,0.661,5,33
+b0931,Stay on the Trail (No Arête),The Tailgate,1,Gus's Rock,5,V5,slab|technical|mantle|eliminate,8.6,False,1.355,0.313,5,33
+b0932,Kiosk,The Tailgate,1,Gus's Rock,0,V0,mantle|crimpy|reachy,8.6,False,2.287,0.803,5,33
+b0933,Citation,The Tailgate,1,Gus's Rock,12,V12,slab|technical,8.6,False,2.161,-0.231,5,33
+b0934,Kiosk Sit,The Tailgate,1,Gus's Rock,0,V0,slab|slopey|mantle,8.6,True,1.861,0.448,5,33
+b0935,Gate Closes at Dusk,The Tailgate,1,Gus's Rock,4,V4,slab|slopey|reachy,8.6,True,2.879,0.688,5,33
+b0936,"Carry In, Carry Out",The Tailgate,1,Gus's Rock,1,V1,slab|slopey|mantle|bunchy,8.6,True,3.54,-0.85,5,33
+b0937,Pets Must Be Leashed,The Tailgate,1,Gus's Rock,2,V2,slab|slopey|mantle|reachy,8.6,False,1.813,0.603,5,33
+b0938,Trespass,The Tailgate,1,Gus's Rock,9,V9,slab|slopey|technical|powerful,8.6,True,2.011,0.009,5,33
+b0939,Lost and Found,The Tailgate,1,Gus's Rock,3,V3,slab|crimpy,8.6,True,1.284,-0.26,5,33
+b0940,Day Use Only,The Tailgate,1,Gus's Rock,6,V6,crimpy|mantle|reachy,8.6,False,3.366,0.736,5,33
+b0941,Fire Danger: Moderate,The Tailgate,1,Gus's Rock,6,V6,slab|crimpy|bunchy,8.6,False,1.538,-0.613,5,33
+b0942,No Swimming,The Tailgate,1,Gus's Rock,3,V3,slopey|technical,8.6,False,2.803,0.378,5,33
+b0943,Leave No Trace,The Tailgate,1,Gus's Rock,3,V3,slab|technical|crimpy,8.6,True,3.174,-0.086,5,33
+b0944,Ranger Gus,The Tailgate,1,Gus's Rock,4,V4,slab|slopey|reachy,8.6,False,3.786,1.0,5,33
+b0945,Permit Required,The Tailgate,1,Gus's Rock,6,V6,slab|slopey|juggy,8.6,False,2.284,0.117,5,33
+b0946,Beaker,The Schoolhouse,6,The Science Lab,7,V7,overhang|pinchy,10.6,False,2.208,0.012,9,67
+b0947,Petri Dish,The Schoolhouse,6,The Science Lab,9,V9,dyno|powerful|reachy,10.6,False,3.165,1.0,9,67
+b0948,Spaghetti Arms,The Schoolhouse,6,The Science Lab,4,V4,powerful|traverse,10.6,True,0.714,0.498,9,67
+b0949,Frog Dissection,The Schoolhouse,6,The Science Lab,4,V4,overhang|powerful|crimpy,10.6,False,3.036,0.012,9,67
+b0950,Critical Mass,The Schoolhouse,6,The Science Lab,13,V13,overhang|compression|bunchy,10.6,True,2.141,-0.782,9,67
+b0951,Chain Reaction,The Schoolhouse,6,The Science Lab,11,V11,overhang|compression|crimpy,10.6,True,1.384,-0.084,9,67
+b0952,Control Group,The Schoolhouse,6,The Science Lab,3,V3,overhang|powerful|technical,10.6,False,1.833,0.187,9,67
+b0953,Mad Scientist,The Schoolhouse,6,The Science Lab,1,V1,overhang|mantle,10.6,False,1.843,0.311,9,67
+b0954,Science Lab Traverse,The Schoolhouse,6,The Science Lab,9,V9,overhang|powerful|compression|traverse|bunchy,10.6,False,0.893,-0.955,9,67
+b0955,Baking Soda Volcano,The Schoolhouse,6,The Science Lab,4,V4,overhang|technical,10.6,True,3.514,0.158,9,67
+b0956,Bunsen Burner,The Schoolhouse,6,The Science Lab,7,V7,overhang|technical|bunchy,10.6,True,3.247,-0.988,9,67
+b0957,Periodic Table,The Schoolhouse,6,The Science Lab,4,V4,overhang|crimpy|powerful,10.6,False,2.488,-0.093,9,67
+b0958,Cream Rises,Back Forty,24,The Milk Can,2,V2,overhang|slopey|mantle,7.4,False,2.374,0.105,0,0
+b0959,Got Milk,Back Forty,24,The Milk Can,5,V5,overhang|slopey|mantle,7.4,True,2.144,-0.131,0,0
+b0960,Lunchbox Traverse (No Feet),The Schoolhouse,6,The Lunchbox,8,V8,overhang|compression|pinchy|eliminate,8.2,False,1.093,0.06,9,65
+b0961,Lunchbox Traverse,The Schoolhouse,6,The Lunchbox,6,V6,overhang|dyno|powerful|traverse,8.2,True,2.657,0.203,9,65
+b0962,Crusts Cut Off,The Schoolhouse,6,The Lunchbox,9,V9,overhang|technical|juggy|reachy,8.2,False,2.783,0.623,9,65
+b0963,Lederhosen,Hemlock Hollow,19,The Squeezebox,3,V3,slopey|pinchy,7.8,False,1.594,0.392,3,21
+b0964,Big Squeeze,Hemlock Hollow,19,The Squeezebox,6,V6,overhang|compression|powerful,7.8,True,0.897,0.108,3,21
+b0965,Pebble Wrestling,Hemlock Hollow,19,The Squeezebox,4,V4,overhang|slopey|pinchy,7.8,False,0.319,-0.356,3,21
+b0966,Concertina,Hemlock Hollow,19,The Squeezebox,3,V3,overhang|powerful|dyno|reachy,7.8,False,1.704,0.881,3,21
+b0967,Bear Hug,Hemlock Hollow,19,The Squeezebox,4,V4,overhang|slopey|crimpy,7.8,True,1.079,-0.425,3,21
+b0968,Death Hug,Hemlock Hollow,19,The Squeezebox,10,V10,overhang|slopey|compression,7.8,False,2.286,0.147,3,21
+b0969,Squeezebox Traverse,Hemlock Hollow,19,The Squeezebox,4,V4,overhang|technical|traverse,7.8,True,1.862,0.165,3,21
+b0970,Pressure Cooker,Hemlock Hollow,19,The Squeezebox,4,V4,overhang|slopey|juggy,7.8,False,0.739,0.053,3,21
+b0971,Boa Constrictor,Hemlock Hollow,19,The Squeezebox,11,V11,powerful|bunchy,7.8,False,1.585,-0.999,3,21
+b0972,Wasp Nest,Hemlock Hollow,19,The Squeezebox,10,V10,crimpy|dyno,7.8,False,0.0,0.349,3,21
+b0973,Panini Press,Hemlock Hollow,19,The Squeezebox,1,V1,overhang|slopey|compression|bunchy,7.8,False,0.0,-1.0,3,21
+b0974,Accordion,Hemlock Hollow,19,The Squeezebox,9,V9,overhang|slopey|dyno|reachy,7.8,True,2.312,0.796,3,21
+b0975,Wanderlust,Hemlock Hollow,19,The Squeezebox,7,V7,slopey|compression|powerful|traverse|eliminate|bunchy,7.8,True,0.0,-0.611,3,21
+b0976,Gap Year,Hemlock Hollow,19,The Squeezebox,7,V7,mantle|compression|traverse|bunchy,7.8,False,0.176,-0.962,3,21
+b0977,Hug Life,Hemlock Hollow,19,The Squeezebox,3,V3,overhang|slopey|compression,7.8,True,1.78,-0.289,3,21
+b0978,Concertina (No Feet),Hemlock Hollow,19,The Squeezebox,4,V4,overhang|compression|powerful|eliminate,7.8,True,1.625,-0.008,3,21
+b0979,Polka,Hemlock Hollow,19,The Squeezebox,1,V1,overhang|slopey|powerful|bunchy,7.8,False,1.75,-0.673,3,21
+b0980,Dirt Nap,Hemlock Hollow,19,The Squeezebox,3,V3,overhang|slopey|compression|crimpy,7.8,True,0.0,0.366,3,21
+b0981,Easy Peasy,Hemlock Hollow,19,The Squeezebox,3,V3,overhang|slopey|compression,7.8,True,2.476,0.29,3,21
+b0982,Book Tour,Hemlock Hollow,19,The Squeezebox,6,V6,overhang|juggy|powerful|traverse,7.8,True,0.949,-0.07,3,21
+b0983,Push and Pull,Hemlock Hollow,19,The Squeezebox,5,V5,overhang|slopey|powerful|bunchy,7.8,True,1.39,-0.757,3,21
+b0984,Squeeze Play,Hemlock Hollow,19,The Squeezebox,8,V8,pinchy,7.8,False,0.826,-0.388,3,21
+b0985,Juicer,Hemlock Hollow,19,The Squeezebox,1,V1,overhang|slopey|dyno|reachy,7.8,True,0.201,1.0,3,21
+b0986,Dog Water,Hemlock Hollow,19,The Squeezebox,9,V9,overhang|compression|bunchy,7.8,False,0.504,-0.944,3,21
+b0987,Pumpkin Spice,Hemlock Hollow,19,The Squeezebox,12,V12,overhang|slopey|powerful|traverse|eliminate|bunchy,7.8,True,0.0,-0.708,3,21
+b0988,Red Tape,Hemlock Hollow,19,The Squeezebox,11,V11,overhang|compression|eliminate|bunchy,7.8,False,0.0,-1.0,3,21
+b0989,Oompah,Hemlock Hollow,19,The Squeezebox,2,V2,overhang|slopey|powerful|compression,7.8,True,1.739,-0.064,3,21
+b0990,Lemon Squeezy,Hemlock Hollow,19,The Squeezebox,1,V1,overhang|juggy|powerful,7.8,True,2.796,0.171,3,21
+b0991,Sticky Situation (Crimps Only),Bracken Gully,16,The Sundew,3,V3,overhang|crimpy|dyno|eliminate|reachy,9.4,False,0.408,1.0,2,17
+b0992,Bog Body,Bracken Gully,16,The Sundew,5,V5,overhang|pinchy,9.4,True,1.051,0.077,2,17
+b0993,Pitcher Plant,Bracken Gully,16,The Sundew,6,V6,overhang|powerful,9.4,True,2.716,0.378,2,17
+b0994,Flytrap,Bracken Gully,16,The Sundew,2,V2,overhang|powerful|pinchy,9.4,True,2.743,-0.053,2,17
+b0995,Sticky Situation,Bracken Gully,16,The Sundew,3,V3,overhang|powerful,9.4,True,2.005,0.085,2,17
+b0996,Technicality,Bracken Gully,16,The Sundew,4,V4,overhang|pinchy|technical|eliminate|reachy,9.4,False,1.601,0.754,2,17
+b0997,Feed Me,Bracken Gully,16,The Sundew,4,V4,overhang|crimpy|bunchy,9.4,False,2.783,-0.833,2,17
+b0998,Iron Lantern Sit,Bracken Gully,16,The Sundew,6,V6,overhang|powerful,9.4,True,3.112,-0.231,2,17
+b0999,Little Shop of Horrors,Bracken Gully,16,The Sundew,2,V2,overhang|compression,9.4,False,2.442,0.276,2,17

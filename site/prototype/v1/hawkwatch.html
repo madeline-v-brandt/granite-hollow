@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta charset="utf-8">
+<title>Hawkwatch Illustrated</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
+<style>
+/* Layout: the game's own frame (an illustrated map on the left, a field
+   notebook on the right), cut down to one area so the art can be judged on
+   its own. The notebook holds the controls for season, light and weather,
+   and a list of things to find. Paper and ink tokens are the game's. */
+:root {
+  --paper: #efe7d3; --panel: #f7f1e1; --raised: #fcf8ee; --ink: #2a251d; --ink-2: #564d3f; --muted: #7d7361;
+  --rule-ink: rgba(42, 37, 29, .2); --hover: rgba(42, 37, 29, .055); --chip: rgba(42, 37, 29, .07);
+  --accent: #2e6c53; --accent-ink: #fcf8ee; --gold: #a0680b; --project: #b07610;
+  --serif: "Fraunces", "Iowan Old Style", Georgia, serif; --body: "Nunito Sans", "Avenir Next", "Segoe UI", system-ui, sans-serif; --hand: "Caveat", "Bradley Hand", cursive;
+  --halo: rgba(252, 248, 238, .92); --map-dim: 0;
+  /* map labels keep the map's own inks in both themes: the illustration stays light */
+  --map-ink: #2a251d; --map-ink-2: #564d3f; --map-halo: rgba(252, 248, 238, .9);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .15 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* the map's fixed inks and defaults (overwritten by the season and the clock) */
+  --snow-white: #fbfdff; --birch-bark: #efebe2; --path-c: #dcc79f; --season-tint: #efd39a;
+  --leaf: 1; --snow: 0; --flowers: .4; --fernness: .7; --berries: 0; --shrooms: 0;
+  --tint: #fff; --tint-op: 0; --veil: #fff; --veil-op: 0; --shx: .2; --shy: -.25; --shadow-op: .3; --sun: #fffbea; --hl-e: .5; --hl-w: .5; --rtop-sun: 20%;
+  --ground: color-mix(in oklab, var(--paper), var(--season-tint) 16%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1b201c; --panel: #222823; --raised: #29302a; --ink: #ece3cc; --ink-2: #c6bba1; --muted: #978d77;
+    --rule-ink: rgba(236, 227, 204, .16); --hover: rgba(236, 227, 204, .06); --chip: rgba(236, 227, 204, .08);
+    --accent: #6cc39a; --accent-ink: #10241a; --gold: #e2b04f; --project: #e2b04f; --halo: rgba(34, 40, 35, .9); --map-dim: .2;
+    --ground: color-mix(in oklab, var(--paper), var(--season-tint) 6%); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1b201c; --panel: #222823; --raised: #29302a; --ink: #ece3cc; --ink-2: #c6bba1; --muted: #978d77;
+  --rule-ink: rgba(236, 227, 204, .16); --hover: rgba(236, 227, 204, .06); --chip: rgba(236, 227, 204, .08);
+  --accent: #6cc39a; --accent-ink: #10241a; --gold: #e2b04f; --project: #e2b04f; --halo: rgba(34, 40, 35, .9); --map-dim: .2;
+  --ground: color-mix(in oklab, var(--paper), var(--season-tint) 6%); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground) var(--grain); color: var(--ink); font: 15px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 24px; transition: background-color 1.2s ease; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1560px; margin: 0 auto; }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0 2px 10px; }
+.top h1 { font-family: var(--serif); font-weight: 800; font-size: clamp(26px, 3.2vw, 36px); line-height: 1; margin: 0; letter-spacing: -.01em; font-variation-settings: "SOFT" 100, "opsz" 96; }
+.top .kicker { font-weight: 800; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.top .hand { font-family: var(--hand); font-size: 21px; color: var(--ink-2); line-height: 1.1; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; }
+@media (max-width: 980px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- the map frame ---- */
+.map { position: relative; min-width: 0; height: clamp(460px, calc(100vh - 110px), 940px); overflow: hidden; border: 1px solid var(--rule-ink); border-radius: 12px;
+  background: var(--floor, #b9c28a); box-shadow: inset 0 0 0 6px color-mix(in oklab, var(--paper), transparent 55%), 0 10px 24px -16px rgba(70, 52, 20, .4); }
+@media (max-width: 980px) { .map { height: clamp(380px, 68vh, 640px); } }
+.map svg#map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.map svg#map:active { cursor: grabbing; }
+.map::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 12px; box-shadow: inset 0 0 70px rgba(60, 44, 18, .28), inset 0 0 0 1px rgba(255, 255, 255, .25); }
+.cartouche { position: absolute; left: 12px; top: 12px; z-index: 2; pointer-events: none; background: color-mix(in oklab, var(--raised), transparent 8%);
+  border: 1px solid var(--rule-ink); border-radius: 10px; padding: 7px 12px 8px; box-shadow: 0 2px 0 var(--rule-ink), inset 0 0 0 3px color-mix(in oklab, var(--raised), var(--rule-ink) 25%); }
+.cartouche b { display: block; font-family: var(--serif); font-weight: 800; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; line-height: 1.1; font-variation-settings: "SOFT" 100; }
+.cartouche span { font-family: var(--hand); font-size: 19px; line-height: 1.1; color: var(--ink-2); }
+.tools { position: absolute; top: 12px; right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 2; display: flex; flex-direction: column; background: var(--raised);
+  border: 1px solid var(--rule-ink); border-radius: 9px; overflow: hidden; box-shadow: 0 2px 0 var(--rule-ink); }
+.tools button { width: 36px; height: 34px; border: 0; background: transparent; cursor: pointer; font-size: 19px; display: grid; place-items: center; }
+.tools button + button { border-top: 1px solid var(--rule-ink); }
+.tools button:hover { background: var(--hover); }
+.tools .fit { font-weight: 800; font-size: 11px; letter-spacing: .08em; }
+.compass { position: absolute; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: 12px; z-index: 2; width: 50px; height: 50px; pointer-events: none; color: var(--ink-2); opacity: .8; }
+.tooltip { position: absolute; z-index: 3; pointer-events: none; max-width: 260px; background: var(--raised) var(--grain); border: 1px solid var(--rule-ink);
+  border-radius: 10px; padding: 9px 11px; font-size: 13px; box-shadow: 0 12px 32px rgba(70, 52, 20, .17); }
+.tooltip strong { font-family: var(--serif); font-size: 18px; font-weight: 750; display: block; line-height: 1.1; font-variation-settings: "SOFT" 100; }
+.tooltip .sub { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+.tooltip .tip-desc { font-family: var(--hand); font-size: 17px; line-height: 1.15; color: var(--ink-2); margin: 3px 0 6px; }
+
+/* ---- the notebook ---- */
+.side { min-width: 0; background: var(--panel) var(--grain); border: 1px solid var(--rule-ink); border-radius: 12px; padding: 16px 18px 20px;
+  box-shadow: 0 10px 24px -16px rgba(70, 52, 20, .4); display: flex; flex-direction: column; gap: 4px; }
+@media (min-width: 981px) { .side { height: clamp(460px, calc(100vh - 110px), 940px); overflow-y: auto; } }
+.side h2 { font-family: var(--serif); font-weight: 750; font-size: 26px; line-height: 1.05; margin: 0; font-variation-settings: "SOFT" 100, "opsz" 72; }
+.side .readout { font-family: var(--hand); font-size: 21px; line-height: 1.15; color: var(--ink-2); margin: 2px 0 4px; min-height: 1.2em; }
+.side h3 { font-weight: 800; font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 16px 0 6px; display: flex; align-items: center; gap: 8px; }
+.side h3::after { content: ""; flex: 1; height: 1px; background: var(--rule-ink); }
+.seg { display: flex; flex-wrap: wrap; gap: 5px; }
+.seg button { border: 1.5px solid var(--rule-ink); background: var(--raised); border-radius: 999px; padding: 3px 11px; cursor: pointer; font-size: 13.5px; font-weight: 650; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.seg button:hover:not([aria-pressed="true"]) { background: color-mix(in oklab, var(--raised), var(--ink) 5%); }
+.slider { display: grid; gap: 2px; margin-top: 6px; }
+.slider label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); font-weight: 650; }
+.slider output { color: var(--ink); font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.finds { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.finds button { width: 100%; text-align: left; border: 0; background: none; cursor: pointer; padding: 6px 8px; border-radius: 8px; display: grid; gap: 0; }
+.finds button:hover { background: var(--hover); }
+.finds .t { font-weight: 750; font-size: 14.5px; }
+.finds .s { font-family: var(--hand); font-size: 17px; line-height: 1.1; color: var(--ink-2); }
+.legend { display: grid; grid-template-columns: 26px 1fr; gap: 6px 8px; align-items: center; font-size: 13.5px; color: var(--ink-2); }
+.legend svg { width: 26px; height: 22px; overflow: visible; }
+.about { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+
+/* ---- the map's art (see paint.js) ---- */
+.floor { fill: var(--floor); }
+.wash.w0 { fill: var(--floor2); opacity: .3; } .wash.w1 { fill: var(--meadow); opacity: .3; }
+.litter { opacity: calc(.75 * (1 - var(--snow))); }
+.lt0 { fill: var(--litter-0); } .lt1 { fill: var(--litter-1); } .lt2 { fill: color-mix(in oklab, var(--litter-0), #fff8e0 40%); }
+.twig { fill: none; stroke: color-mix(in oklab, var(--trunk), transparent 35%); stroke-width: .09; stroke-linecap: round; }
+.hill0 { stop-color: #fffbe8; stop-opacity: .26; } .hill1 { stop-color: #fffbe8; stop-opacity: 0; } .hill2 { stop-color: #1d2a1a; stop-opacity: .16; }
+/* the bald: heath (grass and blueberry) with granite ledges coming through it */
+.bald { fill: color-mix(in oklab, var(--meadow), var(--bald-c) 30%); }
+.bald-fringe { fill: color-mix(in oklab, var(--grass-c), var(--meadow) 40%); opacity: .55; }
+.heath-bb { fill: var(--bb); opacity: calc(.6 * (1 - var(--snow))); stroke: var(--bb); stroke-width: 2.5; stroke-opacity: .35; stroke-linejoin: round; }
+.ledge { stroke: color-mix(in oklab, var(--bald-c), #2b2830 55%); stroke-width: .8px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.ledge0 { fill: color-mix(in oklab, var(--bald-c), #6e675d 26%); }
+.ledge1 { fill: color-mix(in oklab, var(--bald-c), #8a8277 10%); stroke-opacity: .55; }
+.ledge2 { fill: color-mix(in oklab, var(--bald-c), #fffdf5 30%); stroke-opacity: .3; }
+.rocktone0 { fill: #fffdf6; opacity: .2; } .rocktone1 { fill: #7d7468; opacity: .09; }
+.sheet-step { fill: none; stroke: color-mix(in oklab, var(--bald-c), #2a2630 60%); stroke-width: .32; stroke-linecap: round; opacity: .55; }
+.sheet-lip { fill: none; stroke: #fffdf7; stroke-width: .28; stroke-linecap: round; opacity: .6; }
+.joint { fill: none; stroke: color-mix(in oklab, var(--bald-c), #2a2630 65%); stroke-width: .16; stroke-linecap: round; opacity: .45; }
+.ro { opacity: calc(.55 * (1 - var(--snow))); } .ro0 { fill: #a3c18a; } .ro1 { fill: #d2dbbd; } .ro2 { fill: #e3a34b; }
+.pebble { fill: #b3ab9f; stroke: #4a453e; stroke-width: .5px; vector-effect: non-scaling-stroke; }
+.trail-worn { fill: none; stroke: color-mix(in oklab, var(--bald-c), #6e5c46 28%); stroke-width: 2; stroke-linecap: round; opacity: .45; }
+.trail-edge { fill: none; stroke: color-mix(in oklab, var(--path-c), #3e2e1c 40%); stroke-width: 3.1; stroke-linecap: round; opacity: .5; }
+.trail-dirt { fill: none; stroke: var(--path-c); stroke-width: 2.3; stroke-linecap: round; }
+.trail-ink { fill: none; stroke: #6d4927; stroke-width: 1.6px; stroke-dasharray: 5 3.5; vector-effect: non-scaling-stroke; }
+.trail-snowpack { fill: none; stroke: #d3dcea; stroke-width: 1.5; stroke-linecap: round; opacity: calc(var(--snow) * .95); }
+.blaze { fill: #3c70c4; stroke: #1c3a6c; stroke-width: .06; opacity: calc(1 - var(--snow) * .7); }
+.flowers { opacity: var(--flowers); }
+.fl0 { fill: var(--fl-0); } .fl1 { fill: var(--fl-1); } .fl2 { fill: var(--fl-2); } .fl3 { fill: var(--fl-3); } .fl-eye { fill: #f3cf4e; }
+.grass { fill: none; stroke: var(--grass-c); stroke-width: .09; stroke-linecap: round; opacity: calc(1 - var(--snow) * .85); }
+.shrooms { opacity: var(--shrooms); }
+.shrooms .stem { fill: #efe6d2; } .shrooms .cap { fill: #9a5b34; } .shrooms .cap.fly { fill: #d8362b; } .shrooms .spots { fill: #fff; }
+.shrooms .bracket { fill: #dd8b36; stroke: #7a4a1c; stroke-width: .04; }
+.snow-cover { fill: var(--snow-white); opacity: calc(var(--snow) * .88); }
+.pools { fill: var(--canopy); opacity: .13; } .pool-decid { opacity: var(--leaf); }
+.shadows { fill: var(--shade-c); opacity: var(--shadow-op); } .sh-decid { opacity: calc(.3 + .7 * var(--leaf)); }
+/* trees and shrubs: colours by class, read inside the glyphs through variables */
+.t, .sb { --crown: var(--maple-0); --crown-d: color-mix(in oklab, var(--crown) 62%, var(--canopy)); --crown-l: color-mix(in oklab, var(--crown) 58%, var(--sun));
+  --leaf-o: var(--leaf); --trunk-c: var(--trunk); --tree-ink: color-mix(in oklab, var(--canopy) 55%, #120f0c); }
+.t.maple.v1 { --crown: var(--maple-1); } .t.maple.v2 { --crown: var(--maple-2); }
+.t.oak { --crown: var(--oak-0); } .t.oak.v1 { --crown: var(--oak-1); } .t.oak.v2 { --crown: var(--oak-2); }
+.t.birch { --crown: var(--birch-0); } .t.birch.v1 { --crown: var(--birch-1); } .t.birch.v2 { --crown: var(--birch-2); }
+.t.pitch { --crown: var(--ever-0); } .t.pitch.v1 { --crown: color-mix(in oklab, var(--ever-0), var(--ever-1)); }
+.t.hemlock { --crown: var(--ever-1); } .t.hemlock.v2 { --crown: color-mix(in oklab, var(--ever-1), var(--ever-2)); }
+.t.whitepine { --crown: var(--ever-2); } .t.whitepine.v1 { --crown: color-mix(in oklab, var(--ever-2), var(--ever-0)); }
+.t.ever, .sb { --leaf-o: 1; }
+.sb.blueberry { --crown: var(--bb); } .sb.laurel { --crown: var(--shrub-c); }
+.log-bark { fill: #7b5f45; stroke: #2e241b; stroke-width: .8px; vector-effect: non-scaling-stroke; }
+.log-end { fill: #dcbd8e; stroke: #2e241b; stroke-width: .7px; vector-effect: non-scaling-stroke; }
+.log-ring { fill: none; stroke: #a5835a; stroke-width: .05; } .log-grain { fill: none; stroke: #5a4431; stroke-width: .06; }
+.log-moss { fill: #6c9a45; opacity: calc(.85 * (1 - var(--snow))); } .log-snow { fill: var(--snow-white); opacity: var(--snow); }
+.log-shadow { fill: var(--shade-c); opacity: .28; }
+.cairn-stone { fill: #c3bcaf; stroke: #3f3b36; stroke-width: .7px; vector-effect: non-scaling-stroke; }
+/* boulders: faces shade by the compass direction they face (--rs0..7, set from the sun) */
+.boulder { cursor: pointer; outline: none; }
+.r-contact { fill: var(--shade-c); opacity: .38; }
+.r-project { fill: none; stroke: var(--project); stroke-width: 2px; stroke-dasharray: 5 3.5; vector-effect: non-scaling-stroke; }
+.rf { stroke: color-mix(in oklab, var(--rock-ink), transparent 50%); stroke-width: .6px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.rf0 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs0)); } .rf1 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs1)); }
+.rf2 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs2)); } .rf3 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs3)); }
+.rf4 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs4)); } .rf5 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs5)); }
+.rf6 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs6)); } .rf7 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs7)); }
+.rf.rf-under { fill: color-mix(in oklab, var(--rock), var(--rock-shade) 80%); }
+.rtop, .rd4 { fill: color-mix(in oklab, var(--rock-top), var(--sun) var(--rtop-sun)); }
+.rd0 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) var(--rs6)); }
+.rd1 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) calc(var(--rs6) * .7)); }
+.rd2 { fill: color-mix(in oklab, var(--rock), var(--rock-shade) calc(var(--rs6) * .4)); }
+.rd3 { fill: color-mix(in oklab, var(--rock), var(--rock-top) 50%); }
+.rd-shade { fill: var(--rock-shade); } .rd-shade.e { opacity: calc(var(--hl-w) * .26); } .rd-shade.w { opacity: calc(var(--hl-e) * .26); }
+.r-sunspot { fill: var(--sun); } .r-sunspot.hl-e { opacity: calc(var(--hl-e) * .4); } .r-sunspot.hl-w { opacity: calc(var(--hl-w) * .4); }
+.r-sheet { fill: none; stroke: var(--rock-ink); stroke-width: .9px; vector-effect: non-scaling-stroke; opacity: .45; stroke-linecap: round; }
+.r-sheet-lip { fill: none; stroke: #fffdf6; stroke-width: 1.1px; vector-effect: non-scaling-stroke; opacity: .55; stroke-linecap: round; }
+.r-cave { fill: #231f29; opacity: .6; }
+.r-moss { fill: none; stroke: #5f8f3e; stroke-width: .6; stroke-linecap: round; }
+.r-speckle { fill: url(#speckle); } .spk0 { fill: #2f2b33; opacity: .4; } .spk1 { fill: #fff; opacity: .55; }
+.r-lichen { opacity: calc(.9 * (1 - var(--snow))); } .lc0 { fill: #a6c38c; } .lc1 { fill: #d7dec4; } .lc2 { fill: #e3a149; }
+.r-crack { fill: none; stroke: var(--rock-ink); stroke-width: .9px; vector-effect: non-scaling-stroke; opacity: .5; stroke-linecap: round; }
+.r-chalk { fill: #fff; opacity: .85; }
+.r-snow { fill: var(--snow-white); opacity: var(--snow); }
+.r-rim { fill: none; stroke: #fffdf6; stroke-width: 1px; vector-effect: non-scaling-stroke; opacity: .5; stroke-linejoin: round; }
+.r-ink { fill: none; stroke: var(--rock-ink); stroke-width: 1.5px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.r-hit { fill: transparent; stroke: transparent; stroke-width: 10px; vector-effect: non-scaling-stroke; }
+.boulder:hover .r-ink, .boulder:focus-visible .r-ink { stroke: var(--map-ink); stroke-width: 2.8px; }
+.r-bowl { fill: #8a5a32; stroke: var(--rock-ink); stroke-width: .7px; vector-effect: non-scaling-stroke; }
+.r-needles { fill: none; stroke: #d29350; stroke-width: .07; stroke-linecap: round; }
+.pennant .pole { fill: none; stroke: #4a3a28; stroke-width: .13; stroke-linecap: round; }
+.pennant .flag { fill: var(--accent); stroke: #1c3d2f; stroke-width: .05; }
+.tipstar { fill: #e0a526; stroke: #fffaf0; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.pad { stroke: #2a2420; stroke-width: .7px; vector-effect: non-scaling-stroke; stroke-linejoin: round; } .pad.p0 { fill: #d4553a; } .pad.p1 { fill: #2f6f8f; }
+.pad-seam { fill: none; stroke: rgba(0, 0, 0, .35); stroke-width: .07; }
+.bucket { fill: #e7c34a; stroke: #2a2420; stroke-width: .6px; vector-effect: non-scaling-stroke; }
+.bird-body { fill: #cdc6b8; stroke: #2a2622; stroke-width: .5px; vector-effect: non-scaling-stroke; } .bird-cap { fill: #1f1c1a; } .bird-tail { fill: #6b6660; }
+.hawk-body { fill: #7a5536; stroke: #2a1e14; stroke-width: .5px; vector-effect: non-scaling-stroke; } .hawk-breast { fill: #ecdfc6; }
+/* landmarks */
+.lm .contact { fill: var(--canopy); opacity: .3; }
+.chair-legs, .tripod { fill: none; stroke: #3b3733; stroke-width: .09; stroke-linecap: round; }
+.chair { stroke: #2a2420; stroke-width: .5px; vector-effect: non-scaling-stroke; } .chair.c0 { fill: #3e7c5a; } .chair.c1 { fill: #c4552f; }
+.scope { fill: #2c2c2c; }
+.post { fill: none; stroke: #6b5136; stroke-width: .17; stroke-linecap: round; }
+.board { fill: #f3e9d1; stroke: #6b5136; stroke-width: .06; }
+.board-text, .board-num { font-family: var(--body); font-weight: 900; text-anchor: middle; fill: #3a2e22; }
+.board-text { font-size: .3px; letter-spacing: .03px; } .board-num { font-size: .42px; fill: #a3361f; }
+.footing-top { fill: #dcd7cc; stroke: #3b3730; stroke-width: .6px; vector-effect: non-scaling-stroke; } .footing-side { fill: #a7a195; stroke: #3b3730; stroke-width: .6px; vector-effect: non-scaling-stroke; }
+.vane-pole, .vane-arms { fill: none; stroke: #4a3a30; stroke-width: .12; stroke-linecap: round; } .vane-arms { stroke-width: .07; }
+.vane-arrow { fill: #a24c25; stroke: #3d2214; stroke-width: .04; }
+.vane-letter { font-family: var(--serif); font-weight: 800; font-size: .48px; text-anchor: middle; fill: #4a3a30; }
+.snag { fill: #d2cabc; stroke: #4a4238; stroke-width: .8px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.snag-limb { fill: none; stroke: #bab1a3; stroke-width: .22; stroke-linecap: round; }
+.nest { fill: #7b5a3a; stroke: #3a2a1a; stroke-width: .7px; vector-effect: non-scaling-stroke; } .nest-sticks { fill: none; stroke: #4f3a26; stroke-width: .07; }
+.bench-seat, .bench-back { fill: #a8743f; stroke: #3d2a16; stroke-width: .6px; vector-effect: non-scaling-stroke; } .bench-leg { fill: none; stroke: #5a3e22; stroke-width: .14; }
+.sign-board { fill: #b8874f; stroke: #4a3218; stroke-width: .6px; vector-effect: non-scaling-stroke; }
+.sign-text { font-family: var(--body); font-weight: 800; font-size: .34px; text-anchor: middle; fill: #fff7e6; }
+.feeder .string { fill: none; stroke: #3a2a1a; stroke-width: .03; } .feeder-roof { fill: #8b3a2a; stroke: #3a2a1a; stroke-width: .04; }
+.feeder-box { fill: #e2cda4; stroke: #3a2a1a; stroke-width: .04; } .feeder-seed { fill: #6b4a2a; }
+.when-hawkWatch { display: none; } .is-hawkWatch .when-hawkWatch { display: inline; }
+/* the sky */
+.hawk-bird { fill: #46362c; stroke: #1f160e; stroke-width: .04; } .hawk-shadow { fill: var(--shade-c); opacity: .2; }
+.hawk.h2, .hawk.h3, .hawk.h4, .hawk.h5, .hawk.h6 { display: none; } .is-kettle .hawk { display: inline; }
+.map[data-season="winter"] .hawk.h1, .map[data-phase="night"] .hawks { display: none; }
+.fireflies { display: none; } .fireflies circle { fill: #fff9c2; stroke: #ffe36b; stroke-width: 1.1; stroke-opacity: .45; }
+.is-fireflies[data-phase="dusk"] .fireflies, .is-fireflies[data-phase="night"] .fireflies { display: inline; }
+/* light */
+.tint { fill: var(--tint); opacity: var(--tint-op); mix-blend-mode: multiply; transition: opacity 1.2s ease, fill 1.2s ease; }
+.veil { fill: var(--veil); opacity: var(--veil-op); transition: opacity 1.2s ease; }
+.dim { fill: #0d1411; opacity: var(--map-dim); }
+/* labels */
+.lab text { paint-order: stroke; stroke: var(--map-halo); stroke-width: 4.5px; stroke-linejoin: round; }
+.lab-sector .lt { font: 800 17px var(--serif); letter-spacing: .14em; fill: var(--map-ink); font-variation-settings: "SOFT" 100, "opsz" 24; }
+.lab-sector .lsub { font: 750 12px var(--body); fill: var(--map-ink-2); opacity: 0; transition: opacity .25s ease; }
+.zone-hot .lab-sector .lsub { opacity: 1; }
+.lab-boulder .lt { font: 600 18px var(--hand); fill: var(--map-ink-2); }
+.lab-boulder.hot .lt { fill: var(--map-ink); font-weight: 700; }
+.lab-note .lt { font: 500 16px var(--hand); fill: color-mix(in oklab, var(--map-ink-2), #6a4a2a 30%); }
+.lab-trail .lt { font: 600 15px var(--hand); fill: #6d4927; }
+.leader { fill: none; stroke: color-mix(in oklab, var(--map-ink-2), transparent 35%); stroke-width: 1.1; stroke-dasharray: 1.5 2.5; stroke-linecap: round; }
+.me-halo { fill: var(--raised); opacity: .9; } .me-dot { fill: var(--accent); stroke: var(--ink); stroke-width: 1.2; }
+.me-pulse { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .5; }
+@media (prefers-reduced-motion: no-preference) {
+  .me-pulse { animation: pulse 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes pulse { from { transform: scale(.6); opacity: .7; } to { transform: scale(1.9); opacity: 0; } }
+}
+@media (prefers-reduced-motion: reduce) { .tint, .veil, body { transition: none; } }
+/* levels of detail: overview (far), area, close-up */
+.lod-far .lod-a, .lod-far .lod-c, .lod-area .lod-c { display: none; }
+.lod-area .only-far, .lod-close .only-far { display: none; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="kicker">Granite Hollow · map art prototype, first version</span>
+    <h1>Hawkwatch</h1>
+    <span class="hand">the bald summit, eight minutes up from the lot</span>
+  </header>
+  <main class="layout">
+    <section class="map" id="map-wrap" aria-label="Illustrated map of Hawkwatch">
+      <div class="cartouche"><b>Granite Hollow</b><span id="caption">Hawkwatch</span></div>
+      <div class="tools">
+        <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+        <button type="button" id="zoom-fit" class="fit" aria-label="Show all of Hawkwatch">FIT</button>
+      </div>
+      <svg id="map" role="img" aria-label="Hawkwatch: a bald granite summit with eleven boulders, ringed by forest. Select a boulder to read about it."></svg>
+      <div class="tooltip" id="tip" hidden></div>
+      <svg class="compass" viewBox="-25 -25 50 50" aria-hidden="true"><path d="M0-21L4.5 0 0 21-4.5 0Z" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M0-21L4.5 0H-4.5Z" fill="currentColor"/><text y="-12" x="0" text-anchor="middle" font-family="Fraunces, serif" font-weight="800" font-size="8" fill="var(--raised)" dy="1">N</text></svg>
+    </section>
+    <aside class="side" aria-label="Field notes">
+      <h2 id="date-title">Peak foliage</h2>
+      <p class="readout" id="readout"></p>
+
+      <h3>Season</h3>
+      <div class="seg" id="seasons" role="group" aria-label="Season"></div>
+      <div class="slider"><label for="day">Day of the year <output id="day-out"></output></label><input type="range" id="day" min="1" max="365" step="1"></div>
+
+      <h3>Light</h3>
+      <div class="seg" id="phases" role="group" aria-label="Time of day"></div>
+      <div class="slider"><label for="time">Time <output id="time-out"></output></label><input type="range" id="time" step="5"></div>
+      <div class="seg" id="skies" role="group" aria-label="Weather" style="margin-top:8px"></div>
+
+      <h3>Things to find</h3>
+      <ul class="finds" id="finds"></ul>
+
+      <h3>On the map</h3>
+      <div class="legend">
+        <svg viewBox="-1 -10 14 12" aria-hidden="true"><path d="M2 2V-8" stroke="#4a3a28" stroke-width="1.2"/><path d="M2-8L10-5.5 2-3Z" fill="var(--accent)"/></svg><span>A boulder you've sent problems on</span>
+        <svg viewBox="-13 -7 26 14" aria-hidden="true"><ellipse rx="11" ry="5.5" fill="none" stroke="var(--project)" stroke-width="1.8" stroke-dasharray="4 3"/></svg><span>A project you're working</span>
+        <svg viewBox="-7 -7 14 14" aria-hidden="true"><path d="M0-6 1.8-1.9 6.2-1.9 2.6.8 3.9 5.2 0 2.6-3.9 5.2-2.6.8-6.2-1.9-1.8-1.9Z" fill="#e0a526" stroke="#fffaf0"/></svg><span>A local's tip</span>
+        <svg viewBox="-8 -8 16 16" aria-hidden="true"><circle r="6.5" fill="var(--raised)" opacity=".9"/><circle r="5" fill="var(--accent)" stroke="var(--ink)" stroke-width="1"/></svg><span>You, with your pads down at Old Baldy</span>
+      </div>
+      <p class="about">Drag to pan, scroll or use + and − to zoom. Signs, chalk, mushrooms and the granite's grain appear when you zoom in close. Hover a boulder for its story.</p>
+    </aside>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+// Boot: load the game's own modules and data (next to this page when it's
+// published, in ../game/ when it's run from the repo), then paint Hawkwatch.
+(function () {
+  "use strict";
+  const $ = s => document.querySelector(s);
+  const loadScript = (srcs) => new Promise((ok, fail) => {
+    const tryAt = i => {
+      if (i >= srcs.length) return fail(new Error(`${srcs[0]} didn't load`));
+      const el = document.createElement("script");
+      el.src = srcs[i]; el.onload = ok; el.onerror = () => { el.remove(); tryAt(i + 1); };
+      document.head.appendChild(el);
+    };
+    tryAt(0);
+  });
+  const fetchJson = async srcs => { for (const s of srcs) { try { const r = await fetch(s); if (r.ok) return await r.json(); } catch (e) { } } throw new Error("game-data.json didn't load"); };
+
+  const NOON = 12 * 60 + 50;
+  const clock = m => { const h = Math.floor(m / 60), mm = String(Math.round(m % 60)).padStart(2, "0"); return `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? "AM" : "PM"}`; };
+  const SEASONS = [["Spring", "2025-05-22"], ["Summer", "2025-07-16"], ["Early autumn", "2025-09-22"], ["Peak foliage", "2025-10-14"], ["Late autumn", "2025-11-09"], ["Winter", "2026-01-21"]];
+  const PHASES = [["Morning", w => w.rise + 100], ["Midday", () => NOON], ["Golden hour", w => w.dusk - 140], ["Dusk", w => w.dusk - 40]];
+  const SKIES = ["Sunny", "Overcast"];
+  const dayToDate = d => { const t = new Date(Date.UTC(2025, 0, 1) + (d - 1) * 864e5); return t.toISOString().slice(0, 10); };
+  const pretty = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "long", day: "numeric" });
+
+  async function boot() {
+    await loadScript(["../../game/art.js", "../game/art.js", "game/art.js"]);
+    await loadScript(["../../game/mechanics.js", "../game/mechanics.js", "game/mechanics.js"]);
+    await loadScript(["illustrate.js"]);
+    await loadScript(["paint.js"]);
+    // Published, the page carries a small extract of the game's data (just Hawkwatch and its neighbours).
+    const D = await fetchJson(["hawkwatch-data.json", "../hawkwatch-data.json", "../../game/game-data.json", "../game/game-data.json"]);
+    await document.fonts.ready;
+
+    const q = new URLSearchParams(location.search);
+    const st = { date: q.get("date") || "2025-10-14", phase: q.get("min") ? null : q.get("phase") || "Golden hour", minute: q.get("min") ? +q.get("min") : null, sky: q.get("sky") || "Sunny" };
+    if (q.get("theme")) document.documentElement.dataset.theme = q.get("theme");
+    const duskOf = date => Mech.forecastDay(new Date(date + "T12:00:00Z").getUTCMonth(), () => .5).dusk;
+    const P = Paint.paint($("#map"), D, "Hawkwatch", {
+      tooltip: $("#tip"),
+      state: { sent: ["Old Baldy", "The Chickadee", "The Beak", "The Thermal Slab"], project: ["The Raptor"], tip: ["The Lookout"], here: "Old Baldy" },
+      view: q.get("view") && q.get("view").includes(",") ? q.get("view").split(",").map(Number) : null,
+    });
+    if (q.get("view") === "close") P.flyTo(q.get("at") || "Old Baldy", +(q.get("k") || 9));
+
+    function render() {
+      const dusk = duskOf(st.date), rise = 2 * NOON - dusk;
+      const w = { dusk, rise };
+      if (st.phase) { const ph = PHASES.find(p => p[0] === st.phase); st.minute = Math.round(ph[1](w) / 5) * 5; }
+      st.minute = Math.max(rise, Math.min(dusk + 10, st.minute ?? NOON));
+      const pal = P.setDate(st.date), L = P.setTime(st.minute, dusk, st.sky);
+      document.documentElement.style.setProperty("--season-tint", pal.tint);
+      $("#date-title").textContent = pal.name;
+      $("#readout").textContent = `${pretty(st.date)}, ${clock(st.minute)} · ${L.phase.toLowerCase()}${st.sky !== "Sunny" ? ", " + st.sky.toLowerCase() : ""}`;
+      $("#caption").textContent = `${pal.name} · ${L.phase}`;
+      const day = Art.dayOfYear(st.date);
+      $("#day").value = day; $("#day-out").textContent = pretty(st.date).replace(/^\w+, /, "");
+      const t = $("#time"); t.min = rise; t.max = dusk + 10; t.value = st.minute; $("#time-out").textContent = `${clock(st.minute)} · dusk ${clock(dusk)}`;
+      document.querySelectorAll("#seasons button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.date === st.date)));
+      document.querySelectorAll("#phases button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.phase === st.phase)));
+      document.querySelectorAll("#skies button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.sky === st.sky)));
+      $("#finds").querySelectorAll("li").forEach(li => { li.hidden = li.dataset.when === "hawkWatch" && !pal.hawkWatch; });
+    }
+    $("#seasons").innerHTML = SEASONS.map(([n, d]) => `<button type="button" data-date="${d}">${n}</button>`).join("");
+    $("#phases").innerHTML = PHASES.map(([n]) => `<button type="button" data-phase="${n}">${n}</button>`).join("");
+    $("#skies").innerHTML = SKIES.map(s => `<button type="button" data-sky="${s}">${s}</button>`).join("");
+    $("#seasons").onclick = e => { const b = e.target.closest("button"); if (b) { st.date = b.dataset.date; render(); } };
+    $("#phases").onclick = e => { const b = e.target.closest("button"); if (b) { st.phase = b.dataset.phase; render(); } };
+    $("#skies").onclick = e => { const b = e.target.closest("button"); if (b) { st.sky = b.dataset.sky; render(); } };
+    $("#day").oninput = e => { st.date = dayToDate(+e.target.value); render(); };
+    $("#time").oninput = e => { st.phase = null; st.minute = +e.target.value; render(); };
+    $("#zoom-in").onclick = () => P.zoomBy(1.6); $("#zoom-out").onclick = () => P.zoomBy(1 / 1.6); $("#zoom-fit").onclick = () => P.home();
+
+    const FINDS = [
+      ["Old Baldy", "Old Baldy", "The summit dome. Your pads are down."],
+      ["Old Pitch Pine", "The Old Pitch Pine", "Wind-bent, older than the trail"],
+      ["counters", "The hawk counters", "Their chairs and tally board, every September and October", "hawkWatch"],
+      ["bigtree", "The feeder oak", "Someone keeps it full for the chickadees"],
+      ["footings", "The fire tower footings", "And the weathervane that outlived it"],
+      ["snag", "The eagles' snag", "Above The Aerie, where they nested"],
+      ["bench", "The bench at The Lookout", "The best view in the park"],
+      ["barrens", "The blueberry barrens", "Ripe in August, crimson in October"],
+      ["signpost", "The trail sign", "Where the summit trails split"],
+    ];
+    $("#finds").innerHTML = FINDS.map(([k, t, s, when]) => `<li${when ? ` data-when="${when}"` : ""}><button type="button" data-find="${k}"><span class="t">${t}</span><span class="s">${s}</span></button></li>`).join("");
+    $("#finds").onclick = e => { const b = e.target.closest("button"); if (b) P.flyTo(b.dataset.find); };
+    render();
+    document.body.dataset.ready = "1";
+  }
+  boot().catch(err => { $("#map-wrap").insertAdjacentHTML("beforeend", `<p style="position:absolute;inset:auto 16px 16px;background:var(--raised);padding:10px 12px;border-radius:8px">The prototype didn't load (${String(err.message || err).replace(/[<>&]/g, "")}). Reload to try again.</p>`); console.error(err); });
+})();
+</script>

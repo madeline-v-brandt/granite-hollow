@@ -1,0 +1,14 @@
+.venv
+.venv.nosync/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.DS_Store
+# Real (non-simulated) data never gets committed.
+data/raw/
+.venv 2/
+# The git folder lives outside iCloud sync (.git is a pointer to it).
+.git.nosync/
+# Kept local: reference images (other people's art) and personal notes.
+inspo/
+8a.txt

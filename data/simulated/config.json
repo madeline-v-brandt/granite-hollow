@@ -1,0 +1,81 @@
+{
+  "seed": 8,
+  "crag_name": "Granite Hollow State Park",
+  "n_problems": 1000,
+  "n_boulders": 75,
+  "n_climbers": 600,
+  "start_date": "2017-01-01",
+  "end_date": "2025-12-31",
+  "personas": [
+    {
+      "climber_id": "p_short_crimper",
+      "sex": "F",
+      "height_cm": 163,
+      "ape_cm": 0,
+      "visitor_type": "regular",
+      "skill_start": 4.5,
+      "skill_gain": 1.5,
+      "likes": [
+        "crimpy",
+        "technical",
+        "slab"
+      ],
+      "dislikes": [
+        "dyno",
+        "compression"
+      ]
+    },
+    {
+      "climber_id": "p_tall_dynoer",
+      "sex": "M",
+      "height_cm": 190,
+      "ape_cm": 6,
+      "visitor_type": "regular",
+      "skill_start": 5.5,
+      "skill_gain": 1.5,
+      "likes": [
+        "dyno",
+        "overhang",
+        "powerful"
+      ],
+      "dislikes": [
+        "slab",
+        "technical"
+      ]
+    },
+    {
+      "climber_id": "p_eliminate_local",
+      "sex": "M",
+      "height_cm": 175,
+      "ape_cm": 2,
+      "visitor_type": "local_hero",
+      "skill_start": 6.5,
+      "skill_gain": 1.0,
+      "likes": [
+        "eliminate",
+        "traverse",
+        "crimpy"
+      ],
+      "dislikes": [
+        "highball"
+      ]
+    },
+    {
+      "climber_id": "p_classic_tourist",
+      "sex": "F",
+      "height_cm": 168,
+      "ape_cm": 1,
+      "visitor_type": "tourist",
+      "skill_start": 4.0,
+      "skill_gain": 0.0,
+      "likes": [
+        "juggy",
+        "highball"
+      ],
+      "dislikes": [
+        "eliminate"
+      ],
+      "classic_chaser": 2.0
+    }
+  ]
+}

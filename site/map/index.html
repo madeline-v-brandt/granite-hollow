@@ -1,0 +1,638 @@
+<title>Granite Hollow Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;1,500&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: guidebook overview map. A zoomable topo fills the left; a guide panel
+   (sectors and classics, or one boulder's problem list) sits on the right and
+   stacks under the map on narrow screens. */
+:root {
+  --ground: #eef1ec;
+  --panel: #f7f9f6;
+  --ink: #18201b;
+  --ink-2: #465049;
+  --muted: #6b766e;
+  --rule: #d3dad1;
+  --contour: #d0d9cc;
+  --contour-index: #b4c1af;
+  --trail: #96683b;
+  --road: #d6d9d2;
+  --road-edge: #aeb3aa;
+  --water: #d2e0e3;
+  --water-edge: #93adb5;
+  --water-ink: #4f6f78;
+  --quarry: #dcd9d1;
+  --quarry-hatch: #b6b1a5;
+  --boulder-edge: rgba(24, 32, 27, .55);
+  --no-data: #c4c9c2;
+  --chip: rgba(24, 32, 27, .065);
+  --hover: rgba(24, 32, 27, .05);
+  /* Data ramp (one hue, light to dark = less to more). Validated against --ground. */
+  --ramp-0: #6da7ec;
+  --ramp-1: #2a78d6;
+  --ramp-2: #1c5cab;
+  --ramp-3: #0d366b;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #1b211e; --panel: #212824; --ink: #e8ece8; --ink-2: #b6c0b9; --muted: #8b968e;
+    --rule: #333d37; --contour: #2a332e; --contour-index: #3a453f; --trail: #b48b5c;
+    --road: #2c332f; --road-edge: #48514b; --water: #1e2f35; --water-edge: #3e5a63; --water-ink: #8fb0ba;
+    --quarry: #2a2d2a; --quarry-hatch: #4a4d47; --boulder-edge: rgba(232, 236, 232, .45);
+    --no-data: #46504a; --chip: rgba(232, 236, 232, .08); --hover: rgba(232, 236, 232, .06);
+    --ramp-0: #184f95; --ramp-1: #2a78d6; --ramp-2: #6da7ec; --ramp-3: #cde2fb;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #1b211e; --panel: #212824; --ink: #e8ece8; --ink-2: #b6c0b9; --muted: #8b968e;
+  --rule: #333d37; --contour: #2a332e; --contour-index: #3a453f; --trail: #b48b5c;
+  --road: #2c332f; --road-edge: #48514b; --water: #1e2f35; --water-edge: #3e5a63; --water-ink: #8fb0ba;
+  --quarry: #2a2d2a; --quarry-hatch: #4a4d47; --boulder-edge: rgba(232, 236, 232, .45);
+  --no-data: #46504a; --chip: rgba(232, 236, 232, .08); --hover: rgba(232, 236, 232, .06);
+  --ramp-0: #184f95; --ramp-1: #2a78d6; --ramp-2: #6da7ec; --ramp-3: #cde2fb;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 28px;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.masthead {
+  display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between;
+  gap: 8px 32px; margin: 0 auto 16px; max-width: 1440px;
+}
+.eyebrow {
+  font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 2px;
+}
+h1 {
+  font-family: var(--display); font-weight: 700; font-size: clamp(34px, 5vw, 52px);
+  line-height: .95; margin: 0; letter-spacing: -.01em; text-wrap: balance;
+}
+.facts { margin: 0; color: var(--ink-2); font-variant-numeric: tabular-nums; max-width: 46ch; }
+.facts small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+.layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px;
+  max-width: 1440px; margin: 0 auto;
+}
+.map-wrap {
+  position: relative; min-width: 0; height: clamp(480px, calc(100vh - 150px), 920px);
+  border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--ground);
+}
+.panel {
+  min-width: 0; height: clamp(480px, calc(100vh - 150px), 920px); overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 18px 18px 22px;
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .map-wrap { height: clamp(380px, 64vh, 640px); }
+  .panel { height: auto; overflow: visible; }
+}
+
+/* ---- map chrome ---- */
+.toolbar {
+  position: absolute; top: 10px; left: 10px; right: 10px; z-index: 2;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; justify-content: space-between;
+  pointer-events: none;
+}
+.toolbar > * { pointer-events: auto; }
+.card {
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px;
+  backdrop-filter: blur(4px);
+}
+.colorby { display: flex; flex-direction: column; gap: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+.seg button {
+  border: 0; background: transparent; padding: 4px 10px; cursor: pointer;
+  font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .03em;
+}
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.seg button:not([aria-pressed="true"]):hover { background: var(--hover); }
+.label-sm {
+  font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted);
+}
+.legend { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-2); min-width: 210px; }
+.legend .bar { height: 10px; border-radius: 2px; border: 1px solid var(--boulder-edge); }
+.legend .ticks { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.legend .swatches { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.legend .sw { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw i { width: 14px; height: 11px; border-radius: 3px 5px 4px 3px; border: 1px solid var(--boulder-edge); display: inline-block; }
+.zoom { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+.zoom button {
+  width: 34px; height: 32px; border: 0; background: transparent; cursor: pointer;
+  font-size: 18px; line-height: 1; display: grid; place-items: center;
+}
+.zoom button + button { border-top: 1px solid var(--rule); }
+.zoom button:hover { background: var(--hover); }
+.zoom .fit { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: .06em; }
+
+.scalebar {
+  position: absolute; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 2;
+  font-family: var(--display); font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--ink-2);
+  pointer-events: none;
+}
+.scalebar .ruler { height: 6px; border: 1.5px solid var(--ink-2); border-top: 0; margin-top: 2px; }
+.compass {
+  position: absolute; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 2;
+  pointer-events: none; color: var(--ink-2);
+}
+
+svg#map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+svg#map:active { cursor: grabbing; }
+.contour { fill: none; stroke: var(--contour); stroke-width: .8; vector-effect: non-scaling-stroke; }
+.contour.index { stroke: var(--contour-index); stroke-width: 1.1; }
+.water { fill: var(--water); stroke: var(--water-edge); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.ripple { fill: none; stroke: var(--water-edge); stroke-width: .7; opacity: .55; vector-effect: non-scaling-stroke; }
+.dam { stroke: var(--ink-2); stroke-width: 4; stroke-linecap: square; vector-effect: non-scaling-stroke; }
+.quarry { fill: url(#hatch); stroke: var(--quarry-hatch); stroke-width: 1.2; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+.road { stroke: var(--road); stroke-width: 9; vector-effect: non-scaling-stroke; fill: none; }
+.road-edge { stroke: var(--road-edge); stroke-width: 11; vector-effect: non-scaling-stroke; fill: none; }
+.lot { fill: var(--road); stroke: var(--road-edge); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.trail { fill: none; stroke: var(--trail); stroke-width: 1.7; stroke-dasharray: 5 3.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+
+.boulder { cursor: pointer; outline: none; }
+.boulder .shape { stroke: var(--boulder-edge); stroke-width: 1; vector-effect: non-scaling-stroke; transition: stroke-width .12s; }
+.boulder .hit { fill: transparent; }
+.boulder:hover .shape, .boulder:focus-visible .shape { stroke: var(--ink); stroke-width: 2; }
+.boulder.selected .shape { stroke: var(--ink); stroke-width: 2.6; }
+.boulder.dim { opacity: .35; }
+
+.lbl { font-family: var(--display); paint-order: stroke; stroke: var(--ground); stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none; }
+.lbl-sector { font-weight: 700; font-size: 15px; letter-spacing: .07em; text-transform: uppercase; fill: var(--ink); }
+.lbl-walk { font-weight: 500; font-size: 12.5px; fill: var(--ink-2); letter-spacing: .02em; }
+.lbl-boulder { font-weight: 600; font-size: 12.5px; fill: var(--ink-2); }
+.lbl-water { font-style: italic; font-weight: 500; font-size: 13.5px; fill: var(--water-ink); letter-spacing: .05em; }
+.lbl-feature { font-weight: 600; font-size: 12px; fill: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+.lbl-road { font-weight: 600; font-size: 11.5px; fill: var(--muted); letter-spacing: .16em; text-transform: uppercase; }
+.lbl-lot { font-weight: 700; font-size: 14px; fill: var(--ink-2); }
+.boulder-labels { display: none; }
+.zoomed-in .boulder-labels { display: inline; }
+
+.tooltip {
+  position: absolute; z-index: 3; pointer-events: none; max-width: 240px;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  font-variant-numeric: tabular-nums;
+}
+.tooltip strong { font-family: var(--display); font-size: 16px; font-weight: 700; display: block; line-height: 1.1; }
+.tooltip .tip-desc { font-style: italic; color: var(--ink-2, inherit); margin: 2px 0 5px; max-width: 32ch; line-height: 1.35; }
+.tooltip .sub { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+
+/* ---- panel ---- */
+.panel h2 {
+  font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-2); margin: 22px 0 8px;
+}
+.panel h2:first-child { margin-top: 0; }
+.panel .lede { color: var(--ink-2); margin: 0 0 6px; font-size: 14px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+th {
+  text-align: left; font-family: var(--display); font-weight: 600; font-size: 12px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  padding: 0 6px 6px; border-bottom: 1px solid var(--rule);
+}
+td { padding: 6px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th.num, td.num { text-align: right; }
+tr.link { cursor: pointer; }
+tr.link:hover td { background: var(--hover); }
+tr.link:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { border-bottom: 1px solid var(--rule); }
+.list button {
+  width: 100%; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; align-items: baseline;
+  border: 0; background: transparent; text-align: left; padding: 7px 4px; cursor: pointer;
+}
+.list button:hover { background: var(--hover); }
+.list .where { color: var(--muted); font-size: 12.5px; display: block; }
+.list .val { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13.5px; white-space: nowrap; }
+.grade {
+  font-family: var(--display); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.back {
+  border: 0; background: transparent; padding: 0; cursor: pointer; color: var(--ink-2);
+  font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .04em; margin-bottom: 10px;
+}
+.back:hover { color: var(--ink); text-decoration: underline; }
+.bname { font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; margin: 0 0 4px; text-wrap: balance; }
+.bmeta { color: var(--muted); font-size: 13.5px; margin: 0 0 14px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 6px; }
+.stat { border: 1px solid var(--rule); border-radius: 5px; padding: 8px 10px; }
+.stat b { display: block; font-family: var(--display); font-size: 24px; font-weight: 700; line-height: 1; }
+.stat span { color: var(--muted); font-size: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.chip { background: var(--chip); border-radius: 3px; padding: 0 5px; font-size: 11.5px; color: var(--ink-2); }
+.foot { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
+.loading { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .boulder .shape { transition: none; } }
+</style>
+
+<header class="masthead">
+  <div>
+    <p class="eyebrow">Bouldering overview</p>
+    <h1>Granite Hollow State Park</h1>
+  </div>
+  <p class="facts" id="facts">Loading the crag…
+    <small>A simulated crag. The layout is invented from each sector's walk-in time.</small></p>
+</header>
+
+<main class="layout">
+  <section class="map-wrap" id="mapwrap" aria-label="Map of Granite Hollow">
+    <div class="toolbar">
+      <div class="card colorby">
+        <div class="seg" role="group" aria-label="Color boulders by">
+          <button type="button" id="by-sends" data-metric="sends" aria-pressed="true">Sends</button>
+          <button type="button" id="by-stars" data-metric="stars" aria-pressed="false">Rating</button>
+          <button type="button" id="by-angle" data-metric="angle" aria-pressed="false">Rock angle</button>
+        </div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="card zoom">
+        <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+        <button type="button" id="zoom-fit" class="fit" aria-label="Show the whole park">FIT</button>
+      </div>
+    </div>
+    <svg id="map" role="img" aria-label="Zoomable map of sectors, trails and boulders"></svg>
+    <div class="tooltip" id="tip" hidden></div>
+    <div class="scalebar" id="scalebar"><span id="scale-label">200 m</span><div class="ruler" id="scale-ruler"></div></div>
+    <svg class="compass" width="26" height="40" viewBox="0 0 26 40" aria-hidden="true">
+      <path d="M13 4 L19 24 L13 20 L7 24 Z" fill="currentColor"></path>
+      <text x="13" y="37" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-weight="700" font-size="12" fill="currentColor">N</text>
+    </svg>
+  </section>
+
+  <aside class="panel" id="panel" aria-live="polite">
+    <p class="loading">Loading sectors…</p>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+(async function () {
+  const data = await fetch("map-data.json").then(r => r.json());
+  const fmt = d3.format(",");
+  const ANGLES = ["slab", "vertical", "overhang", "roof"];
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ------------------------------------------------------------ data prep
+  const sectorsByName = new Map(data.sectors.map(s => [s.name, s]));
+  data.boulders.forEach((b, i) => { b.id = i; b.walk = sectorsByName.get(b.sector).walk_min; });
+  const allProblems = data.boulders.flatMap(b => b.problems.map(([name, grade, stars, ratings, sends, styles]) =>
+    ({ name, grade, stars, ratings, sends, styles, boulder: b })));
+  const totalSends = d3.sum(data.boulders, b => b.sends);
+  for (const s of data.sectors) {
+    const bs = data.boulders.filter(b => b.sector === s.name);
+    s.boulderCount = bs.length;
+    s.problemCount = d3.sum(bs, b => b.problems.length);
+    s.sends = d3.sum(bs, b => b.sends);
+  }
+
+  document.getElementById("facts").innerHTML =
+    `${fmt(data.n_problems)} problems on ${data.boulders.length} boulders in ${data.sectors.length} sectors. ` +
+    `${fmt(totalSends)} sends logged by ${fmt(data.n_climbers)} climbers, ${data.date_range[0].slice(0, 4)}–${data.date_range[1].slice(0, 4)}.` +
+    `<small>A simulated crag. The layout is invented from each sector's walk-in time (${data.pace_m_per_min} m per minute of walking).</small>`;
+
+  // ------------------------------------------------------------ geometry
+  const pts = [
+    ...data.boulders.map(b => [b.x, b.y]),
+    ...data.features.flatMap(f => [[f.x - f.r, f.y - f.r], [f.x + f.r, f.y + f.r]]),
+    [0, -60],
+  ];
+  const pad = 140;
+  const minX = d3.min(pts, p => p[0]) - pad, maxX = d3.max(pts, p => p[0]) + pad;
+  const minY = d3.min(pts, p => p[1]) - pad, maxY = d3.max(pts, p => p[1]) + pad;
+  const W = maxX - minX, H = maxY - minY;
+  const sx = x => x - minX;            // map metres -> svg units (1 unit = 1 m)
+  const sy = y => maxY - y;            // north up
+
+  function rand(seedStr) {             // small seeded PRNG so shapes are stable
+    let h = 1779033703 ^ seedStr.length;
+    for (let i = 0; i < seedStr.length; i++) { h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353); h = h << 13 | h >>> 19; }
+    return function () {
+      h = Math.imul(h ^ h >>> 16, 2246822507); h = Math.imul(h ^ h >>> 13, 3266489909);
+      return ((h ^= h >>> 16) >>> 0) / 4294967296;
+    };
+  }
+  const closed = d3.line().curve(d3.curveCardinalClosed.tension(0.15));
+  function blob(seed, n = 10, wobble = 0.3) {   // unit-radius irregular outline
+    const r = rand(seed);
+    return closed(d3.range(n).map(i => {
+      const a = (i / n) * 2 * Math.PI + r() * 0.3, k = 1 - wobble / 2 + r() * wobble;
+      return [Math.cos(a) * k, Math.sin(a) * k];
+    }));
+  }
+
+  const svg = d3.select("#map");
+  const defs = svg.append("defs");
+  defs.append("pattern").attr("id", "hatch").attr("patternUnits", "userSpaceOnUse")
+    .attr("width", 9).attr("height", 9).attr("patternTransform", "rotate(45)")
+    .call(p => {
+      p.append("rect").attr("width", 9).attr("height", 9).attr("fill", "var(--quarry)");
+      p.append("line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 9)
+        .attr("stroke", "var(--quarry-hatch)").attr("stroke-width", 2);
+    });
+
+  const world = svg.append("g").attr("class", "world");
+  const labelLayer = svg.append("g").attr("class", "labels");
+  const boulderLayer = svg.append("g").attr("class", "boulders");
+  const boulderLabelLayer = svg.append("g").attr("class", "boulder-labels");
+
+  // Contours from a smooth height field: base elevation + hills.
+  const cell = 12, nx = Math.ceil(W / cell) + 1, ny = Math.ceil(H / cell) + 1;
+  const elev = new Float64Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const x = minX + i * cell, y = minY + j * cell;
+    let z = data.base_elevation_m;
+    for (const h of data.hills) z += h.amp * Math.exp(-((x - h.x) ** 2 + (y - h.y) ** 2) / (2 * h.sigma ** 2));
+    elev[j * nx + i] = z;
+  }
+  const [zmin, zmax] = d3.extent(elev);
+  const levels = d3.range(Math.ceil(zmin / 5) * 5, zmax, 5);
+  const contourPath = d3.geoPath(d3.geoTransform({
+    point(x, y) { this.stream.point(sx(minX + x * cell), sy(minY + y * cell)); },
+  }));
+  world.append("g").selectAll("path").data(d3.contours().size([nx, ny]).thresholds(levels)(elev)).join("path")
+    .attr("class", d => d.value % 25 === 0 ? "contour index" : "contour")
+    .attr("d", contourPath);
+
+  // Road and parking.
+  world.append("path").attr("class", "road-edge").attr("d", `M${sx(minX)},${sy(-38)} H${sx(maxX)}`);
+  world.append("path").attr("class", "road").attr("d", `M${sx(minX)},${sy(-38)} H${sx(maxX)}`);
+  world.append("rect").attr("class", "lot").attr("x", sx(-26)).attr("y", sy(4)).attr("width", 52).attr("height", 32).attr("rx", 3);
+
+  // Water, dam and quarry.
+  for (const f of data.features) {
+    const g = world.append("g").attr("transform", `translate(${sx(f.x)},${sy(f.y)})`);
+    if (f.kind === "water") {
+      g.append("path").attr("class", "water").attr("d", blob(f.name, 12, 0.35)).attr("transform", `scale(${f.r})`);
+      for (const k of [0.55, 0.32]) {
+        g.append("path").attr("class", "ripple").attr("d", blob(f.name, 12, 0.35)).attr("transform", `scale(${f.r * k})`);
+      }
+      if (f.dam_toward) {
+        const dx = f.dam_toward[0] - f.x, dy = f.dam_toward[1] - f.y, len = Math.hypot(dx, dy);
+        const ux = dx / len, uy = -dy / len;  // svg y is flipped
+        const cx = ux * f.r * 0.92, cy = uy * f.r * 0.92, half = f.r * 0.32;
+        g.append("line").attr("class", "dam")
+          .attr("x1", cx - uy * half).attr("y1", cy + ux * half).attr("x2", cx + uy * half).attr("y2", cy - ux * half);
+      }
+    } else {
+      g.append("path").attr("class", "quarry").attr("d", blob(f.name, 9, 0.25)).attr("transform", `scale(${f.r})`);
+    }
+  }
+
+  // Approach trails, gently wiggled.
+  const trailLine = d3.line().curve(d3.curveBasis);
+  world.append("g").selectAll("path").data(data.trails).join("path").attr("class", "trail")
+    .attr("d", t => {
+      const r = rand("trail" + t.to);
+      const [x0, y0] = t.start, [x1, y1] = t.end, dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
+      const nxp = -dy / len, nyp = dx / len;
+      const mid = [0.33, 0.66].map(f => {
+        const off = (r() - 0.5) * Math.min(70, len * 0.25);
+        return [sx(x0 + dx * f + nxp * off), sy(y0 + dy * f + nyp * off)];
+      });
+      return trailLine([[sx(x0), sy(y0)], ...mid, [sx(x1), sy(y1)]]);
+    });
+
+  // ------------------------------------------------------------ colour
+  const css = () => getComputedStyle(document.documentElement);
+  let metric = "sends";
+  const ratedBoulders = data.boulders.filter(b => b.ratings >= 10);
+  const starExtent = d3.extent(ratedBoulders, b => b.stars);
+  const sendScale = d3.scaleSqrt().domain([0, d3.max(data.boulders, b => b.sends)]).range([0, 1]);
+  const starScale = d3.scaleLinear().domain(starExtent).range([0, 1]).clamp(true);
+  function ramp() { const s = css(); return [0, 1, 2, 3].map(i => s.getPropertyValue(`--ramp-${i}`).trim()); }
+  function fillFor(b, stops) {
+    const interp = d3.interpolateRgbBasis(stops);
+    if (metric === "sends") return interp(sendScale(b.sends));
+    if (metric === "stars") return b.ratings >= 10 ? interp(starScale(b.stars)) : css().getPropertyValue("--no-data").trim();
+    return stops[ANGLES.indexOf(b.angle)];
+  }
+
+  function drawLegend() {
+    const stops = ramp(), el = document.getElementById("legend");
+    const grad = `linear-gradient(90deg, ${stops.join(", ")})`;
+    if (metric === "sends") {
+      const ticks = sendScale.ticks(4).filter(t => t <= sendScale.domain()[1]);
+      el.innerHTML = `<span class="label-sm">Sends per boulder</span><div class="bar" style="background:${grad}"></div>
+        <div class="ticks" style="position:relative;height:16px">${ticks.map(t =>
+          `<span style="position:absolute;left:${(sendScale(t) * 100).toFixed(1)}%;transform:translateX(-${sendScale(t) * 100}%)">${fmt(t)}</span>`).join("")}</div>`;
+    } else if (metric === "stars") {
+      const [a, b] = starExtent;
+      el.innerHTML = `<span class="label-sm">Average rating, 0–4 stars</span><div class="bar" style="background:${grad}"></div>
+        <div class="ticks"><span>${a.toFixed(1)}★</span><span>${((a + b) / 2).toFixed(1)}★</span><span>${b.toFixed(1)}★</span></div>
+        <span class="sw"><i style="background:var(--no-data)"></i>Fewer than 10 ratings</span>`;
+    } else {
+      el.innerHTML = `<span class="label-sm">Main rock angle</span><div class="swatches">${ANGLES.map((a, i) =>
+        `<span class="sw"><i style="background:${stops[i]}"></i>${a[0].toUpperCase() + a.slice(1)}</span>`).join("")}</div>`;
+    }
+  }
+
+  // ------------------------------------------------------------ boulders
+  const boulders = boulderLayer.selectAll("g").data(data.boulders).join("g")
+    .attr("class", "boulder").attr("tabindex", 0).attr("role", "button")
+    .attr("aria-label", b => `${b.name}, ${b.sector}: ${b.problems.length} problems, ${fmt(b.sends)} sends`);
+  boulders.append("circle").attr("class", "hit").attr("r", 1);
+  boulders.append("path").attr("class", "shape").attr("d", b => blob(b.sector + b.name, 9, 0.38));
+
+  function recolor() {
+    const stops = ramp();
+    boulders.select(".shape").attr("fill", b => fillFor(b, stops));
+    drawLegend();
+  }
+
+  // Labels (positioned in screen space so they stay legible at any zoom).
+  const sectorLabels = labelLayer.selectAll("g").data(data.sectors).join("g");
+  sectorLabels.append("text").attr("class", "lbl lbl-sector").attr("text-anchor", "middle").text(s => s.name);
+  sectorLabels.append("text").attr("class", "lbl lbl-walk").attr("text-anchor", "middle").attr("dy", 15)
+    .text(s => s.walk_min <= 1 ? "1 min walk" : `${s.walk_min} min walk`);
+  const featureLabels = labelLayer.selectAll("text.f").data(data.features).join("text")
+    .attr("class", f => "f lbl " + (f.kind === "water" ? "lbl-water" : "lbl-feature")).attr("text-anchor", "middle").text(f => f.name);
+  const roadLabel = labelLayer.append("text").attr("class", "lbl lbl-road").attr("text-anchor", "middle").text("Quarry Hill Road");
+  const lotLabel = labelLayer.append("text").attr("class", "lbl lbl-lot").attr("text-anchor", "middle").attr("dy", 5).text("P");
+  const boulderLabels = boulderLabelLayer.selectAll("text").data(data.boulders).join("text")
+    .attr("class", "lbl lbl-boulder").text(b => b.name);
+
+  // ------------------------------------------------------------ zoom
+  const wrap = document.getElementById("mapwrap");
+  let size = { w: wrap.clientWidth, h: wrap.clientHeight };
+  let transform = d3.zoomIdentity;
+  const zoom = d3.zoom().scaleExtent([0.2, 40]).on("zoom", e => { transform = e.transform; render(); });
+  svg.call(zoom).on("dblclick.zoom", null);
+
+  function render() {
+    const t = transform, k = t.k;
+    world.attr("transform", t);
+    // Boulders: true size, but never smaller than 5 px across so they stay tappable.
+    boulders.attr("transform", b => `translate(${t.applyX(sx(b.x))},${t.applyY(sy(b.y))}) scale(${Math.max(b.r * k, 5)})`);
+    boulders.select(".hit").attr("r", b => Math.max(1, 11 / Math.max(b.r * k, 5)));
+    sectorLabels.attr("transform", s => `translate(${t.applyX(sx(s.x))},${t.applyY(sy(s.y + s.radius)) - 22})`);
+    featureLabels.attr("transform", f => `translate(${t.applyX(sx(f.x))},${t.applyY(sy(f.y)) + 4})`);
+    roadLabel.attr("transform", `translate(${t.applyX(sx(maxX - 260))},${t.applyY(sy(-38)) - 9})`);
+    lotLabel.attr("transform", `translate(${t.applyX(sx(0))},${t.applyY(sy(-12))})`);
+    boulderLabels.attr("transform", b => `translate(${t.applyX(sx(b.x)) + Math.max(b.r * k, 5) + 4},${t.applyY(sy(b.y)) + 4})`);
+    wrap.classList.toggle("zoomed-in", k > 2.2);
+    // Scale bar: pick a round distance about 90-180 px long.
+    const metres = [25, 50, 100, 200, 250, 500, 1000].find(m => m * k >= 90) || 1000;
+    document.getElementById("scale-ruler").style.width = `${metres * k}px`;
+    document.getElementById("scale-label").textContent = metres >= 1000 ? `${metres / 1000} km` : `${metres} m`;
+  }
+
+  function fitTransform(x0, y0, x1, y1, margin = 40) {
+    const top = 96;  // keep clear of the toolbar
+    const w = size.w - 2 * margin, h = size.h - margin - top;
+    const k = Math.min(w / (x1 - x0), h / (y1 - y0));
+    return d3.zoomIdentity.translate(margin + (w - k * (x1 - x0)) / 2 - k * x0, top + (h - k * (y1 - y0)) / 2 - k * y0).scale(k);
+  }
+  const fitAll = () => fitTransform(0, 0, W, H, 16);
+  function go(t) { svg.transition().duration(reduceMotion ? 0 : 550).call(zoom.transform, t); }
+  function zoomToBoulder(b) {
+    const k = Math.max(transform.k, 3.2), x = sx(b.x), y = sy(b.y);
+    go(d3.zoomIdentity.translate(size.w / 2 - k * x, (size.h + 60) / 2 - k * y).scale(k));
+  }
+  function zoomToSector(s) {
+    const r = s.radius + 40;
+    go(fitTransform(sx(s.x - r), sy(s.y + r), sx(s.x + r), sy(s.y - r), 40));
+  }
+
+  svg.attr("viewBox", `0 0 ${size.w} ${size.h}`);
+  svg.call(zoom.transform, fitAll());
+  new ResizeObserver(() => {
+    const prev = size;
+    size = { w: wrap.clientWidth, h: wrap.clientHeight };
+    if (size.w === prev.w && size.h === prev.h) return;
+    svg.attr("viewBox", `0 0 ${size.w} ${size.h}`);
+    svg.call(zoom.transform, fitAll());
+  }).observe(wrap);
+
+  document.getElementById("zoom-in").onclick = () => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, 1.6);
+  document.getElementById("zoom-out").onclick = () => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, 1 / 1.6);
+  document.getElementById("zoom-fit").onclick = () => { select(null); go(fitAll()); };
+
+  // ------------------------------------------------------------ tooltip
+  const tip = document.getElementById("tip");
+  const starsText = b => b.ratings ? `${b.stars.toFixed(1)}★ from ${fmt(b.ratings)} ratings` : "No ratings yet";
+  boulders
+    .on("pointerenter pointermove", (e, b) => {
+      tip.innerHTML = `<strong>${b.name}</strong><div class="sub">${b.sector} · ${b.angle} · ${b.height_ft} ft</div>${b.desc ? `<div class="tip-desc">${b.desc}</div>` : ""}
+        ${b.problems.length} problems · ${fmt(b.sends)} sends<br>${starsText(b)}`;
+      tip.hidden = false;
+      const r = wrap.getBoundingClientRect();
+      let x = e.clientX - r.left + 14, y = e.clientY - r.top + 14;
+      if (x + tip.offsetWidth > r.width - 8) x = e.clientX - r.left - tip.offsetWidth - 14;
+      if (y + tip.offsetHeight > r.height - 8) y = e.clientY - r.top - tip.offsetHeight - 14;
+      tip.style.left = `${x}px`; tip.style.top = `${y}px`;
+    })
+    .on("pointerleave", () => { tip.hidden = true; })
+    .on("click", (e, b) => { e.stopPropagation(); select(b); })
+    .on("keydown", (e, b) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(b); zoomToBoulder(b); } });
+
+  // ------------------------------------------------------------ panel
+  const panel = document.getElementById("panel");
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let selected = null;
+
+  function select(b) {
+    selected = b;
+    boulders.classed("selected", d => d === b);
+    if (b) showBoulder(b); else showOverview();
+  }
+
+  function problemRow(p, value) {
+    return `<li><button type="button" data-boulder="${p.boulder.id}">
+      <span class="grade">V${p.grade}</span>
+      <span>${esc(p.name)}<span class="where">${esc(p.boulder.name)} · ${esc(p.boulder.sector)}</span></span>
+      <span class="val">${value}</span></button></li>`;
+  }
+
+  function showOverview() {
+    const mostSent = [...allProblems].sort((a, b) => b.sends - a.sends).slice(0, 8);
+    const topRated = allProblems.filter(p => p.ratings >= 20).sort((a, b) => b.stars - a.stars).slice(0, 8);
+    const sectors = [...data.sectors].sort((a, b) => a.walk_min - b.walk_min || a.name.localeCompare(b.name));
+    panel.innerHTML = `
+      <h2>Sectors</h2>
+      <p class="lede">Sorted by walk from the parking lot. Select a sector to zoom to it, or a boulder on the map to see its problems.</p>
+      <table><thead><tr><th>Sector</th><th class="num">Walk</th><th class="num">Problems</th><th class="num">Sends</th></tr></thead>
+      <tbody>${sectors.map(s => `<tr class="link" tabindex="0" data-sector="${esc(s.name)}">
+        <td>${esc(s.name)}</td><td class="num">${s.walk_min} min</td><td class="num">${s.problemCount}</td><td class="num">${fmt(s.sends)}</td></tr>`).join("")}
+      </tbody></table>
+      <h2>Most-sent problems</h2>
+      <ul class="list">${mostSent.map(p => problemRow(p, `${fmt(p.sends)} sends`)).join("")}</ul>
+      <h2>Highest rated</h2>
+      <p class="lede">Problems with at least 20 ratings.</p>
+      <ul class="list">${topRated.map(p => problemRow(p, `${p.stars.toFixed(1)}★`)).join("")}</ul>
+      <p class="foot">Sends count each climber once per problem. Ratings are logged stars, 0–4.</p>`;
+    panel.querySelectorAll("tr[data-sector]").forEach(tr => {
+      const s = sectorsByName.get(tr.dataset.sector);
+      tr.onclick = () => zoomToSector(s);
+      tr.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoomToSector(s); } };
+    });
+    bindProblemLinks();
+  }
+
+  function showBoulder(b) {
+    const grades = d3.extent(b.problems, p => p[1]);
+    panel.innerHTML = `
+      <button type="button" class="back" id="back">← All sectors</button>
+      <p class="bname">${esc(b.name)}</p>
+      <p class="bmeta">${esc(b.sector)} · ${b.walk} min walk · ${b.height_ft} ft tall · mostly ${b.angle}</p>
+      <div class="stats">
+        <div class="stat"><b>${b.problems.length}</b><span>problems, V${grades[0]}${grades[1] > grades[0] ? "–V" + grades[1] : ""}</span></div>
+        <div class="stat"><b>${fmt(b.sends)}</b><span>sends</span></div>
+        <div class="stat"><b>${b.ratings ? b.stars.toFixed(1) + "★" : "–"}</b><span>${b.ratings ? fmt(b.ratings) + " ratings" : "no ratings"}</span></div>
+      </div>
+      <h2>Problems</h2>
+      <table><thead><tr><th>Grade</th><th>Problem</th><th class="num">Rating</th><th class="num">Sends</th></tr></thead>
+      <tbody>${b.problems.map(([name, grade, stars, ratings, sends, styles]) => `<tr>
+        <td class="grade">V${grade}</td>
+        <td>${esc(name)}<div class="chips">${styles.split("|").filter(Boolean).map(s => `<span class="chip">${esc(s)}</span>`).join("")}</div></td>
+        <td class="num">${stars == null ? "–" : stars.toFixed(1) + "★"}</td><td class="num">${fmt(sends)}</td></tr>`).join("")}
+      </tbody></table>`;
+    document.getElementById("back").onclick = () => select(null);
+    panel.scrollTop = 0;
+  }
+
+  function bindProblemLinks() {
+    panel.querySelectorAll("button[data-boulder]").forEach(btn => {
+      btn.onclick = () => { const b = data.boulders[+btn.dataset.boulder]; select(b); zoomToBoulder(b); };
+    });
+  }
+
+  // ------------------------------------------------------------ controls
+  document.querySelectorAll(".seg button").forEach(btn => {
+    btn.onclick = () => {
+      metric = btn.dataset.metric;
+      document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+      recolor();
+    };
+  });
+  // Re-read the palette when the viewer's theme changes.
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", recolor);
+  new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  recolor();
+  render();
+  showOverview();
+})().catch(err => {
+  document.getElementById("panel").innerHTML = `<p>The map data didn't load (${String(err.message || err)}). Reload the page to try again.</p>`;
+});
+</script>

@@ -1,0 +1,59 @@
+# climbrec / Granite Hollow
+
+Two things live here:
+
+1. **climbrec**: a Python bouldering recommender (`src/climbrec/`), developed on a simulated crag, Granite Hollow State Park, while we wait to hear about real logbook data. It's paused for now. See README.md.
+2. **Granite Hollow, the game** (`site/game/`): a browser game set on that simulated crag. Most current work is here.
+
+## Granite Hollow: the vision
+
+Use this as long-term design guidance when planning or reviewing game features. It isn't a backlog: don't build ideas from it unless asked.
+
+**Granite Hollow is a cozy climbing exploration and strategy game that captures the experience of becoming a rock climber.** Players create a V0 climber (height, ape index, strengths, a weakness) and grow stronger through days spent exploring, climbing, projecting and discovering new areas.
+
+It combines two experiences:
+
+- **A cozy, beautiful world to explore.** Think Stardew Valley's atmosphere and sense of place, centered on outdoor bouldering: forests, trails, distinctive rock, seasons, weather. Spending time there should be a pleasure in itself.
+- **Meaningful climbing strategy.** Real decisions about how to spend a climbing day: what to try, when to rest, how to manage energy and skin, explore or project, how to use conditions. Progress should feel earned, and harder grades should take developing skills, not just accumulating XP.
+
+**The goal isn't to simulate grades or optimize XP. It's to capture the feeling of falling in love with climbing, and with a particular climbing place.**
+
+### Design principles
+
+- **Exploration and discovery.** Eventually players won't see every boulder at once. They'll find trails and areas and build their own map and guidebook. Finding a beautiful hidden boulder should be its own reward.
+- **Memorable climbs and projects.** Boulders have personalities, names and histories. Working a project over several sessions (learning moves, finding better beta, finally sending) should be one of the most satisfying things in the game.
+- **Cozy but strategic.** Relaxing and inviting, never stressful or punishing, but decisions matter. Move away from a clicker loop where you spam Try until you send. Strategy should come out of climbing, exploring, conditions and resources.
+- **A living, seasonal world.** Seasons, time of day, weather, temperature, friction and daylight should shape where and how you climb, and areas should feel distinct.
+- **Authentic climbing culture.** Quirky names, local legends, obscure classics, funny beta, intimidating projects, supportive partners, the thrill of new rock. Made by people who love climbing, with room for humor and eccentricity.
+- **Your own story.** The journal, logbook, CragLog ticks, discovered boulders, memorable sends and long-standing projects together tell the player's climbing story.
+
+### How we build
+
+- Incrementally. Keep the working game working, and make it richer, more beautiful and more engaging step by step.
+- Cohesive design over feature count. Avoid unnecessary complexity, micromanagement and tedium.
+- Accessible to non-climbers, with enough authentic detail that climbers recognize the experience.
+
+### Directions we may explore later (not commitments)
+
+An illustrated, explorable map with hidden boulders and trails; seasonal changes and time-of-day lighting; move-by-move projecting with beta discovery; climbing styles and techniques that interact with the player's body; recurring NPCs, local characters and climbing partners; a richer personal journal; training and rest choices; hidden areas, legends and special climbs that reward exploration.
+
+## Working on the game
+
+- `site/game/mechanics.js` holds the climbing rules as pure functions (send chance, XP, skills, costs, weather and rain odds). `game.js` is the UI and game state; `illustrate.js` and `paint.js` are the map (below). `index.html` holds the page and CSS tokens (light and dark).
+- The look: `site/game/art.js` holds pure functions for the seasons (colours blended by day of year), the light through the day (tint, shadows, phase), and where the scenery goes (trees, flowers, ferns, landmarks, stone walls, brooks). `applyAtmosphere()` in `game.js` writes these as CSS custom properties on the page root, and the map and interface read them, so changing the season or time never redraws the map. Art direction: an illustrated trail map and field guide (warm paper, inked trails, watercolour washes, side-on trees). Fraunces is for headings and map names, Nunito Sans for everything functional (including grades and numbers), and Caveat only for short handwritten notes. Visual changes must not touch `mechanics.js`.
+- **The map** is an illustrated park drawn by `site/game/illustrate.js` (pure, testable in Node like `art.js`) and `site/game/paint.js` (the SVG painter). `buildMap()` in `game.js` is a thin adapter: clicks walk you to a boulder or an area, the tooltip shows your sends and the walk, `setMarks()` draws your progress (sent ✓ badges, project rings, locals' tips, your pads; never flags on boulders, which read as a golf course), walking follows the trails' curves, and `applyAtmosphere()` passes the date and clock to `setDate()`/`setTime()`. `illustrate.js` has the palette, boulder forms (`facetForm`: faceted 3D granite, a recipe per kind, from each boulder's description) and `parkScene(D)`, which places the big things once (open ground per area, water, the quarry, the lot, trails, brooks and the millrace, stone walls, ~39k trees with each area's own woods, landmarks from `VIGNETTES`, written from each area's lore) and the small things per 90 m tile through `detail(tx, ty)`; it reuses `Art.scenery`'s streams, walls and ruins. `paint.js` draws the ground always; zoomed out (k < 2.2) a light park view (forest masses, clumped crowns, bare boulder planes); zoomed in, tiles built the first time they come into view and hidden while off screen. The map keeps its own inks in both themes (a dim veil in dark mode) and its own seasonal palette, set on `#mapwrap`. Its CSS lives in `index.html` under "the map"; class names `field`, `blaze` and `gauge` belong to the interface, so the map uses `hayfield`, `trail-blaze` and `flood-gauge`. Performance: SVG repaints every element on each pan/zoom frame, so merge many small shapes into few paths, cull off-screen tiles, and never fade a group with `opacity` (it composites the layer offscreen each frame; use `fill-opacity` per path), nor use per-element CSS transforms, masks or full-map blend modes. Building the scene takes a second or two when the game starts.
+- **Map art prototype** (`site/prototype/park.html`, using the game's `illustrate.js`/`paint.js`): the page where the look was worked out and reviewed, with season, light and weather controls and a list of things to find. Published at https://claude.ai/artifact/BH7gdK6JZkXgoHoGWkSCig with `park-data.json` (the crag without the simulated climbers). `v2/` keeps the approved Hawkwatch-only version and `v1/` the first one. Screenshots: `docs/screenshots/park-prototype/`, `docs/screenshots/game-illustrated-map/`, and earlier rounds in `hawkwatch-prototype*/` and `hawkwatch-boulders-*/`.
+- After changing pacing or rules, run `node scripts/balance_game.js` (200 simulated players). Current pacing: about V3 by climbing day 5, V5 by 12, V7 by 22, V9 by 39.
+- `game-data.json` is generated: `.venv/bin/python -m climbrec.viz.game_data`. The map page's data comes from `python -m climbrec.viz.crag_map`.
+- **Don't break players' saves.** Saves (localStorage and downloaded save files) and the shared leaderboard refer to problems by index and to boulders by position. Reordering, adding or removing problems or boulders isn't safe unless you migrate saves. Renaming problems and boulders is safe, but saves store **sector names** (`G.loc.sector`, `G.visited`): if you rename a sector, add the old name to `OLD_SECTOR_NAMES` in `game.js` (`migrateSave` translates it on load). Keep old save fields readable (see `validateSave`, `migrateSave` and the fallbacks for older forecasts and ticks), and test changes with an old, mid-day save, not just a fresh game.
+- Names, boulder themes, boulder descriptions and the crag's lore live in `src/climbrec/simulate/naming.py`. Keep new names and text consistent with that lore (the quarry and mill village, the drowned valley, Dot, the Bishop, Ranger Gus, Pickles). The `sector_order`/`boulder_order` columns keep the map in place when names change.
+- The game's Mountain-Project-like site is called **CragLog**. Never put a real company's name or branding on a published page.
+- The game is published as a claude.ai artifact at https://claude.ai/artifact/52JmdfSGKsApoYMAGPycnS (the crag map: https://claude.ai/artifact/Vn4mQD8u8AvbHuShnY1baD). The game uses the artifact's `db` (leaderboard, `runs/{self}`), `user` and `downloads` capabilities. Republish with the same file path. Data shared through the leaderboard is untrusted: validate it and escape it.
+- **GitHub:** https://github.com/madeline-v-brandt/granite-hollow (public). `.github/workflows/pages.yml` publishes `site/` to GitHub Pages on every push to `main`: https://madeline-v-brandt.github.io/granite-hollow/ (the root redirects to `game/`; also `map/` and `prototype/park.html`). Off claude.ai the leaderboard is off and saves are separate (move them with save files). The git folder is `.git.nosync` (outside iCloud; `.git` points to it). Commits use the GitHub noreply address. `inspo/` and `8a.txt` stay local (gitignored). Push only when asked.
+- There's no browser here. Check changes with syntax checks and a jsdom playthrough, and say so when something hasn't been seen in a real browser.
+
+## Working on the recommender
+
+- Python env: `.venv.nosync`, with `.venv` linked to it. The folder syncs to iCloud, which hides `.pth` files inside a synced `.venv`, and Python 3.13+ skips hidden `.pth` files. Use `.venv/bin/python`.
+- Tests: `.venv/bin/python -m pytest -q`. Regenerate the crag: `.venv/bin/python -m climbrec.simulate`. It's deterministic, and naming uses its own random stream, so names can change without changing grades, styles or ticks.
+- Real data: don't scrape sites whose terms forbid it (Mountain Project's do). We've asked Mountain Project for permission and are waiting to hear back.
