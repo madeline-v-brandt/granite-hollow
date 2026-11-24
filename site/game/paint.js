@@ -189,6 +189,11 @@
     const S = Illu.parkScene(D);
     const svg = d3.select(svgEl), wrap = svgEl.parentElement;
     svg.selectAll("*").remove();
+    // What the player knows (setKnown). null: everything, as on the prototype page
+    // and under the game's old rules. Unknown boulders are still drawn, unnamed.
+    let known = null;
+    const nameOf = bo => (known ? known.boulders[bo.id] || null : bo.b.name);
+    const ariaOf = bo => { const n = nameOf(bo); return n ? `${n}, ${bo.b.sector}` : "Unfamiliar boulder"; };
     const defs = svg.append("defs");
     for (const [id, cls] of [["soft-dark", "sd"], ["soft-light", "sl"], ["soft-earth", "se"]]) {
       const gr = defs.append("radialGradient").attr("id", id);
@@ -652,7 +657,7 @@
     function drawBoulder(Lr, bo, st, F = bo.form) {
       const X = bo.b.x, Y = -bo.b.y, name = bo.b.name;
       const g = Lr.append("g").attr("class", `boulder k-${F.kind}`).attr("data-id", bo.id).attr("tabindex", 0).attr("role", "button")
-        .attr("aria-label", `${name}, ${bo.b.sector}`).attr("transform", `translate(${f2(X)},${f2(Y)})`);
+        .attr("aria-label", ariaOf(bo)).attr("transform", `translate(${f2(X)},${f2(Y)})`);
       const R = F.R, hullD = roundPoly(F.hull, .32);
       const clipId = `bclip-${bo.id}`;
       defs.append("clipPath").attr("id", clipId).append("path").attr("d", hullD);
@@ -1338,6 +1343,7 @@
       const order = [...labelItems].sort((a, b) => rank(a) - rank(b));
       for (const d of order) {
         d.show = false;
+        if (d.off) continue;
         const wanted = d.kind === "boulder" && (d.id === ui.hover || d.id === ui.picked);
         if (k < d.minK && !wanted) continue;
         if (d.kind === "water" && k > 6) continue;
@@ -1469,6 +1475,20 @@
       badgeSel.attr("transform", bo => `translate(${f2(T.applyX(bo.b.x + bo.form.R * .75) + 4)},${f2(T.applyY(-bo.b.y - bo.form.H * .85) - Math.min(10, k * 1.2))})`);
     }
     function setMe(p) { meWorld = p; placeMe(); }
+    // Label only what the player knows: { sectors: { name: { show, sub } }, boulders: { id: name | null } }.
+    function setKnown(view) {
+      known = view || null;
+      for (const d of labelItems) {
+        if (d.kind === "sector") {
+          const v = known && known.sectors[d.name];
+          d.off = !!known && !(v && v.show);
+          d.subNow = known ? (v && v.sub) || "" : d.sub;
+        } else if (d.kind === "boulder") d.off = !!known && !known.boulders[d.id];
+      }
+      labelSel.filter(d => d.kind === "sector").select("text.lsub").text(d => d.subNow ?? d.sub);
+      svg.selectAll("g.boulder").attr("aria-label", function () { return ariaOf(S.boulders[+this.dataset.id]); });
+      placeLabels();
+    }
     // Bring an area into view, if it isn't already (after a walk).
     function focus(name) {
       const s = D.sectors.find(x => x.name === name); if (!s) return;
@@ -1477,7 +1497,7 @@
       if (t.k > T.k * 1.15 || !inView) go(t, 700);
     }
     draw();
-    return { setDate, setTime, flyTo, setMarks, setMe, focus, home: () => go(home()), zoomBy: f => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f), scene: S,
+    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, focus, home: () => go(home()), zoomBy: f => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f), scene: S,
       tilesPending: () => pending.size + (building ? 1 : 0) };
   }
 

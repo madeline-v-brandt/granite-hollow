@@ -72,6 +72,13 @@
     if (chance >= 0.025) return { key: "project", label: "Project", bars: 4 };
     return { key: "nope", label: "Not yet", bars: 5 };
   }
+  // Can you see a line as something you could climb? Judged for you fresh, in
+  // average conditions and without beta, so it doesn't change with the weather
+  // or how tired you are. Only "Not yet" lines stay hidden. (Phase 2 discovery.)
+  function canSpot(player, p) {
+    const fresh = { ...player, energy: 100, skin: 100 };
+    return feel(sendChance(margin(fresh, p, null, { cond: 0 }))).key !== "nope";
+  }
 
   // ---- costs & gains -------------------------------------------------------------
   function attemptCost(player, p) {
@@ -197,7 +204,7 @@
   }
 
   const Mech = { PREF, levelInfo, ability, styleBonus, morph, reachDependence, frictionSensitivity, breakdown,
-    margin, sendChance, feel, attemptCost, betaGain, sendXp, skillGains, movesIn, attempt, weather, forecastDay, realize, rainChance, rainStart, dayEnds, hm, startOfDay,
+    margin, sendChance, feel, canSpot, attemptCost, betaGain, sendXp, skillGains, movesIn, attempt, weather, forecastDay, realize, rainChance, rainStart, dayEnds, hm, startOfDay,
     tagsOf, BETA_MAX, clamp };
   if (typeof module !== "undefined") module.exports = Mech; else root.Mech = Mech;
 })(typeof window !== "undefined" ? window : globalThis);

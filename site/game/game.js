@@ -3,6 +3,13 @@
 (function () {
   "use strict";
   const SAVE_KEY = "granite-hollow-save-v1";
+  // Development mode (?dev, remembered for the tab; ?dev=0 leaves it): its own save
+  // slot, the Phase 2 rules for new climbers, the dev tools, and never the leaderboard.
+  const DEV = (() => { try { const q = new URLSearchParams(location.search); if (q.has("dev")) sessionStorage.setItem("gh-dev", q.get("dev") === "0" ? "0" : "1"); return sessionStorage.getItem("gh-dev") === "1"; } catch (e) { return false; } })();
+  const SLOT = DEV ? "granite-hollow-save-dev" : SAVE_KEY;
+  // The Phase 2 rules (v2 saves: a crag that develops as you play) stay in
+  // development mode until Stage 3, when discovery and first ascents are playable.
+  const RULES2_LIVE = false;
   const START_DATE = "2025-09-06";
   const fmt = d3.format(",");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -51,6 +58,17 @@
   ];
 
   let D = null, G = null, M = null;    // data, game state, map
+  // What the player knows (knowledge.js): every screen gets names, grades and
+  // lists from it. Under the old rules (a v1 save) it knows everything, so the
+  // game reads exactly as it always has.
+  let K = null;
+  const v2 = () => !!(G && G.v === 2 && G.world);
+  const pname = i => K.name(i) ?? "an unfamiliar line";
+  const vg = i => { const g = K.grade(i); return g == null ? "" : "V" + g; };
+  const titleOf = i => (vg(i) ? `${pname(i)}, ${vg(i)}` : pname(i));          // "Name, V3"
+  const nameGrade = i => (vg(i) ? `${vg(i)} ${pname(i)}` : pname(i));         // "V3 Name"
+  const pref = i => (K.line(i) === "open" ? "the " + pname(i).charAt(0).toLowerCase() + pname(i).slice(1) : pname(i));   // in a sentence
+  const gradeSpan = (i, style = "") => { const g = K.grade(i); return `<span class="grade"${style}${g == null ? ' title="Not climbed yet, so no grade"' : ""}>${g == null ? "?" : "V" + g}</span>`; };
   const UI = { tab: "here", expanded: new Set(), cl: { q: "", sector: "", lo: 0, hi: 13, sort: "logs", problem: null, view: "problems", done: "" }, pj: { view: "open", sort: "recent" }, rk: { window: "12m", height: "", open: null, n: 25 }, busy: false, confirmReset: false };
 
   // ====================================================================== data
@@ -119,6 +137,8 @@
       ps: {}, ticks: [], tips: [], todo: [], ach: {}, visited: [], feed: [], bestGrade: -1, board: { joined: false },
       day: null,
     };
+    if (DEV && devRules() === 2) Object.assign(G, { v: 2, rules: 2, world: World.create(D, World.newSeed()), know: World.initialKnow(D, START_DATE) });
+    if (DEV) G.dev = true;
     startDay(0, 0, true);
   }
   // The next few days' weather is rolled once and saved with the game, so the
@@ -147,7 +167,9 @@
     G.day = { no: G.dayNo, minute: 9 * 60 + Math.floor(Math.random() * 40), weather: w, startEnergy: s.energy,
       attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null,
       over: false, warned: false, levelBefore: Mech.levelInfo(G.player.xp).level };
-    const intro = first
+    const intro = first && v2()
+      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk map marks three climbing areas: The Tailgate, right by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot.`
+      : first
       ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. Pick a sector on the map to walk in. The Schoolhouse is 6 minutes up the trail, and the boulders at the Tailgate are right beside the car.`
       : `${w.sky}, ${w.temp}°F. ${w.note}`;
     G.day.last = { kind: "info", title: first ? "Welcome to Granite Hollow" : `Day ${G.dayNo}`, text: intro };
@@ -156,14 +178,16 @@
       G.day.reason = `${w.pop != null ? `The ${Mech.rainChance(w)} came through, and the rock is soaked.` : `${w.precip === "Snow" ? "Snow" : "Rain"} all day.`} Wet granite is slick and holds can snap, so there's no climbing. It counts as a rest day.`;
       note(`Day ${G.dayNo}: rained out.`);
     } else note(`Day ${G.dayNo}: ${w.sky}, ${w.temp}°F, ${w.label.toLowerCase()} conditions.`);
+    // The community climbs too: every day since the last one is simulated, once.
+    if (v2()) safely("the crag's history", () => World.step(D, G, G.date, { today: { date: G.date, wet: !!G.day.rainedOut } }));
   }
   function note(text) { G.feed.unshift({ text, date: G.date, minute: G.day ? G.day.minute : 540 }); G.feed.length = Math.min(G.feed.length, 60); }
   function save() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* storage can be unavailable */ }
+    try { localStorage.setItem(SLOT, JSON.stringify(G)); } catch (e) { /* storage can be unavailable */ }
     if (G && G.board && G.board.joined) syncBoard();
   }
   const newId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-  function load() { try { const s = localStorage.getItem(SAVE_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+  function load() { try { const s = localStorage.getItem(SLOT); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
   const pstate = i => (G.ps[i] = G.ps[i] || { att: 0, beta: 0, sent: false, flash: false, best: 0, sends: 0 });
   const firstSends = () => G.ticks.filter(t => t.style !== "Repeat");
   const levelNow = () => Mech.levelInfo(G.player.xp);
@@ -186,7 +210,7 @@
     ["big-day", "Big Day", "Send 10 new problems in one day.", () => G.day && G.day.sends.filter(s => s.style !== "Repeat").length >= 10],
     ["explorer", "Explorer", "Visit all 10 sectors.", () => G.visited.length >= D.sectors.length],
     ["good-beta", "Good Beta", "Send a climb a local recommended.", () => G.tips.some(t => t.done)],
-    ["classics", "Classic Hunter", "Send 5 problems rated 3.3★ or better.", () => firstSends().filter(t => (D.problems[t.p].stars || 0) >= 3.3).length >= 5],
+    ["classics", "Classic Hunter", "Send 5 problems rated 3.3★ or better.", () => firstSends().filter(t => (K.stats(t.p).stars || 0) >= 3.3).length >= 5],
     ["pyramid", "Solid Pyramid", "At V3 or harder: 1 send at your max, 2 one grade below, 4 two below.", pyramidDone],
     ["winter", "Winter Warrior", "Climb in December, January or February.", () => G.day && G.day.attempts > 0 && [11, 0, 1].includes(monthOf(G.date))],
     ["flapper", "Flapper", "Tear a flapper. Ouch.", () => G.flapper === true],
@@ -230,6 +254,8 @@
 
     if (r.sent) {
       const first = !st.sent, flash = first && st.att === 1, newMax = first && p.grade > G.bestGrade;
+      // Nobody had documented it: it's your first ascent, for good.
+      const fa = first && v2() && World.recordSend(D, G, i, G.date, flash).fa;
       const tip = G.tips.find(t => t.p === i && !t.done);
       const xp = Mech.sendXp(G.player, p, { first, flash, tip: !!tip && first, newMax });
       const before = levelNow().level;
@@ -241,18 +267,19 @@
       G.todo = G.todo.filter(t => t !== i || !first);
       const style = first ? (flash ? "Flash" : "Send") : "Repeat";
       G.ticks.push({ p: i, date: G.date, day: G.dayNo, style, att: st.att, stars: null });
-      G.day.sends.push({ p: i, style, xp });
+      G.day.sends.push({ p: i, style, xp, ...(fa ? { fa: true } : {}) });
       let text;
       if (flash) text = "Flash! You read every move from the ground.";
       else if (!first) text = "Fun to climb it again, but you won't learn much from a repeat.";
       else if (st.att >= 10) text = `After ${st.att} tries it finally goes. That's what projecting feels like.`;
       else if (st.att >= 4) text = `Your ${ordinal(st.att)} try. Working out the beta paid off.`;
-      else text = `You top out ${p.name}.`;
+      else text = `You top out ${pname(i)}.`;
       if (newMax) text += ` Your hardest send yet.`;
+      if (fa) text += " Nobody has documented an ascent before yours: it goes in CragLog as your first ascent.";
       if (tip && first) text += ` Good beta from ${D.climbers[tip.from][0]}.`;
-      G.day.last = { kind: "send", title: `${style === "Repeat" ? "Repeat" : "Sent"}: ${p.name}, V${p.grade}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
-      note(`${style} ${p.name} (V${p.grade}), +${fmt(xp)} XP.`);
-      showBanner(style, p, xp);
+      G.day.last = { kind: "send", title: `${style === "Repeat" ? "Repeat" : fa ? "First ascent" : "Sent"}: ${titleOf(i)}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
+      note(`${fa ? "First ascent:" : style} ${pname(i)}${vg(i) ? ` (${vg(i)})` : ""}, +${fmt(xp)} XP.`);
+      showBanner(fa ? "FA" : style, i, xp);
       const after = levelNow().level;
       if (after > before) { UI.levelPending = true; setTimeout(() => showLevelUp(after), reduceMotion ? 0 : 900); }
     } else {
@@ -265,7 +292,7 @@
       if (newHigh) text += " New highpoint!";
       if (st.beta - before > 0.03 && st.att <= 6) text += " You worked out a bit more of the beta.";
       if (G.day.weather.cond <= -0.8 && Mech.frictionSensitivity(p) >= 0.6) text += " Everything is wet.";
-      G.day.last = { kind: "fall", title: `${p.name}, V${p.grade}: attempt ${st.att}`, text, gains, p: i };
+      G.day.last = { kind: "fall", title: `${titleOf(i)}: attempt ${st.att}`, text, gains, p: i };
     }
     // Sharp granite and thin skin: flappers happen.
     if (G.player.skin < 30 && Mech.frictionSensitivity(p) >= 0.6 && Math.random() < 0.07) {
@@ -309,6 +336,16 @@
     const w = G.day.weather, ra = Mech.rainStart(w);
     return ra != null && ra <= w.dusk && G.day.minute >= ra;
   }
+  // Look a boulder over: you find it, and see the lines on it you could climb.
+  function inspectBoulder(b) {
+    if (UI.busy || G.day.over || G.loc.boulder !== b || K.all()) return;
+    const r = K.inspect(b, G.date), name = D.boulders[b].name, n = r.lines.length;
+    G.day.minute += 5;
+    const lines = n ? `You see ${n} ${n === 1 ? "line" : "lines"} you could try.` : "Nothing on it looks climbable to you yet. Stronger climbers might see more.";
+    G.day.last = { kind: "info", title: r.found ? `New boulder: ${name}` : `Another look at ${name}`, text: r.found ? `You look it over. ${lines}` : n ? `You look again. ${lines}` : "You look again, but don't see anything new." };
+    if (r.found) { note(`Found a boulder: ${name}.`); toast(`Found: ${name}`, n ? `${n} ${n === 1 ? "line" : "lines"} to try.` : "Nothing you can climb yet.", "info"); }
+    afterAction();
+  }
   function rest() {
     if (UI.busy || G.day.over) return;
     G.day.minute += 20;
@@ -339,6 +376,10 @@
     M.walk(pts, reduceMotion ? 0 : Math.max(300, Math.min(1800, minutes * 70)), () => {
       UI.busy = false;
       G.loc = { sector: to.sector, boulder: to.boulder };
+      if (v2()) {
+        if (to.sector && K.visitArea(to.sector)) toast(`New area: ${to.sector}`, "You've found a climbing area that isn't on the kiosk map.", "info");
+        if (to.boulder != null && K.boulder(to.boulder) >= 1) K.visitBoulder(to.boulder);
+      }
       const newSector = to.sector !== from.sector;
       if (newSector && to.sector) {
         if (!G.visited.includes(to.sector)) G.visited.push(to.sector);
@@ -353,8 +394,10 @@
     });
   }
   function sectorBlurb(name) {
-    const s = D.sectorBy.get(name), sent = D.sectorProblems.get(name).filter(i => G.ps[i]?.sent).length;
-    return `${s.boulderIds.length} boulders, ${D.sectorProblems.get(name).length} problems from V${s.lo} to V${s.hi}. You've sent ${sent} here.`;
+    const s = D.sectorBy.get(name), a = K.areaStats(name);
+    if (K.all()) return `${s.boulderIds.length} boulders, ${D.sectorProblems.get(name).length} problems from V${s.lo} to V${s.hi}. You've sent ${a.sent} here.`;
+    if (!a.boulders) return "You haven't found any boulders here yet. Have a look around.";
+    return `${a.boulders} ${a.boulders === 1 ? "boulder" : "boulders"} you know here${a.n ? `, ${a.n} documented ${a.n === 1 ? "problem" : "problems"} from V${a.lo} to V${a.hi}` : ""}${a.open ? `, ${a.open} unclimbed ${a.open === 1 ? "line" : "lines"}` : ""}. You've sent ${a.sent} here.`;
   }
 
   function endDay(reason) {
@@ -367,7 +410,7 @@
   // ============================================================== encounters
   function maybeEncounter(sector) {
     if (G.day.met.length >= 3 || Math.random() > 0.55) return;
-    const pool = D.npcsBySector.get(sector).filter(ci => !G.day.met.includes(ci));
+    const pool = D.npcsBySector.get(sector).filter(ci => !G.day.met.includes(ci) && (!v2() || G.world.npc["c" + ci]));
     if (!pool.length) return;
     const weight = ci => ({ local_hero: 4, regular: 2.5, occasional: 1, tourist: 1 })[D.climbers[ci][2]] || 1;
     const total = d3.sum(pool, weight);
@@ -406,19 +449,21 @@
     let line = pick(greet);
     if (w.cond >= 0.3) line += " Friction's amazing today."; else if (w.cond <= -0.3) line += " Pretty greasy out here though.";
     // A recommendation: something they liked that suits you.
-    const cands = D.liked[ci].filter(i => !G.ps[i]?.sent);
+    const documented = i => !v2() || !!G.world.est[i];        // under the new rules, only what's been climbed
+    const cands = D.liked[ci].filter(i => !G.ps[i]?.sent && documented(i));
     let ranked = cands.map(i => [i, playerFit(i)]).filter(x => x[1] > -4).sort((a, b) => b[1] - a[1]);
     let theirs = true;
     if (!ranked.length) {
       theirs = false;
-      ranked = D.sectorProblems.get(sector).filter(i => !G.ps[i]?.sent).map(i => [i, playerFit(i)]).sort((a, b) => b[1] - a[1]);
+      ranked = D.sectorProblems.get(sector).filter(i => !G.ps[i]?.sent && documented(i)).map(i => [i, playerFit(i)]).sort((a, b) => b[1] - a[1]);
     }
     const rec = ranked.length ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))][0] : null;
     let recLine = "";
     if (rec != null) {
+      K.tell(rec, "c" + ci, G.date);                         // they've told you about it, so now you know
       const p = D.problems[rec], why = whyFor(rec);
       const where = p.sector === sector ? `right here on ${p.boulder.name}` : `over at ${p.sector}`;
-      recLine = `You should try ${p.name}, V${p.grade}, ${where}. ${theirs ? "One of my favorites. " : ""}I think ${why.slice(0, 2).join(" and ")}.`;
+      recLine = `You should try ${titleOf(rec)}, ${where}. ${theirs ? "One of my favorites. " : ""}I think ${why.slice(0, 2).join(" and ")}.`;
       if (Math.abs(h - G.player.height) <= 5) recLine += " We're about the same height, so trust me.";
     }
     // Beta for a project you're working in this sector.
@@ -427,7 +472,7 @@
     if (projects.length && Math.random() < 0.7) {
       const pi = projects.sort((a, b) => G.ps[b].att - G.ps[a].att)[0], p = D.problems[pi];
       const worst = p.tagList.filter(t => BETA_TIP[t]).sort((a, b) => (G.player.skills[a] ?? Mech.morph(G.player, p)) - (G.player.skills[b] ?? Mech.morph(G.player, p)))[0];
-      beta = { p: pi, text: `Saw you working ${p.name}. ${BETA_TIP[worst] || "Try it with more confidence on the first move."}` };
+      beta = { p: pi, text: `Saw you working ${pref(pi)}. ${BETA_TIP[worst] || "Try it with more confidence on the first move."}` };
     }
     return { ci, sector, line, rec, recLine, beta, accepted: false, betaTaken: false };
   }
@@ -435,14 +480,14 @@
     const e = G.day.encounter; if (!e || e.rec == null) return;
     e.accepted = true;
     if (!G.tips.some(t => t.p === e.rec && !t.done)) G.tips.push({ p: e.rec, from: e.ci, date: G.date, why: whyFor(e.rec), done: false });
-    note(`${D.climbers[e.ci][0]} recommended ${D.problems[e.rec].name}.`);
+    note(`${D.climbers[e.ci][0]} recommended ${pname(e.rec)}.`);
     save(); renderAll();
   }
   function takeBeta() {
     const e = G.day.encounter; if (!e || !e.beta) return;
     const st = pstate(e.beta.p); st.beta = Math.min(Mech.BETA_MAX, st.beta + 0.25); st.tipped = true; e.betaTaken = true;
-    note(`Got beta for ${D.problems[e.beta.p].name} from ${D.climbers[e.ci][0]}.`);
-    toast("Beta unlocked", `${D.problems[e.beta.p].name} will feel a bit easier now.`, "info");
+    note(`Got beta for ${pref(e.beta.p)} from ${D.climbers[e.ci][0]}.`);
+    toast("Beta unlocked", `${pname(e.beta.p)} will feel a bit easier now.`, "info");
     save(); renderAll();
   }
 
@@ -465,8 +510,18 @@
       furniture: ".cartouche, .map-tools, .compass, .scalebar",
       state: { here: G.loc.boulder != null ? D.boulders[G.loc.boulder].name : null },
       onBoulder: id => { const b = D.boulders[id]; travel({ sector: b.sector, boulder: b.id }); },
-      onSector: name => travel({ sector: name, boulder: null }),
+      onSector: name => {
+        if (!K.canGo({ sector: name })) { toast("No climbing you know of there", "Walk to a boulder you can see instead, or ask around.", "info"); return; }
+        travel({ sector: name, boulder: null });
+      },
       tipHtml: b => {
+        const mins0 = walkMinutes({ sector: b.sector, boulder: b.id });
+        if (K.boulder(b.id) < 1) return `<strong>Unfamiliar boulder</strong><div class="sub">${b.height_ft} ft · ${esc(b.angle)}</div>It isn't in your guidebook. Walk over and have a look.${mins0 ? `<br>${mins0} min walk` : ""}`;
+        if (!K.all()) {
+          const a = K.boulderStats(b.id);
+          return `<strong>${esc(b.name)}</strong><div class="sub">${esc(b.sector)} · ${b.height_ft} ft · ${b.angle}</div>
+            ${b.desc ? `<div class="tip-desc">${esc(b.desc)}</div>` : ""}${a.n ? `${a.n} documented, V${a.lo}${a.hi > a.lo ? "–V" + a.hi : ""}` : "Nothing documented yet"}${a.open ? ` · ${a.open} unclimbed ${a.open === 1 ? "line" : "lines"}` : ""}<br>You've sent ${a.sent}${mins0 ? ` · ${mins0} min walk` : ""}`;
+        }
         const ps = b.problems.map(i => G.ps[i]).filter(Boolean), sent = ps.filter(x => x.sent).length;
         const g = d3.extent(b.problems, i => D.problems[i].grade), mins = walkMinutes({ sector: b.sector, boulder: b.id });
         return `<strong>${esc(b.name)}</strong><div class="sub">${esc(b.sector)} · ${b.height_ft} ft · ${b.angle}</div>
@@ -514,7 +569,11 @@
         if (el >= ms) { timer.stop(); P.setMe(points[points.length - 1]); done(); }
       });
     }
+    let knownKey = "all";
     function update() {
+      // Label only what the player knows (only when that has changed).
+      const view = K.mapView(), key = view ? JSON.stringify(view) : "all";
+      if (key !== knownKey) { knownKey = key; P.setKnown(view); }
       P.setMe(meXY(G.loc));
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
       P.setMarks({
@@ -728,10 +787,11 @@
       morph: Mech.reachDependence(p) < 0 ? "Bunchy, vs your reach" : "Reachy, vs your reach", beta: "Beta you've worked out",
       conditions: "Today's friction", fatigue: "Tiredness", skin: "Thin skin", head: "Highball nerves", grade: `Grade V${p.grade}`,
     };
-    const chips = Object.entries(parts).filter(([k, v]) => k === "ability" || k === "grade" || Math.abs(v) >= 0.05)
+    const graded = K.grade(i) != null;
+    const chips = Object.entries(parts).filter(([k, v]) => (k === "ability" || k === "grade" ? graded : Math.abs(v) >= 0.05))
       .map(([k, v]) => `<span class="chip ${k === "grade" || k === "ability" ? "" : v > 0 ? "good" : "bad"}">${label[k]} ${signed(v)}</span>`).join("");
     const c = chanceFor(i);
-    return `<div class="why">About ${c >= 0.1 ? Math.round(c * 100) + "%" : c >= 0.01 ? "1 in " + Math.round(1 / c) : "under 1%"} per try right now.
+    return `<div class="why">About ${c >= 0.1 ? Math.round(c * 100) + "%" : c >= 0.01 ? "1 in " + Math.round(1 / c) : "under 1%"} per try right now.${graded ? "" : " Nobody has climbed it, so nobody knows its grade."}
       <div class="chips">${chips}</div></div>`;
   }
   function problemRowHtml(i) {
@@ -743,8 +803,8 @@
     const hp = st && !st.sent && st.att ? `<div class="hp"><div class="meter"><i style="width:${(st.best * 100).toFixed(0)}%"></i></div>Highpoint move ${Math.round(st.best * p.moves)} of ${p.moves}</div>` : "";
     const disabled = UI.busy || G.day.over ? "disabled" : "";
     return `<div class="prob"><div class="prob-main">
-        <span class="grade">V${p.grade}</span>
-        <div><button type="button" class="linklike pname" data-expand="${i}" aria-expanded="${open}">${esc(p.name)}</button>${status}
+        ${gradeSpan(i)}
+        <div><button type="button" class="linklike pname" data-expand="${i}" aria-expanded="${open}">${esc(pname(i))}</button>${status}
           <div class="chips">${tip}${p.tagList.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>${hp}</div>
         ${feelHtml(i)}
         <button type="button" class="btn small ${st?.sent ? "" : "primary"}" data-try="${i}" ${disabled}>${st?.sent ? "Repeat" : "Try"}</button>
@@ -754,30 +814,47 @@
     const d = G.day;
     if (d.over) return `${resultHtml()}<h2>Day over</h2><p class="lede">${esc(d.reason || "")}</p><button type="button" class="btn primary" data-summary>See today's summary</button>`;
     if (G.loc.sector == null) {
-      const rows = [...D.sectors].sort((a, b) => a.walk_min - b.walk_min).map(s => {
-        const sent = D.sectorProblems.get(s.name).filter(i => G.ps[i]?.sent).length;
+      const rows = [...D.sectors].filter(s => K.area(s.name) >= 1).sort((a, b) => a.walk_min - b.walk_min).map(s => {
+        const a = K.areaStats(s.name);
+        const sub = K.all() ? `${s.boulderIds.length} boulders · V${s.lo}–V${s.hi} · you've sent ${a.sent} of ${D.sectorProblems.get(s.name).length}`
+          : a.boulders ? `${a.boulders} ${a.boulders === 1 ? "boulder" : "boulders"} found · ${a.n} documented${a.open ? ` · ${a.open} unclimbed` : ""} · you've sent ${a.sent}`
+          : "You know where it is, but you haven't found its boulders yet.";
         return `<li><button type="button" class="rowbtn" data-go-sector="${esc(s.name)}"><span><span class="t">${esc(s.name)}</span>
-          <span class="s">${s.boulderIds.length} boulders · V${s.lo}–V${s.hi} · you've sent ${sent} of ${D.sectorProblems.get(s.name).length}</span></span>
+          <span class="s">${sub}</span></span>
           <span class="v">${route(null, s.name).minutes} min walk</span></button></li>`;
       }).join("");
-      return `${resultHtml()}<h2>The parking lot</h2><p class="meta">Pick a sector to walk to. Walking takes time, and the park closes at dusk.</p><ul class="rowlist">${rows}</ul>`;
+      return `${resultHtml()}<h2>The parking lot</h2><p class="meta">${K.all() ? "Pick a sector to walk to." : "The kiosk map marks the areas below. Pick one to walk to, or head for any boulder you can see on the map."} Walking takes time, and the park closes at dusk.</p><ul class="rowlist">${rows}</ul>`;
     }
     const s = D.sectorBy.get(G.loc.sector);
     if (G.loc.boulder == null) {
-      const rows = s.boulderIds.map(bi => {
-        const b = D.boulders[bi], g = d3.extent(b.problems, i => D.problems[i].grade), sent = b.problems.filter(i => G.ps[i]?.sent).length;
+      const ids = K.all() ? s.boulderIds : K.knownBoulders(s.name);
+      const rows = ids.map(bi => {
+        const b = D.boulders[bi], a = K.boulderStats(bi);
         const proj = b.problems.some(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 2);
+        const range = a.n ? ` · V${a.lo}${a.hi > a.lo ? "–V" + a.hi : ""}` : "";
+        const what = K.all() || !a.open ? `${a.n} problems${range}` : `${a.n} documented · ${a.open} unclimbed${range}`;
         return `<li><button type="button" class="rowbtn" data-go-boulder="${bi}"><span><span class="t">${esc(b.name)}</span>
-          <span class="s">${b.problems.length} problems · V${g[0]}${g[1] > g[0] ? "–V" + g[1] : ""} · ${b.height_ft} ft · ${b.angle}${proj ? " · project here" : ""}</span></span>
-          <span class="v">${sent}/${b.problems.length} sent</span></button></li>`;
+          <span class="s">${what} · ${b.height_ft} ft · ${b.angle}${proj ? " · project here" : ""}</span></span>
+          <span class="v">${a.sent}/${a.lines} sent</span></button></li>`;
       }).join("");
-      return `${resultHtml()}${npcHtml()}<h2>${esc(s.name)}</h2><p class="meta">${s.walk_min} min from the lot. Pick a boulder.</p><ul class="rowlist">${rows}</ul>`;
+      const none = `<p class="lede">You haven't found any boulders here yet. Have a look around: walk to any boulder you can see on the map.</p>`;
+      return `${resultHtml()}${npcHtml()}<h2>${esc(s.name)}</h2><p class="meta">${s.walk_min} min from the lot.${ids.length ? " Pick a boulder." : ""}</p>${ids.length ? `<ul class="rowlist">${rows}</ul>` : none}`;
     }
     const b = D.boulders[G.loc.boulder];
-    const others = s.boulderIds.filter(x => x !== b.id).map(x => `<button type="button" class="linklike" data-go-boulder="${x}">${esc(D.boulders[x].name)}</button>`).join(", ");
+    const disabled = UI.busy || d.over ? "disabled" : "";
+    if (K.boulder(b.id) < 1) {
+      return `${resultHtml()}${npcHtml()}<h2>Unfamiliar boulder</h2>
+        <p class="meta">${esc(s.name)} · ${b.height_ft} ft · mostly ${b.angle}.</p>
+        <p class="lede">It isn't in your guidebook. Look it over to see whether anything on it might go.</p>
+        <button type="button" class="btn primary" data-inspect="${b.id}" ${disabled}>Inspect</button>`;
+    }
+    const lines = K.linesOn(b.id), more = K.all() ? [] : K.spottable(b.id);
+    const others = (K.all() ? s.boulderIds : K.knownBoulders(s.name)).filter(x => x !== b.id).map(x => `<button type="button" class="linklike" data-go-boulder="${x}">${esc(D.boulders[x].name)}</button>`).join(", ");
+    const lookAgain = more.length ? `<p class="meta" style="margin-top:10px"><button type="button" class="btn small" data-inspect="${b.id}" ${disabled}>Look it over</button>
+      ${K.boulder(b.id) < 2 || !b.problems.some(i => G.know.lines[i] && G.know.lines[i].how === "spot") ? "You haven't looked this boulder over properly yet." : "You're stronger than when you last looked. You might see more now."}</p>` : "";
     return `${resultHtml()}${npcHtml()}<h2>${esc(b.name)}</h2>${b.desc ? `<p class="boulder-desc">${esc(b.desc)}</p>` : ""}
       <p class="meta">${esc(s.name)} · ${b.height_ft} ft · mostly ${b.angle}. Select a problem's name to see what makes it hard for you.</p>
-      ${b.problems.map(problemRowHtml).join("")}
+      ${lines.length ? lines.map(problemRowHtml).join("") : `<p class="lede">Nothing here that you can see how to climb yet. Stronger climbers might see more.</p>`}${lookAgain}
       <h3>Nearby</h3><p class="meta">${others || "No other boulders in this sector."} · <button type="button" class="linklike" data-go-sector="${esc(s.name)}">Sector overview</button></p>`;
   }
 
@@ -841,6 +918,7 @@
         <button type="button" data-cl-view="leaders" aria-pressed="${v === "leaders"}">First to</button></div>`;
   }
   function rankingsHtml() {
+    if (!K.all()) return `${cragHead()}<p class="lede">Granite Hollow only reopened to climbing this season, so there are no rankings yet. They'll come back once the community has some history here.</p>`;
     const r = UI.rk, [from, to] = rankWindow(r.window);
     const rows = [];
     D.npcSends.forEach((list, ci) => {
@@ -909,21 +987,23 @@
     const projects = Object.entries(G.ps).filter(([, s]) => !s.sent && s.att > 0).map(([i, s]) => [+i, s]).sort((a, b) => b[1].best - a[1].best || b[1].att - a[1].att);
     const rows = [...G.ticks].reverse().slice(0, 80).map(t => {
       const p = D.problems[t.p];
-      return `<tr><td>${shortDate(t.date)}</td><td class="grade" style="font-size:15px">V${p.grade}</td><td><button type="button" class="linklike" data-cl="${t.p}">${esc(p.name)}</button><div class="meta" style="margin:0">${esc(p.sector)}</div></td><td>${t.style}</td><td class="num stars">${t.stars ? "★".repeat(t.stars) : ""}</td></tr>`;
+      return `<tr><td>${shortDate(t.date)}</td><td class="grade" style="font-size:15px">${vg(t.p) || "?"}</td><td><button type="button" class="linklike" data-cl="${t.p}">${esc(pname(t.p))}</button><div class="meta" style="margin:0">${esc(p.sector)}</div></td><td>${t.style}${v2() && World.isMine(G, t.p) && G.world.est[t.p].date === t.date && t.style !== "Repeat" ? " · FA" : ""}</td><td class="num stars">${t.stars ? "★".repeat(t.stars) : ""}</td></tr>`;
     }).join("");
     return `<h2>Logbook</h2><p class="meta">${sends.length} problems sent, ${G.ticks.filter(t => t.style === "Flash").length} flashed, over ${G.dayNo} days.</p>
       <h3>Grade pyramid</h3>
       <div class="pyr">${counts.map(([g, c]) => `<span class="g">V${g}</span><div class="bar"><i style="width:${(c / maxC * 82).toFixed(1)}%"></i>${c}</div>`).join("")}</div>
       ${projects.length ? `<h3>Open projects</h3><ul class="rowlist">${projects.slice(0, 12).map(([i, s]) => {
         const p = D.problems[i];
-        return `<li><button type="button" class="rowbtn" data-go-problem="${i}"><span><span class="t">V${p.grade} ${esc(p.name)}</span><span class="s">${esc(p.boulder.name)} · ${esc(p.sector)} · ${s.att} tries</span></span><span class="v">high ${Math.round(s.best * p.moves)}/${p.moves}</span></button></li>`;
+        return `<li><button type="button" class="rowbtn" data-go-problem="${i}"><span><span class="t">${esc(nameGrade(i))}</span><span class="s">${esc(p.boulder.name)} · ${esc(p.sector)} · ${s.att} tries</span></span><span class="v">high ${Math.round(s.best * p.moves)}/${p.moves}</span></button></li>`;
       }).join("")}</ul>` : ""}
       <h3>Ticks</h3><table><thead><tr><th>Date</th><th>Grade</th><th>Problem</th><th>Style</th><th class="num">Stars</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   // ---- CragLog ----
   function commentFor(log, p, pi, li) {
-    const [ci, , style, stars, sugg] = log, h = D.climbers[ci][1];
+    const [who, , style, stars, sugg] = log;
+    const ci = typeof who === "number" ? who : /^c\d+$/.test(who) ? +who.slice(1) : 7;
+    const h = typeof who === "number" ? D.climbers[who][1] : World.whoInfo(D, who).h || 175;
     let seed = (pi * 31 + li * 17 + ci) % 1000;
     const r = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
     if (r() < 0.35) return "";
@@ -944,7 +1024,7 @@
     if (f && r() < 0.5) bits.push(flavor[f]);
     return bits.slice(0, 2).join(" ");
   }
-  function describe(p) {
+  function describe(p, named = true) {
     const phrase = { crimpy: "sharp crimps", slopey: "rounded slopers", pinchy: "a couple of good pinches", juggy: "big jugs", compression: "a squeezy compression sequence",
       dyno: "a big dyno", technical: "precise footwork", powerful: "a powerful crux move", mantle: "a stout mantle", slab: "delicate slab moves",
       overhang: "steep pulling", roof: "a roof with a tricky lip" };
@@ -954,7 +1034,7 @@
     if (p.tagList.includes("traverse")) s += " Traverses the face before topping out.";
     if (p.tagList.includes("eliminate")) {
       const rule = p.name.match(/\(([^)]+)\)$/);   // "Comb-Over (Slopers Only)"
-      s += rule ? ` An eliminate of ${p.name.slice(0, rule.index).trim()}: ${rule[1].toLowerCase()}.` : " Eliminate: the arête and the big jug are off.";
+      s += rule && named ? ` An eliminate of ${p.name.slice(0, rule.index).trim()}: ${rule[1].toLowerCase()}.` : " Eliminate: the arête and the big jug are off.";
     }
     if (p.tagList.includes("reachy")) s += " Long moves between holds.";
     if (p.tagList.includes("bunchy")) s += " Cramped, compressed positions.";
@@ -967,27 +1047,30 @@
     if (UI.cl.view === "leaders") return leadersHtml();
     const c = UI.cl, q = c.q.trim().toLowerCase();
     const doneOk = p => !c.done || (c.done === "sent" ? !!G.ps[p.id]?.sent : c.done === "tried" ? !!G.ps[p.id] && !G.ps[p.id].sent && G.ps[p.id].att > 0 : !G.ps[p.id]?.sent);
-    let list = D.problems.filter(p => p.grade >= c.lo && p.grade <= c.hi && (!c.sector || p.sector === c.sector) && doneOk(p) &&
-      (!q || p.name.toLowerCase().includes(q) || p.boulder.name.toLowerCase().includes(q) || p.tags.includes(q)));
-    const sorts = { logs: (a, b) => b.sends - a.sends, stars: (a, b) => (b.stars || 0) - (a.stars || 0), grade: (a, b) => a.grade - b.grade || b.sends - a.sends, fit: (a, b) => playerFit(b.id) - playerFit(a.id) };
+    const gr = p => K.grade(p.id), st = new Map();
+    const stats = p => { if (!st.has(p.id)) st.set(p.id, K.stats(p.id)); return st.get(p.id); };
+    let list = K.guidebook().map(i => D.problems[i]).filter(p => gr(p) >= c.lo && gr(p) <= c.hi && (!c.sector || p.sector === c.sector) && doneOk(p) &&
+      (!q || pname(p.id).toLowerCase().includes(q) || p.boulder.name.toLowerCase().includes(q) || p.tags.includes(q)));
+    const sorts = { logs: (a, b) => stats(b).sends - stats(a).sends, stars: (a, b) => (stats(b).stars || 0) - (stats(a).stars || 0), grade: (a, b) => gr(a) - gr(b) || stats(b).sends - stats(a).sends, fit: (a, b) => playerFit(b.id) - playerFit(a.id) };
     list.sort(sorts[c.sort]);
     const total = list.length; list = list.slice(0, 60);
     const gradeOpts = sel => d3.range(0, 14).map(g => `<option value="${g}" ${g === sel ? "selected" : ""}>V${g}</option>`).join("");
     return `${cragHead()}
       <div class="cl-filters">
         <input type="search" id="cl-q" placeholder="Search problems, boulders or styles" value="${esc(c.q)}" aria-label="Search">
-        <select id="cl-sector" aria-label="Sector"><option value="">All sectors</option>${D.sectors.map(s => `<option ${s.name === c.sector ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
+        <select id="cl-sector" aria-label="Sector"><option value="">All sectors</option>${D.sectors.filter(s => K.area(s.name) >= 1).map(s => `<option ${s.name === c.sector ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
         <select id="cl-sort" aria-label="Sort"><option value="logs" ${c.sort === "logs" ? "selected" : ""}>Most climbed</option><option value="stars" ${c.sort === "stars" ? "selected" : ""}>Highest rated</option><option value="grade" ${c.sort === "grade" ? "selected" : ""}>Grade</option><option value="fit" ${c.sort === "fit" ? "selected" : ""}>Best for you</option></select>
         <select id="cl-lo" aria-label="Lowest grade">${gradeOpts(c.lo)}</select>
         <select id="cl-hi" aria-label="Highest grade">${gradeOpts(c.hi)}</select>
         <select id="cl-done" aria-label="Your ticks">${[["", "All problems"], ["unsent", "Not sent yet"], ["tried", "Tried, not sent"], ["sent", "Sent"]].map(([v, l]) => `<option value="${v}" ${c.done === v ? "selected" : ""}>${l}</option>`).join("")}</select>
       </div>
-      <p class="meta">${total} problems${total > 60 ? ", showing 60" : ""}.</p>
-      <ul class="rowlist">${list.map(p => `<li><button type="button" class="rowbtn" data-cl="${p.id}"><span><span class="t">V${p.grade} ${esc(p.name)}${G.ps[p.id]?.sent ? ` <span style="color:var(--plus);font-weight:500">✓</span>` : ""}</span>
+      <p class="meta">${K.all() ? `${total} problems` : `${total} documented ${total === 1 ? "problem" : "problems"} you know of`}${total > 60 ? ", showing 60" : ""}.${K.all() ? "" : " Problems appear here once someone has climbed them, on boulders you know."}</p>
+      <ul class="rowlist">${list.map(p => { const x = stats(p); return `<li><button type="button" class="rowbtn" data-cl="${p.id}"><span><span class="t">${esc(nameGrade(p.id))}${G.ps[p.id]?.sent ? ` <span style="color:var(--plus);font-weight:500">✓</span>` : ""}</span>
         <span class="s">${esc(p.boulder.name)} · ${esc(p.sector)}</span></span>
-        <span class="v">${p.stars != null ? `<span class="stars">★</span> ${p.stars.toFixed(1)}` : "no ratings"}<span class="s">${fmt(p.sends)} sends</span></span></button></li>`).join("")}</ul>`;
+        <span class="v">${x.stars != null ? `<span class="stars">★</span> ${x.stars.toFixed(1)}` : "no ratings"}<span class="s">${fmt(x.sends)} sends</span></span></button></li>`; }).join("")}</ul>`;
   }
   function cragProblemHtml(i) {
+    if (!K.all()) return cragLineHtml(i);
     const p = D.problems[i], st = G.ps[i], logs = D.logs[i];
     const sugg = logs.map(l => l[4]).filter(v => v != null);
     const cons = sugg.length ? `Climbers suggest V${Math.round(d3.mean(sugg))} (${sugg.length} recent ${sugg.length === 1 ? "vote" : "votes"})` : "";
@@ -1013,6 +1096,40 @@
       </div>
       <h3>For you</h3>${whyHtml(i).replace('class="why"', 'class="why" style="margin-left:0"')}
       <h3>Recent logs</h3>${mine}${entries || `<p class="meta">No logs yet.</p>`}`;
+  }
+
+  // A problem's page under the new rules: what's been documented in this save's
+  // Granite Hollow, or, for a line nobody has climbed, just what you can see.
+  function cragLineHtml(i) {
+    const p = D.problems[i], st = G.ps[i], state = K.line(i), e = K.est(i);
+    const back = `<button type="button" class="linklike" data-cl-back>← ${{ rankings: "Rankings", leaders: "First to" }[UI.cl.view] || "All problems"}</button>`;
+    if (state === "hidden") return `${back}<p class="lede" style="margin-top:12px">You don't know about this one yet.</p>`;
+    const x = K.stats(i), legend = K.legend(i), onTodo = G.todo.includes(i), go = K.canGo({ sector: p.sector, boulder: p.b });
+    const mine = G.ticks.filter(t => t.p === i).reverse().map(t => `<div class="logentry mine"><span class="who">${esc(G.player.name)}<small>${G.player.height} cm</small></span>
+      <div class="what">${shortDate(t.date)} · ${t.style}${World.isMine(G, i) && G.world.est[i].date === t.date && t.style !== "Repeat" ? " · first ascent" : ""}${t.stars ? ` · <span class="stars">${"★".repeat(t.stars)}</span>` : ""}</div></div>`).join("");
+    const entries = state === "est" && e ? e.logs.map((l, li) => {
+      const [who, date, style, stars, sg] = l, info = World.whoInfo(D, who), c = commentFor(l, p, i, li);
+      return `<div class="logentry"><span class="who">${esc(info.name)}<small>${info.h ? info.h + " cm" : ""}</small></span>
+        <div class="what">${shortDate(date)} · ${{ F: "Flash", S: "Send" }[style] || "Send"}${stars != null ? ` · <span class="stars">${"★".repeat(stars) || "bomb"}</span>` : ""}${sg != null ? ` · suggests V${sg}` : ""}</div>
+        ${c ? `<p>${esc(c)}</p>` : ""}</div>`;
+    }).join("") : "";
+    const head = state === "est"
+      ? `<h2 style="margin-top:8px">${esc(pname(i))} <span class="grade" style="font-size:24px">${vg(i)}</span></h2>
+        <p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · ${x.stars != null ? `<span class="stars">★</span> ${x.stars.toFixed(1)} from ${x.ratings} ${x.ratings === 1 ? "rating" : "ratings"}` : "no ratings yet"} · ${fmt(x.sends)} ${x.sends === 1 ? "send" : "sends"}${e && e.classic ? " · a Granite Hollow classic" : ""}</p>
+        <p class="meta">First ascent: ${esc(K.faText(i))}${e && !e.old ? `, ${shortDate(e.date)}` : ""}${e && e.flash ? " (flashed)" : ""}</p>`
+      : `<h2 style="margin-top:8px">${esc(pname(i))}</h2>
+        <p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · nobody has documented an ascent, so it has no name or grade yet</p>`;
+    return `${back}${head}
+      ${legend ? `<p class="legend">Local legend: ${esc(legend)}</p>` : ""}
+      ${p.boulder.desc ? `<p class="boulder-desc" style="font-size:14px">${esc(p.boulder.name)}: ${esc(p.boulder.desc)}</p>` : ""}
+      <div class="chips" style="margin-bottom:8px">${p.tagList.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+      <p class="lede">${esc(describe(p, false))}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        ${go ? `<button type="button" class="btn small primary" data-go-problem="${i}" ${UI.busy || G.day.over ? "disabled" : ""}>Go there</button>` : ""}
+        ${st?.sent ? `<span class="chip good">You've sent this</span>` : `<button type="button" class="btn small" data-todo="${i}">${onTodo ? "On your to-do list" : "Add to to-do list"}</button>`}
+      </div>
+      <h3>For you</h3>${whyHtml(i).replace('class="why"', 'class="why" style="margin-left:0"')}
+      ${state === "est" ? `<h3>Recent logs</h3>${mine}${entries || `<p class="meta">No logs yet.</p>`}` : ""}`;
   }
 
   // ---- Journal ----
@@ -1042,7 +1159,7 @@
         ? `${st.att} ${st.att === 1 ? "try" : "tries"}${sessions ? ` over ${sessions} ${sessions === 1 ? "session" : "sessions"}` : ""}${lastDate(st) ? ` · last tried ${shortDate(lastDate(st))}` : ""}`
         : `Sent ${st.sentOn ? shortDate(st.sentOn) : ""} after ${st.att} tries${sessions ? ` over ${sessions} ${sessions === 1 ? "session" : "sessions"}` : ""}`;
       return `<li class="pj">
-        <div class="pj-top"><button type="button" class="linklike pj-name" data-cl="${i}"><span class="grade">V${p.grade}</span> ${esc(p.name)}</button>
+        <div class="pj-top"><button type="button" class="linklike pj-name" data-cl="${i}">${gradeSpan(i)} ${esc(pname(i))}</button>
           ${open ? `<button type="button" class="btn small" data-go-problem="${i}">Go</button>` : `<span style="color:var(--plus);font-weight:600">✓</span>`}</div>
         <div class="meta" style="margin:0">${esc(p.boulder.name)} · ${esc(p.sector)} · ${summary}</div>
         <div class="pj-row"><span class="pj-lbl">${open ? `Highpoint: move ${best} of ${p.moves}` : "Topped out"}</span><div class="pj-moves">${moves}</div></div>
@@ -1068,12 +1185,12 @@
       ${projectsHtml()}
       <h3>Tips from locals</h3>
       ${tips.length ? `<ul class="rowlist">${tips.map(t => { const p = D.problems[t.p];
-        return `<li><button type="button" class="rowbtn" data-go-problem="${t.p}"><span><span class="t">V${p.grade} ${esc(p.name)} ${t.done ? `<span style="color:var(--plus);font-weight:500">✓ sent</span>` : ""}</span>
+        return `<li><button type="button" class="rowbtn" data-go-problem="${t.p}"><span><span class="t">${esc(nameGrade(t.p))} ${t.done ? `<span style="color:var(--plus);font-weight:500">✓ sent</span>` : ""}</span>
           <span class="s">From ${esc(D.climbers[t.from][0])}: ${esc(t.why.slice(0, 2).join(", "))} · ${esc(p.sector)}</span></span><span class="v">${t.done ? "" : "Go"}</span></button></li>`; }).join("")}</ul>`
         : `<p class="meta">Climbers you meet on the trail will tell you about problems that suit you. Sending one earns bonus XP.</p>`}
       <h3>To-do list</h3>
       ${todo.length ? `<ul class="rowlist">${todo.map(i => { const p = D.problems[i];
-        return `<li><button type="button" class="rowbtn" data-go-problem="${i}"><span><span class="t">V${p.grade} ${esc(p.name)}</span><span class="s">${esc(p.boulder.name)} · ${esc(p.sector)}</span></span><span class="v">Go</span></button></li>`; }).join("")}</ul>`
+        return `<li><button type="button" class="rowbtn" data-go-problem="${i}"><span><span class="t">${esc(nameGrade(i))}</span><span class="s">${esc(p.boulder.name)} · ${esc(p.sector)}</span></span><span class="v">Go</span></button></li>`; }).join("")}</ul>`
         : `<p class="meta">Add problems from CragLog.</p>`}
       <h3>Achievements</h3>
       <div class="ach">${ACH.map(([id, name, desc]) => `<div class="${G.ach[id] ? "" : "locked"}"><b>${esc(name)}</b><span>${esc(desc)}${G.ach[id] ? ` · ${shortDate(G.ach[id])}` : ""}</span></div>`).join("")}</div>
@@ -1087,7 +1204,13 @@
     on("[data-expand]", n => { const i = +n.dataset.expand; UI.expanded.has(i) ? UI.expanded.delete(i) : UI.expanded.add(i); renderPanel(); });
     on("[data-go-sector]", n => travel({ sector: n.dataset.goSector, boulder: null }));
     on("[data-go-boulder]", n => { const b = D.boulders[+n.dataset.goBoulder]; travel({ sector: b.sector, boulder: b.id }); });
-    on("[data-go-problem]", n => { const p = D.problems[+n.dataset.goProblem]; UI.expanded.add(p.id); travel({ sector: p.sector, boulder: p.b }); });
+    on("[data-go-problem]", n => {
+      const p = D.problems[+n.dataset.goProblem];
+      if (!K.canGo({ sector: p.sector, boulder: p.b })) { toast("You don't know the way", "Nobody has told you where it is yet.", "info"); return; }
+      UI.expanded.add(p.id); travel({ sector: p.sector, boulder: p.b });
+    });
+    on("[data-inspect]", n => inspectBoulder(+n.dataset.inspect));
+    on("[data-lb-bucket]", n => { UI.lbBucket = +n.dataset.lbBucket; UI.lbGrade = null; renderPanel(); });
     on("[data-cl]", n => { UI.cl.problem = +n.dataset.cl; UI.tab = "craglog"; renderTabs(); renderPanel(); $("#tabbody").scrollTop = 0; });
     on("[data-cl-back]", () => { UI.cl.problem = null; renderPanel(); });
     on("[data-todo]", n => { const i = +n.dataset.todo; if (!G.todo.includes(i)) G.todo.push(i); save(); renderAll(); });
@@ -1111,7 +1234,7 @@
     on("[data-import]", pickSaveFile);
     on("[data-reset]", () => { UI.confirmReset = true; renderPanel(); });
     on("[data-reset-no]", () => { UI.confirmReset = false; renderPanel(); });
-    on("[data-reset-yes]", () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } G = null; UI.confirmReset = false; showCreator(); });
+    on("[data-reset-yes]", () => { try { localStorage.removeItem(SLOT); } catch (e) { } G = null; UI.confirmReset = false; showCreator(); });
     const q = el.querySelector("#cl-q");
     if (q) {
       q.oninput = () => { UI.cl.q = q.value; const pos = q.selectionStart; renderPanel(); const nq = $("#cl-q"); nq.focus(); nq.setSelectionRange(pos, pos); };
@@ -1137,10 +1260,10 @@
     setTimeout(() => el.remove(), 4200);
   }
   let bannerTimer = null;
-  function showBanner(style, p, xp) {
+  function showBanner(style, i, xp) {
     const b = $("#banner");
-    b.innerHTML = `<div class="big ${style === "Flash" ? "flash" : ""}">${style === "Flash" ? "FLASH!" : style === "Repeat" ? "AGAIN" : "SENT!"}</div>
-      <div class="what">${esc(p.name)} · V${p.grade}</div><div class="xp">+${fmt(xp)} XP</div>`;
+    b.innerHTML = `<div class="big ${style === "Flash" || style === "FA" ? "flash" : ""}">${style === "Flash" ? "FLASH!" : style === "Repeat" ? "AGAIN" : style === "FA" ? "FIRST ASCENT!" : "SENT!"}</div>
+      <div class="what">${esc(pname(i))}${vg(i) ? ` · ${vg(i)}` : ""}</div><div class="xp">+${fmt(xp)} XP</div>`;
     b.hidden = false; b.classList.remove("show"); void b.offsetWidth; b.classList.add("show");
     clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.hidden = true; }, 2200);
   }
@@ -1172,7 +1295,7 @@
     }).join("");
     modal(`<span class="label-sm">Day ${d.no} · ${prettyDate(G.date)}</span><h2>${d.rainedOut ? "Rained out" : newSends.length ? `${newSends.length} new ${newSends.length === 1 ? "send" : "sends"}` : d.attempts ? "No sends today" : "A quiet day"}</h2>
       <p class="lede">${esc(d.reason || "")} ${d.attempts} attempts, ${d.highpoints} new highpoints, +${fmt(d.xp)} XP${levelUps > 0 ? `, and you leveled up to V${levelNow().level}` : ""}.</p>
-      ${newSends.length ? `<ul class="rowlist">${newSends.map(s => `<li><div class="rowbtn" style="cursor:default"><span><span class="t">V${D.problems[s.p].grade} ${esc(D.problems[s.p].name)}</span><span class="s">${s.style}</span></span><span class="v" style="color:var(--gold)">+${fmt(s.xp)} XP</span></div></li>`).join("")}</ul>` : ""}
+      ${newSends.length ? `<ul class="rowlist">${newSends.map(s => `<li><div class="rowbtn" style="cursor:default"><span><span class="t">${esc(nameGrade(s.p))}</span><span class="s">${s.fa ? `First ascent${s.style === "Flash" ? ", flashed" : ""}` : s.style}</span></span><span class="v" style="color:var(--gold)">+${fmt(s.xp)} XP</span></div></li>`).join("")}</ul>` : ""}
       ${gains.length ? `<h3 style="font-family:var(--display);letter-spacing:.1em;text-transform:uppercase;font-size:13px;color:var(--ink-2)">Getting better at</h3><div class="chips">${gains.map(([t, g]) => `<span class="chip good">${STYLE[t][0]} +${g.toFixed(2)}</span>`).join("")}</div>` : ""}
       ${d.ach.length ? `<p class="lede" style="margin-top:10px">Achievements: <b>${d.ach.map(esc).join(", ")}</b></p>` : ""}
       ${d.no - (G.backup ? G.backup.dayNo : 0) >= 10 ? `<p class="meta" style="margin-top:12px">It's been ${G.backup ? `${d.no - G.backup.dayNo} days since your last save file` : "a while and you haven't downloaded a save file yet"}. <button type="button" class="linklike" data-export>Download one now</button></p>` : ""}
@@ -1232,9 +1355,10 @@
   // Check a loaded file thoroughly: every problem and climber it points at must
   // exist, and no text may contain markup.
   function validateSave(obj) {
-    const g = obj && obj.format === SAVE_FORMAT ? obj.game : obj && obj.v === 1 && obj.player ? obj : null;
+    const g = obj && obj.format === SAVE_FORMAT ? obj.game : obj && (obj.v === 1 || obj.v === 2) && obj.player ? obj : null;
     if (!g) throw new Error("This isn't a Granite Hollow save file.");
-    if (g.v !== 1) throw new Error("This save file is from a different version of the game.");
+    if (g.v !== 1 && g.v !== 2) throw new Error("This save file is from a different version of the game.");
+    if (g.v === 2 && !DEV && !RULES2_LIVE) throw new Error("This save file is from a development version of the game.");
     (function walk(x) {
       if (typeof x === "string") { if (/[<>]/.test(x)) throw new Error("The save file contains text the game doesn't allow."); }
       else if (x && typeof x === "object") Object.values(x).forEach(walk);
@@ -1258,12 +1382,14 @@
     for (const [k, v] of [["tips", []], ["todo", []], ["ach", {}], ["visited", []], ["feed", []]]) if (g[k] == null) g[k] = v;
     if (!num(g.bestGrade)) g.bestGrade = -1;
     migrateSave(g);
+    if (g.v === 2 && World.validate(D, g)) throw new Error("This save file is damaged or incomplete.");
+    if (DEV) g.dev = true;
     g.day.encounter = null;
     const okWx = f => f && typeof f.date === "string" && /^\d{4}-\d\d-\d\d$/.test(f.date) && num(f.temp) && num(f.cond) && num(f.dusk)
       && ["label", "sky", "note"].every(k => typeof f[k] === "string") && (f.rainAt == null || num(f.rainAt)) && (f.pop == null || (num(f.pop) && f.pop >= 0 && f.pop <= 1));
     if (!Array.isArray(g.forecast) || !g.forecast.every(okWx)) g.forecast = [];
     if (typeof g.id !== "string" || !/^[a-z0-9]{4,40}$/.test(g.id)) g.id = newId();
-    g.board = g.board && g.board.joined === true ? { joined: true } : { joined: false };
+    g.board = g.board && g.board.joined === true && !g.dev ? { joined: true } : { joined: false };
     return g;
   }
 
@@ -1315,14 +1441,17 @@
       if (t.style === "Repeat") continue;
       const p = D.problems[t.p];
       for (let v = 1; v <= p.grade; v++) if (!out[v])
-        out[v] = { date: t.date, days: daysSince(t.date), cday: Number.isInteger(t.day) ? t.day : null, p: t.p, name: p.name, grade: p.grade, style: t.style };
+        out[v] = { date: t.date, days: daysSince(t.date), cday: Number.isInteger(t.day) ? t.day : null, p: g.v === 2 ? null : t.p, name: g.v === 2 ? "" : p.name, grade: p.grade, style: t.style };
     }
     return out;
   }
   function boardEntry() {
     const pl = G.player;
-    return { name: pl.name.slice(0, 24), height: pl.height, ape: pl.ape, best: G.bestGrade, level: levelNow().level,
+    const e = { name: pl.name.slice(0, 24), height: pl.height, ape: pl.ape, best: G.bestGrade, level: levelNow().level,
       sends: firstSends().length, days: daysSince(G.date), cdays: G.dayNo, ms: milestones(G), rk: rankSummaryForBoard() };
+    // Which board: the rules this climber started under (migrated climbers stay on the old one).
+    if (v2()) { e.rules = G.rules === 2 ? 2 : 1; e.fa = Object.values(G.world.est).filter(x => x.by === "you").length; if (e.rules === 2) e.rk = { y: [], a: [] }; }
+    return e;
   }
 
   async function connectBoard() {
@@ -1343,6 +1472,7 @@
   }
   // Write this climber's entry when it has changed. One write at a time.
   async function syncBoard(remove = false) {
+    if (DEV || (G && G.dev)) return;                      // development mode never posts
     if (!LB.db || !LB.uid || !G || LB.canWrite === false) return;
     if (LB.writing) { LB.pending = true; return; }
     const entry = boardEntry(), key = G.id + (remove ? ":removed" : JSON.stringify(entry));
@@ -1388,7 +1518,7 @@
         const rkList = v => (Array.isArray(v) ? v.slice(0, RANK_TOP) : []).filter(x => Array.isArray(x) && Number.isInteger(x[0]) && x[0] >= 0
           && x[0] < D.problems.length && /^\d{4}-\d\d-\d\d$/.test(x[1])).map(x => ({ p: x[0], d: epochDays(x[1]), f: x[2] === 1, pts: rankPoints(D.problems[x[0]].grade, x[2] === 1) }));
         const rk = c.rk && typeof c.rk === "object" ? { y: rkList(c.rk.y), a: rkList(c.rk.a) } : null;
-        out.push({ rk, name: str(c.name, 24).trim() || "Climber", height: n(c.height, 100, 250), ape: n(c.ape, -30, 30),
+        out.push({ rk, rules: c.rules === 2 ? 2 : 1, fa: n(c.fa, 0, 1e5) ?? 0, name: str(c.name, 24).trim() || "Climber", height: n(c.height, 100, 250), ape: n(c.ape, -30, 30),
           best: n(c.best, -1, 17) ?? -1, level: n(c.level, 0, 17) ?? 0, sends: n(c.sends, 0, 1e6) ?? 0, days: n(c.days, 0, 1e5) ?? 0,
           cdays: n(c.cdays, 0, 1e5), ms, mine: false, yours: uid === LB.uid });
       }
@@ -1398,7 +1528,12 @@
   }
 
   function leadersHtml() {
-    const all = boardClimbers();
+    const everyone = boardClimbers(), mineRules = v2() && G.rules === 2 ? 2 : 1;
+    const bucket = UI.lbBucket || mineRules, rulesOf = c => (c.mine ? mineRules : c.rules || 1);
+    const all = everyone.filter(c => rulesOf(c) === bucket);
+    const buckets = everyone.some(c => rulesOf(c) === 2) ? `<div class="cl-views" role="group" aria-label="Which leaderboard" style="margin-bottom:8px">
+      <button type="button" data-lb-bucket="2" aria-pressed="${bucket === 2}">Since the reopening</button>
+      <button type="button" data-lb-bucket="1" aria-pressed="${bucket === 1}">Before the reopening</button></div>` : "";
     const ranked = g => all.filter(c => c.ms[g]).sort((a, b) => a.ms[g].days - b.ms[g].days
       || (a.ms[g].cday ?? 1e9) - (b.ms[g].cday ?? 1e9) || a.name.localeCompare(b.name));
     const counts = Object.fromEntries(BOARD_GRADES.map(g => [g, ranked(g).length]));
@@ -1415,7 +1550,8 @@
     else if (LB.status === "connecting") status = `<p class="meta">Connecting to the leaderboard…</p>`;
 
     let join = "";
-    if (LB.status !== "off") {
+    if (DEV || G.dev) join = `<p class="meta">Development mode never posts to the leaderboard.</p>`;
+    else if (LB.status !== "off") {
       if (!LB.uid) join = `<p class="meta">Sign in to claude.ai to post your climber.</p>`;
       else if (LB.canWrite === false) join = `<div class="lb-join"><p class="lede" style="margin:0">You can watch the board, but your access to this game is view-only, so you can't post. Ask whoever shared it for edit access.</p></div>`;
       else if (!G.board.joined) join = `<div class="lb-join"><p class="lede" style="margin:0 0 8px">Post <b>${esc(G.player.name)}</b> to the leaderboard? Everyone who can open this game will see your climber's name, height and first send of each grade. Your claude.ai name isn't shown.</p>
@@ -1425,13 +1561,13 @@
     const others = [...all].sort((a, b) => b.best - a.best || (a.ms[a.best]?.days ?? 1e9) - (b.ms[b.best]?.days ?? 1e9));
     return `${cragHead()}
       <p class="meta">Who sent each grade first, counted in days since everyone's first day at Granite Hollow (${shortDate(START_DATE)}). A V${g} board also counts a first send of anything harder.</p>
-      ${status}${join}
+      ${buckets}${status}${join}
       <div class="lb-grades" role="group" aria-label="Grade">${BOARD_GRADES.map(v => `<button type="button" data-lb-grade="${v}" aria-pressed="${v === g}">V${v}${counts[v] ? `<span>${counts[v]}</span>` : ""}</button>`).join("")}</div>
       <h3>First to V${g}</h3>
       ${rows.length ? `<table><thead><tr><th>#</th><th>Climber</th><th>When</th><th>Problem</th></tr></thead><tbody>
         ${rows.map((c, k) => { const m = c.ms[g]; return `<tr class="${c.mine ? "lb-me" : ""}"><td class="num">${k + 1}</td><td>${who(c)}</td>
           <td>Day ${m.days + 1}<div class="meta" style="margin:0">${esc(fmtDate(m.date))}${m.cday != null ? ` · ${m.cday} climbing` : ""}</div></td>
-          <td>${m.p != null ? `<button type="button" class="linklike" data-cl="${m.p}">${esc(D.problems[m.p].name)}</button>` : esc(m.name)}<div class="meta" style="margin:0">${m.grade != null ? `V${m.grade}` : ""}${m.style ? ` · ${esc(m.style)}` : ""}</div></td></tr>`; }).join("")}
+          <td>${m.p != null && K.visible(m.p) ? `<button type="button" class="linklike" data-cl="${m.p}">${esc(pname(m.p))}</button>` : K.all() ? esc(m.name) : ""}<div class="meta" style="margin:0">${m.grade != null ? `V${m.grade}` : ""}${m.style ? ` · ${esc(m.style)}` : ""}</div></td></tr>`; }).join("")}
         </tbody></table>` : `<p class="lede">Nobody has sent V${g} yet.</p>`}
       <h3>Everyone</h3>
       <table><thead><tr><th>Climber</th><th>Hardest</th><th>Level</th><th>Sends</th><th>Days in</th></tr></thead><tbody>
@@ -1439,7 +1575,7 @@
       </tbody></table>
       ${G.board.joined && LB.status !== "off" ? `<p class="meta" style="margin-top:14px"><button type="button" class="linklike" data-lb-leave>Take ${esc(G.player.name)} off the leaderboard</button></p>` : ""}`;
   }
-  function joinBoard() { G.board = { joined: true }; LB.lastSent = null; save(); renderPanel(); }
+  function joinBoard() { if (DEV || G.dev) return; G.board = { joined: true }; LB.lastSent = null; save(); renderPanel(); }
   function leaveBoard() { G.board = { joined: false }; save(); syncBoard(true); renderPanel(); }
 
   // ================================================================= creator
@@ -1479,7 +1615,7 @@
     function draw() {
       const ftIn = cm => { const i = Math.round(cm / 2.54); return `${Math.floor(i / 12)}′${i % 12}″`; };
       el.innerHTML = `${CREATOR_ART}<p class="label-sm">A bouldering game</p><h1>Granite Hollow</h1>
-        <p class="intro">1,000 problems on 75 boulders, from V0 warm-ups to V13 test pieces. You start at V0. Every attempt is a roll against the grade, shaped by your strength, your style, your height, the beta you've worked out, your skin, and the weather.</p>
+        <p class="intro">${DEV && devRules() === 2 ? "Granite Hollow has just reopened to climbing after nearly forty years. Its 75 boulders hold about 1,000 possible lines, and almost none of them are documented. You start at V0." : "1,000 problems on 75 boulders, from V0 warm-ups to V13 test pieces. You start at V0."} Every attempt is a roll against the grade, shaped by your strength, your style, your height, the beta you've worked out, your skin, and the weather.</p>
         <div class="cc-grid">
           <div class="cc-card"><h2>Your climber</h2><p class="help">Height and ape index decide which problems suit your body.</p>
             <div class="field"><label for="cc-name">Name</label><input type="text" id="cc-name" maxlength="24" placeholder="e.g. Maddie" value="${esc(st.name)}"></div>
@@ -1517,9 +1653,86 @@
       try { M = buildMap(); }
       catch (e) { reportError("map", e); M = { walk: (pts, ms, done) => done(), update() { safely("light", applyAtmosphere); }, focusSector() {}, meXY: placeXY }; }
     }
+    if (DEV) devButton();
     renderAll();
     if (!G.day.over && rainNow()) endDay(`It's ${G.day.weather.precip === "Snow" ? "snowing" : "raining"}. Wet granite is slick and holds can snap, so you head home.`);
     else if (G.day.over) showSummary();
+  }
+
+  // ======================================================= development mode
+  // ?dev: a separate save slot and these tools, for building and testing the
+  // Phase 2 rules. Never posts to the leaderboard (see syncBoard and joinBoard).
+  function devRules() { try { return sessionStorage.getItem("gh-dev-rules") === "1" ? 1 : 2; } catch (e) { return 2; } }
+  function devButton() {
+    if ($("#dev-btn")) return;
+    const b = document.createElement("button");
+    b.type = "button"; b.id = "dev-btn"; b.className = "dev-btn"; b.textContent = "Dev"; b.title = "Development tools";
+    b.onclick = devPanel; document.body.appendChild(b);
+  }
+  function devPanel() {
+    const W = G.world, kn = G.know, est = W ? Object.values(W.est) : [];
+    const info = v2() ? [
+      ["Rules", `new (v2) · leaderboard bucket: ${G.rules === 2 ? "since the reopening" : "before the reopening"}${W.migrated ? " · migrated from v1" : ""}`],
+      ["Seed", W.seed], ["Simulated through", W.simDate],
+      ["Established", `${est.length}: ${est.filter(e => e.by === "you").length} yours, ${est.filter(e => e.old).length} from the notebook, ${est.filter(e => e.by !== "you" && !e.old).length} by the community`],
+      ["Community", `${Object.keys(W.npc).length} climbers have arrived; they know ${W.found.length} of ${D.boulders.length} boulders`],
+      ["You know", `${Object.keys(kn.areas).length} areas, ${Object.keys(kn.boulders).length} boulders, ${Object.keys(kn.lines).length} lines`],
+      ["Invariants", World.check(D, G).slice(0, 3).join("; ") || "all hold"],
+    ] : [["Rules", "old (v1): the whole crag is documented"]];
+    const here = G.loc.boulder != null ? D.boulders[G.loc.boulder].problems[0] : 0;
+    modal(`<span class="label-sm">Development mode</span><h2>Dev tools</h2>
+      <p class="meta">This tab has its own save slot and never posts to the leaderboard. <a href="?dev=0">Leave development mode</a></p>
+      <dl class="dev-info">${info.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join("")}</dl>
+      <div class="dev-acts">${v2() ? `<button type="button" class="btn small" data-dv="reveal">Reveal everything</button><button type="button" class="btn small" data-dv="forget">Reset knowledge</button>
+        <button type="button" class="btn small" data-dv="skip7">Rest 7 days</button><button type="button" class="btn small" data-dv="skip30">Rest 30 days</button>`
+        : `<button type="button" class="btn small" data-dv="migrate">Convert this climber to the new rules</button>`}
+        <button type="button" class="btn small" data-dv="copy">Copy my real climber here</button></div>
+      <div class="dev-acts"><select id="dv-b" aria-label="Boulder">${D.boulders.map((b, i) => `<option value="${i}" ${i === G.loc.boulder ? "selected" : ""}>${esc(b.sector)} · ${esc(b.name)}</option>`).join("")}</select>
+        <button type="button" class="btn small" data-dv="teleport">Teleport there</button></div>
+      ${v2() ? `<div class="dev-acts"><label class="meta" style="margin:0">Problem # <input id="dv-p" type="number" min="0" max="${D.problems.length - 1}" value="${here}" style="width:6em"></label>
+        <button type="button" class="btn small" data-dv="inspect">Show its layers</button><button type="button" class="btn small" data-dv="establish">Have the community climb it</button></div>` : ""}
+      <div class="dev-acts"><span class="meta" style="margin:0">New climbers start under the ${devRules() === 2 ? "new" : "old"} rules.</span>
+        <button type="button" class="btn small" data-dv="rules">Use the ${devRules() === 2 ? "old" : "new"} rules</button></div>
+      <pre class="dev-out" id="dv-out"></pre>
+      <div class="acts"><button type="button" class="btn primary" data-close>Close</button></div>`, (root, close) => {
+      const out = t => { root.querySelector("#dv-out").textContent = t; };
+      const done = (again = true) => { save(); renderAll(); if (again) devPanel(); else close(); };
+      const pid = () => Math.max(0, Math.min(D.problems.length - 1, Math.round(+root.querySelector("#dv-p").value || 0)));
+      const act = {
+        reveal: () => { World.devRevealAll(D, G); done(); },
+        forget: () => {
+          G.know = World.initialKnow(D, G.date);
+          for (const [i, st] of Object.entries(G.ps)) if (st.att > 0) K.identify(+i, "tried", G.date);
+          if (G.loc.boulder != null) K.visitBoulder(G.loc.boulder);
+          done();
+        },
+        skip7: () => { close(); startDay(7, 7); save(); renderAll(); M.update(); if (G.day.over) showSummary(); },
+        skip30: () => { close(); startDay(30, 30); save(); renderAll(); M.update(); if (G.day.over) showSummary(); },
+        migrate: () => { G = World.migrate(D, JSON.parse(JSON.stringify(G))); G.dev = true; done(); },
+        copy: () => {
+          let raw = null; try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { }
+          if (!raw) { out("There's no real climber saved in this browser."); return; }
+          try { G = validateSave(JSON.parse(raw)); G.dev = true; UI.cl.problem = null; done(); } catch (e) { out("Couldn't copy it: " + e.message); }
+        },
+        teleport: () => {
+          const b = +root.querySelector("#dv-b").value, bo = D.boulders[b];
+          G.loc = { sector: bo.sector, boulder: b };
+          if (v2()) { K.visitArea(bo.sector); if (K.boulder(b) >= 1) K.visitBoulder(b); }
+          if (!G.visited.includes(bo.sector)) G.visited.push(bo.sector);
+          G.day.last = null; done(false); M.focusSector(bo.sector);
+        },
+        inspect: () => {
+          const i = pid(), p = D.problems[i];
+          out(JSON.stringify({ problem: { id: i, name: p.name, grade: p.grade, boulder: p.boulder.name, area: p.sector, stars: p.stars },
+            history: G.world.est[i] || null, knows: { line: K.line(i), shownAs: K.name(i), how: G.know.lines[i] || null, boulder: K.boulder(p.b), area: K.area(p.sector), canSpot: K.canSpot(i) },
+            yours: G.ps[i] || null, legend: World.legendOf(D, i) }, null, 1));
+        },
+        establish: () => { const i = pid(); out(World.devEstablish(D, G, i) ? `#${i} is now established by ${World.whoName(D, G.world.est[i].by)}.` : `#${i} is already established.`); save(); renderAll(); },
+        rules: () => { try { sessionStorage.setItem("gh-dev-rules", devRules() === 2 ? "1" : "2"); } catch (e) { } devPanel(); },
+      };
+      root.querySelectorAll("[data-dv]").forEach(b => { b.onclick = () => safely("dev tools", act[b.dataset.dv]); });
+      root.querySelector("[data-close]").onclick = close;
+    });
   }
 
   // ==================================================================== boot
@@ -1539,6 +1752,11 @@
     if (!b) g.loc.boulder = null;
     if (g.loc.sector != null && !D.sectorBy.has(g.loc.sector)) g.loc = { sector: null, boulder: null };
     g.visited = [...new Set((g.visited || []).map(fix).filter(Boolean))];
+    if (g.know && g.know.areas && typeof g.know.areas === "object") {
+      const a = {};
+      for (const [k, v] of Object.entries(g.know.areas)) { const f = fix(k); if (f) a[f] = Math.max(a[f] || 0, v); }
+      g.know.areas = a;
+    }
     return g;
   }
   const loadScript = src => new Promise((ok, fail) => {
@@ -1549,8 +1767,11 @@
   async function boot() {
     if (!window.Mech) await loadScript("mechanics.js");
     if (!window.Art) await loadScript("art.js");
+    if (!window.World) await loadScript("world.js");
+    if (!window.Know) await loadScript("knowledge.js");
     D = await fetch("game-data.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
     prepData();
+    K = Know.make(D, () => G);
     connectDownloads();
     connectBoard();
     $("#save-file").onchange = e => onSaveFile(e.target.files[0]);
@@ -1558,8 +1779,8 @@
     if (hot && hot.snapshot) hot.snapshot(() => ({ G }));
     const start = data => {
       G = (data && data.G) || load();
-      if (G) { if (!G.id) G.id = newId(); if (!G.board) G.board = { joined: false }; migrateSave(G); save(); }
-      if (G && G.v === 1 && G.day) showGame(); else showCreator();
+      if (G) { if (!G.id) G.id = newId(); if (!G.board) G.board = { joined: false }; if (DEV) { G.dev = true; G.board = { joined: false }; } migrateSave(G); save(); }
+      if (G && (G.v === 1 || (G.v === 2 && (DEV || RULES2_LIVE))) && G.day) showGame(); else showCreator();
     };
     if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
   }

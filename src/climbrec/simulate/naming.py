@@ -13,6 +13,13 @@ climbers have been naming for fifty years, so they share a little lore:
   merchant, and the long-running argument between them; Gus, the ranger who
   spent years ticketing climbers and then took up bouldering; and Pickles,
   the parking-lot dog.
+* The park closed to climbing in 1987, after an accident at the quarry rim,
+  and nobody wrote anything down. It reopened in September 2025 (Gus spent a
+  decade campaigning for it). One page of the old kiosk notebook survives,
+  listing four problems by the lot; everything else in the game is a first
+  documented ascent of the new era, and the old days live on as legend: Dot's
+  tick marks, and the Bishop, now in his seventies, sure he did your problem
+  in 1979. (The game's side of this is site/game/world.js.)
 * It's New England, so there's some regional flavour: wicked, quahogs, coffee
   milk, nor'easters, Frost poems.
 
