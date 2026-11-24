@@ -41,6 +41,38 @@ What this shows so far:
 Headless Chrome doesn't show what a real GPU, a Retina screen or Safari will do.
 That's the next step: the same page in a real browser.
 
-## Real browsers
+## A real browser: Chrome 158 on the user's Mac, 2026-11-24
 
-(To come: the numbers from the browsers the game is played in.)
+The view was 960×554 at 1.8× pixel density. Tiles along the walk took 5.2 s to build.
+
+| Zoom | Today | Sliding layer | Layer, climber in the SVG |
+|---|---|---|---|
+| 4 | 35 fps · 34 ms · **70%** | 60 · 17.5 ms · 0.2% | **60 · 17.5 ms · 0.4%** |
+| 6 | 16 fps · 49 ms · **55%** (one 8.3 s pause) | 29 · 17.7 ms · 1.7% (one 4.0 s pause) | **60 · 17.6 ms · 0.2%** |
+| 9 | 40 fps · 34 ms · **50%** | 60 · 17.5 ms · 0.2% | **60 · 17.4 ms · 0%** |
+
+(Each cell shows frames a second, the slowest 5% of frames, and the share of frames over 25 ms.)
+
+On a real Retina Mac, redrawing the SVG every frame takes about 33 ms at every zoom, so
+it runs at 30 frames a second or worse. That's a visible stutter, and it's
+probably how dragging the map in today's game feels too. Headless Chrome hid
+this: it only showed trouble at zoom 4. The sliding layer holds 60 frames a second at every zoom, and its redraw every few
+seconds costs at most one 33 ms frame. The two multi-second pauses at zoom 6 are
+single outliers, probably the tab briefly in the background, and need confirming.
+
+## Decision
+
+**Follow the climber with a sliding layer, and draw the climber inside the SVG.**
+
+- The world is drawn a margin larger than the view (220 px here) and slid with a
+  GPU transform. It's redrawn, as today, when the slide nears the margin's edge.
+- The climber stays in the map's own layers, so they can pass behind boulders
+  and under trees. That costs nothing measurable.
+- The art stays exactly as it is. No image tiles or canvas rewrite are needed.
+
+To do when this goes into the painter (Stage 4, or earlier for dragging):
+- **Dragging:** the same slide can carry mouse and touch panning, which is probably slow in today's game.
+- **Building tiles ahead:** build tiles ahead of the climber in idle time, so walking onto new ground doesn't stall.
+  Building them takes seconds per route.
+- **Redraw timing:** redraw when the slide nears the margin's edge, and if possible start it a little early, in idle time.
+- **Labels and badges:** these are screen-space and are placed at each redraw. They slide with the map in between, which looked right.
