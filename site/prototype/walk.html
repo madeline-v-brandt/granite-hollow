@@ -1,0 +1,222 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Granite Hollow: walking benchmark</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
+<!--
+  Phase 2, Stage 1: can the illustrated world follow a walking climber smoothly?
+  A climber walks the trail from the lot to Hawkwatch and on to the Cellar Holes
+  while the camera follows, three ways, at two zooms, and every frame is timed:
+
+    today   the camera re-transforms the whole SVG world every frame (how the
+            game pans now); the climber is drawn inside the SVG.
+    layer   the map is drawn a margin larger than the view and slid with a GPU
+            transform; it's only redrawn when the slide runs out of margin. The
+            climber is a separate little layer on top.
+    layer+  the same slide, but the climber is inside the SVG (so it could pass
+            behind boulders), to see what moving one thing in the map costs.
+
+  The map's look comes from park.html's stylesheet (borrowed at load, so the
+  two never drift apart). ?auto runs everything at once and leaves the results
+  in window.__results.
+-->
+<style id="page-css">
+  html, body { margin: 0; }
+  body { background: var(--paper, #efe7d3); color: var(--ink, #2b2a24); font-family: "Nunito Sans", system-ui, sans-serif; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 12px 18px; max-width: 1180px; margin: 0 auto; }
+  .bar h1 { font-family: Fraunces, Georgia, serif; font-size: 22px; margin: 0 12px 0 0; }
+  .bar button, .bar select { font: inherit; font-weight: 700; padding: 7px 14px; border-radius: 8px; border: 1.5px solid var(--ink, #2b2a24); background: var(--raised, #f8f2e2); color: inherit; cursor: pointer; }
+  .bar button.primary { background: var(--accent, #2f6b4f); color: #fff; border-color: var(--accent, #2f6b4f); }
+  .bar button:disabled { opacity: .5; cursor: default; }
+  #status { font-size: 14px; color: var(--ink-2, #5b574a); }
+  #stage { position: relative; overflow: hidden; margin: 0 auto; border-radius: 12px; box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 6px 24px rgba(40,30,10,.12); background: var(--paper, #efe7d3); }
+  #slide { position: absolute; will-change: transform; }
+  #slide > .map { position: absolute; inset: 0; margin: 0; border-radius: 0; height: auto; min-height: 0; }
+  #slide > .map > svg#map { width: 100%; height: 100%; display: block; }
+  #walker { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; will-change: transform; }
+  .results { max-width: 1180px; margin: 14px auto 40px; padding: 0 18px; font-size: 14px; }
+  .results table { border-collapse: collapse; width: 100%; background: var(--raised, #f8f2e2); }
+  .results th, .results td { padding: 6px 10px; border-bottom: 1px solid rgba(0,0,0,.08); text-align: right; font-variant-numeric: tabular-nums; }
+  .results th:first-child, .results td:first-child, .results th:nth-child(2), .results td:nth-child(2) { text-align: left; }
+  .results .good { color: #2f6b4f; font-weight: 800; } .results .bad { color: #a8452f; font-weight: 800; }
+  .results p { line-height: 1.5; }
+  textarea { width: 100%; height: 90px; font: 12px ui-monospace, Menlo, monospace; }
+</style>
+
+<div class="bar">
+  <h1>Walking benchmark</h1>
+  <button type="button" class="primary" id="run" disabled>Run the benchmark</button>
+  <select id="mode" aria-label="Try one way of following"><option value="today">Today (redraw every frame)</option><option value="layer" selected>Sliding layer</option><option value="layerSvg">Sliding layer, climber in the SVG</option></select>
+  <select id="zoom" aria-label="Zoom"><option value="4">Zoom 4</option><option value="6">Zoom 6</option><option value="9" selected>Zoom 9</option></select>
+  <button type="button" id="try" disabled>Just walk</button>
+  <span id="status">Loading the park…</span>
+</div>
+<div id="stage">
+  <div id="slide"><section class="map" id="map-wrap" aria-label="Illustrated map of Granite Hollow State Park"><svg id="map" role="img" aria-label="Granite Hollow State Park"></svg></section></div>
+  <svg id="walker" width="40" height="52" viewBox="-20 -44 40 52" aria-hidden="true">
+    <ellipse cx="0" cy="4" rx="9" ry="3" fill="rgba(40,30,20,.25)"/>
+    <g id="w-legs" stroke="#2b2a24" stroke-width="2.6" stroke-linecap="round"><path id="w-leg1" d="M-2,-12L-4,2"/><path id="w-leg2" d="M2,-12L4,2"/></g>
+    <rect x="-9" y="-30" width="18" height="15" rx="3" fill="#2f6b4f" stroke="#2b2a24" stroke-width="1.4"/>
+    <path d="M-5,-26h10M-5,-21h10" stroke="#e8dcc0" stroke-width="1.2"/>
+    <circle cx="0" cy="-35" r="5.2" fill="#e9c9a8" stroke="#2b2a24" stroke-width="1.4"/>
+    <path d="M-5.3,-36.5a5.4 5.4 0 0 1 10.6 0z" fill="#b5462e" stroke="#2b2a24" stroke-width="1.2"/>
+  </svg>
+</div>
+<div class="results" id="results"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = s => document.querySelector(s);
+  const q = new URLSearchParams(location.search);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const frame = () => new Promise(r => requestAnimationFrame(r));
+  const loadScript = srcs => new Promise((ok, fail) => {
+    const tryAt = i => { if (i >= srcs.length) return fail(new Error(srcs[0] + " didn't load")); const el = document.createElement("script"); el.src = srcs[i]; el.onload = ok; el.onerror = () => { el.remove(); tryAt(i + 1); }; document.head.appendChild(el); };
+    tryAt(0);
+  });
+  const fetchJson = async srcs => { for (const s of srcs) { try { const r = await fetch(s); if (r.ok) return await r.json(); } catch (e) { } } throw new Error("game-data.json didn't load"); };
+
+  // The view is the size of the game's map on a laptop; the slide is that plus a margin all round.
+  const W = Math.min(960, innerWidth - 24), H = Math.min(680, Math.max(420, innerHeight - 140)), M = 220;
+  const SPEED = 7;             // metres a second on screen: a relaxed walk
+  const MEASURE_MS = 8000;
+  const ZOOMS = [4, 6, 9];      // 4 is the area view; walking will probably be 6–9
+  let P = null, route = null;
+
+  async function boot() {
+    // park.html's stylesheet, so the map looks as it does there.
+    try {
+      const html = await (await fetch("park.html")).text(), css = html.match(/<style>([\s\S]*?)<\/style>/);
+      if (css) { const st = document.createElement("style"); st.textContent = css[1]; document.head.insertBefore(st, $("#page-css")); }
+    } catch (e) { }
+    for (const f of ["art.js", "mechanics.js", "illustrate.js", "paint.js"]) await loadScript(["../game/" + f + "?v=16", f + "?v=16"]);
+    const D = await fetchJson(["../game/game-data.json", "park-data.json"]);
+    await document.fonts.ready;
+    const stage = $("#stage"); stage.style.width = W + "px"; stage.style.height = H + "px";
+    setSlide(false);
+    const t0 = performance.now();
+    P = Paint.paint($("#map"), D, {});
+    P.setDate("2025-10-14"); P.setTime(15 * 60, 18 * 60 + 20, "Sunny");
+    route = buildRoute(D, P.scene, ["The Tailgate", "Hawkwatch", "The Cellar Holes"]);
+    $("#status").textContent = `Park built in ${Math.round(performance.now() - t0)} ms. The walk is ${Math.round(route.len)} m.`;
+    $("#run").disabled = $("#try").disabled = false;
+    $("#run").onclick = runAll;
+    $("#try").onclick = async () => { busy(true); await walk($("#mode").value, +$("#zoom").value, route.len / SPEED * 1000, false); busy(false); };
+    if (q.has("auto")) runAll();
+  }
+  const busy = b => { $("#run").disabled = $("#try").disabled = b; };
+
+  // The trail from the lot through each named area, as one polyline in world metres.
+  function buildRoute(D, S, stops) {
+    const near = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1;
+    const pts = [[0, 0]];
+    for (const to of stops) {
+      const j = D.trails.findIndex(t => t.to === to);
+      if (j < 0) continue;
+      const tp = S.trails[j].pts, fwd = near(D.trails[j].start, pts[pts.length - 1]) || Math.hypot(tp[0][0] - pts[pts.length - 1][0], tp[0][1] - pts[pts.length - 1][1]) < Math.hypot(tp[tp.length - 1][0] - pts[pts.length - 1][0], tp[tp.length - 1][1] - pts[pts.length - 1][1]);
+      pts.push(...(fwd ? tp : [...tp].reverse()));
+    }
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const at = d => {
+      d = Math.max(0, Math.min(cum[cum.length - 1], d));
+      let i = d3.bisectRight(cum, d) - 1; i = Math.min(i, pts.length - 2);
+      const f = (d - cum[i]) / ((cum[i + 1] - cum[i]) || 1);
+      return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f];
+    };
+    return { pts, len: cum[cum.length - 1], at };
+  }
+
+  // The slide is the view (today) or the view plus a margin all round (layer).
+  let slideOn = null;
+  function setSlide(on) {
+    if (slideOn === on) return;
+    slideOn = on;
+    const s = $("#slide"), m = on ? M : 0;
+    Object.assign(s.style, { left: -m + "px", top: -m + "px", width: W + 2 * m + "px", height: H + 2 * m + "px", transform: "translate3d(0,0,0)" });
+  }
+  const waitTiles = async () => { for (let n = 0; n < 600 && window.__tilesPending > 0; n++) await frame(); };
+
+  // Walk the route for `ms` (from the start), following with the camera one of three ways.
+  async function walk(mode, k, ms, measure) {
+    const layer = mode !== "today", walkerOn = mode === "layer";
+    setSlide(layer);
+    await frame(); await frame();
+    const slide = $("#slide"), walker = $("#walker"), leg1 = $("#w-leg1"), leg2 = $("#w-leg2");
+    walker.style.display = walkerOn ? "" : "none";
+    walker.style.transform = `translate3d(${W / 2 - 20}px,${H / 2 - 44}px,0)`;
+    let c = route.at(0);
+    P.centerOn(c[0], c[1], k); P.setMe(walkerOn ? [1e6, 1e6] : c);
+    await waitTiles(); await sleep(200);
+    const frames = [], commits = []; let last = null, t0 = null, longTasks = 0;
+    const lt = "PerformanceObserver" in window ? new PerformanceObserver(l => { longTasks += l.getEntries().length; }) : null;
+    try { lt && lt.observe({ entryTypes: ["longtask"] }); } catch (e) { }
+    let committed = c, tx = 0, ty = 0;
+    await new Promise(done => {
+      function tick(now) {
+        if (t0 == null) t0 = now;
+        const el = now - t0;
+        if (last != null) frames.push(now - last);
+        last = now;
+        const pos = route.at(el / 1000 * SPEED);
+        if (mode === "today") { P.centerOn(pos[0], pos[1], k); P.setMe(pos); }
+        else {
+          tx = -k * (pos[0] - committed[0]); ty = k * (pos[1] - committed[1]);
+          if (Math.abs(tx) > M * .8 || Math.abs(ty) > M * .8) {
+            const c0 = performance.now();
+            committed = pos; tx = ty = 0; P.centerOn(pos[0], pos[1], k);
+            commits.push(performance.now() - c0);
+          }
+          slide.style.transform = `translate3d(${tx.toFixed(1)}px,${ty.toFixed(1)}px,0)`;
+          if (!walkerOn) P.setMe(pos);
+        }
+        if (walkerOn) { const sw = Math.sin(el / 1000 * SPEED * 1.6) * 3.2; leg1.setAttribute("d", `M-2,-12L${(-4 + sw).toFixed(1)},2`); leg2.setAttribute("d", `M2,-12L${(4 - sw).toFixed(1)},2`); }
+        if (el < ms) requestAnimationFrame(tick); else done();
+      }
+      requestAnimationFrame(tick);
+    });
+    lt && lt.disconnect();
+    if (!measure) return null;
+    const f = frames.slice(5).sort((a, b) => a - b), pct = p => f[Math.min(f.length - 1, Math.floor(f.length * p))];
+    const mean = d3.mean(f);
+    return { mode, k, frames: f.length, fps: +(1000 / mean).toFixed(1), p50: +pct(.5).toFixed(1), p95: +pct(.95).toFixed(1), p99: +pct(.99).toFixed(1), max: +f[f.length - 1].toFixed(1),
+      janky: +(100 * f.filter(x => x > 25).length / f.length).toFixed(1), commits: commits.length, commitMs: commits.length ? +d3.mean(commits).toFixed(1) : null, longTasks };
+  }
+
+  const LABEL = { today: "Today: redraw every frame", layer: "Sliding layer", layerSvg: "Sliding layer, climber in the SVG" };
+  async function runAll() {
+    busy(true);
+    const results = [], t0 = performance.now();
+    // Walk the whole route once first, so every tile along it is built and only the camera is being timed.
+    $("#status").textContent = "Building the tiles along the walk…";
+    setSlide(true);
+    for (const k of ZOOMS) for (let d = 0; d <= route.len; d += 40) { const p = route.at(d); P.centerOn(p[0], p[1], k); await frame(); await waitTiles(); }
+    const warm = Math.round(performance.now() - t0);
+    for (const k of ZOOMS) for (const mode of ["today", "layer", "layerSvg"]) {
+      $("#status").textContent = `Timing “${LABEL[mode]}” at zoom ${k}…`;
+      results.push(await walk(mode, k, MEASURE_MS, true));
+    }
+    const env = { ua: navigator.userAgent, dpr: devicePixelRatio, view: `${W}×${H}`, margin: M, speed: SPEED, tilesWarmMs: warm, date: new Date().toISOString().slice(0, 10) };
+    window.__results = { env, results };
+    show(env, results);
+    $("#status").textContent = "Done.";
+    document.body.dataset.done = "1";
+    busy(false);
+  }
+  function show(env, rs) {
+    const cls = (v, good, bad) => (v <= good ? "good" : v >= bad ? "bad" : "");
+    $("#results").innerHTML = `<table><thead><tr><th>Following</th><th>Zoom</th><th>Frames a second</th><th>Typical frame</th><th>Slowest 5%</th><th>Worst</th><th>Janky frames</th><th>Redraws</th></tr></thead><tbody>
+      ${rs.map(r => `<tr><td>${LABEL[r.mode]}</td><td>${r.k}</td><td class="${r.fps >= 55 ? "good" : r.fps < 30 ? "bad" : ""}">${r.fps}</td><td class="${cls(r.p50, 18, 34)}">${r.p50} ms</td><td class="${cls(r.p95, 20, 40)}">${r.p95} ms</td><td>${r.max} ms</td><td class="${cls(r.janky, 2, 20)}">${r.janky}%</td><td>${r.mode === "today" ? "every frame" : `${r.commits} × ${r.commitMs ?? "–"} ms`}</td></tr>`).join("")}
+      </tbody></table>
+      <p>A frame every 16.7 ms is 60 a second. "Janky" frames took over 25 ms. ${esc(env.view)} view at ${env.dpr}× pixel density, walking at ${env.speed} m/s. Building the tiles along the walk first took ${(env.tilesWarmMs / 1000).toFixed(1)} s.</p>
+      <p><b>To send these back:</b> copy everything below.</p>
+      <textarea readonly>${esc(JSON.stringify({ env, results: rs }))}</textarea>`;
+  }
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  boot().catch(e => { $("#status").textContent = "Couldn't load: " + e.message; });
+})();
+</script>

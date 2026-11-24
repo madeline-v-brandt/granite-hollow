@@ -1475,6 +1475,8 @@
       badgeSel.attr("transform", bo => `translate(${f2(T.applyX(bo.b.x + bo.form.R * .75) + 4)},${f2(T.applyY(-bo.b.y - bo.form.H * .85) - Math.min(10, k * 1.2))})`);
     }
     function setMe(p) { meWorld = p; placeMe(); }
+    // Put world point (x, y) in the middle of the view, at zoom k (the current one by default). Instant.
+    function centerOn(x, y, k = T.k) { svg.call(zoom.transform, d3.zoomIdentity.translate(size.w / 2 - k * x, size.h / 2 + k * y).scale(k)); }
     // Label only what the player knows: { sectors: { name: { show, sub } }, boulders: { id: name | null } }.
     function setKnown(view) {
       known = view || null;
@@ -1497,7 +1499,7 @@
       if (t.k > T.k * 1.15 || !inView) go(t, 700);
     }
     draw();
-    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, focus, home: () => go(home()), zoomBy: f => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f), scene: S,
+    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, centerOn, view: () => T, focus, home: () => go(home()), zoomBy: f => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f), scene: S,
       tilesPending: () => pending.size + (building ? 1 : 0) };
   }
 
