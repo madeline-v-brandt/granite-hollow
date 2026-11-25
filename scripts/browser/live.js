@@ -21,7 +21,8 @@ const World = require(GAME_DIR + "world.js"), D = require(GAME_DIR + "game-data.
   console.log("first dialog:", await modalH2());
   await click(p, ".modal [data-close]"); await sleep(200);
   console.log("Tailgate panel:", (await p.evaluate(() => document.querySelector("#tabbody").innerText)).split("\n").filter(Boolean).slice(0, 8).join(" / "));
-  await p.evaluate(() => document.querySelectorAll("[data-go-boulder]")[0].click()); await sleep(1600);
+  await p.evaluate(() => document.querySelectorAll("[data-go-boulder]")[0].click());
+  for (let i = 0; i < 20 && !(await p.$("[data-try]:not([disabled])")); i++) await sleep(250);   // the walk over
   for (let n = 0; n < 10; n++) { if (!(await click(p, "[data-try]:not([disabled])"))) break; await settle(p); }
   let g = await saved();
   console.log("new climber: v", g.v, "rules", g.rules, "dev", !!g.dev, "| tried", Object.keys(g.ps).length, "sent", g.ticks.length, "| invariants", World.check(D, g), "| valid", World.validate(D, g));

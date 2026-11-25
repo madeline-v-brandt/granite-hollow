@@ -1219,11 +1219,71 @@
 
     // ---- you: a small climber with a crash pad on their back, dressed for the
     // weather (setOutfit), drawn in screen space above the canopy so the woods
-    // never hide them. Feet at 0,0, about 30 px tall at scale 1.
+    // never hide them. Feet at 0,0, about 30 px tall at scale 1. Four facings:
+    // from the side (r, and mirrored for l), from the front (d, walking towards
+    // you, the pad peeking out behind) and from the back (u, the pad on show).
     const meG = marks.append("g").attr("class", "me");
     let outfit = { shirt: "#c2553a", pants: "#3f4f63", shorts: false, jacket: false, hat: null, scarf: false, pad: "#2f6b8f", skin: "#e6bf98", hair: "#4a3426" };
-    let mePose = { phase: 0, moving: false, facing: 1, padDown: false };
+    let mePose = { phase: 0, moving: false, facing: "d", padDown: false };
     let meParts = null;
+    const legsOf = (g, o) => [0, 1].map(() => {
+      const l = g.append("g");
+      return { low: l.append("path").attr("class", "me-leg").attr("stroke", o.shorts ? o.skin : o.pants),
+        up: l.append("path").attr("class", "me-leg").attr("stroke", o.pants), shoe: l.append("path").attr("class", "me-shoe") };
+    });
+    const top = o => (o.jacket ? o.jacket : o.shirt), sleeve = o => o.jacket || (o.longSleeves ? o.shirt : o.skin);
+    // A pad seen from behind or peeking out from behind (x0..x0+w).
+    function padFlat(g, o, x0, w, y0 = -25, h = 15.5) {
+      const p = g.append("g").attr("class", "me-pad");
+      p.append("rect").attr("x", x0).attr("y", y0).attr("width", w).attr("height", h).attr("rx", 1.6).attr("fill", o.pad);
+      p.append("path").attr("d", `M${x0},${y0 + 4.5}h${w}M${x0},${y0 + 10}h${w}`).attr("class", "me-pad-seam");
+      return p;
+    }
+    function drawSide(g, o) {
+      const legs = legsOf(g, o);
+      // The pad on the back (the back is to the left: mirrored to face left).
+      const padG = padFlat(g, o, -11, 7.2);
+      g.append("path").attr("class", "me-strap").attr("d", "M-4.6,-21.5Q0,-17 2.6,-10.5");
+      g.append("rect").attr("class", "me-torso").attr("x", -4.8).attr("y", -21.5).attr("width", 9.6).attr("height", 12.5).attr("rx", 3.2).attr("fill", top(o));
+      if (o.jacket) g.append("path").attr("class", "me-zip").attr("d", "M1.2,-21V-9.5");
+      if (o.scarf) g.append("path").attr("class", "me-scarf").attr("d", "M-3.6,-21.3h7.4v2.4h-7.4zM2.2,-19.2l1,4.2").attr("fill", o.scarf);
+      const arm = g.append("path").attr("class", "me-arm").attr("stroke", sleeve(o));
+      g.append("circle").attr("class", "me-head").attr("cx", .6).attr("cy", -26.3).attr("r", 4.5).attr("fill", o.skin);
+      if (o.hat === "beanie") {
+        g.append("path").attr("class", "me-hat").attr("d", "M-4.1,-27.2a4.8,4.6 0 0 1 9.4,0z").attr("fill", o.hatC || "#b5462e");
+        g.append("circle").attr("class", "me-hat").attr("cx", .6).attr("cy", -32.3).attr("r", 1.4).attr("fill", o.hatC || "#b5462e");
+      } else if (o.hat === "cap") {
+        g.append("path").attr("class", "me-hat").attr("d", "M-3.9,-27.4a4.6,4.4 0 0 1 9,0zM4.6,-27.6h3.6").attr("fill", o.hatC || "#2f6b4f");
+      } else g.append("path").attr("class", "me-hair").attr("d", "M-3.9,-26.8a4.6,4.6 0 0 1 8.4,-2.4q-3.2,.6-5,2.6z").attr("fill", o.hair);
+      return { g, legs, arms: [arm], padG, kind: "side" };
+    }
+    // Head-on: towards you (front) or away (back).
+    function drawFacing(g, o, front) {
+      let padG = null;
+      if (front) padG = padFlat(g, o, -6.9, 13.8, -25.5);          // behind the shoulders
+      const legs = legsOf(g, o);
+      const arms = [-1, 1].map(() => g.append("path").attr("class", "me-arm").attr("stroke", sleeve(o)));
+      g.append("rect").attr("class", "me-torso").attr("x", -4.8).attr("y", -21.5).attr("width", 9.6).attr("height", 12.5).attr("rx", 3.2).attr("fill", top(o));
+      if (front) {
+        if (o.jacket) g.append("path").attr("class", "me-zip").attr("d", "M0,-21V-9.5");
+        if (o.scarf) g.append("path").attr("class", "me-scarf").attr("d", "M-3.7,-21.4h7.4v2.4h-7.4zM1.3,-19.1l.5,4.4h1.6l-.4,-4.4z").attr("fill", o.scarf);
+        padG.append("path").attr("class", "me-strap").attr("d", "M-3.1,-21.2V-12.5M3.1,-21.2V-12.5");
+      } else {
+        if (o.scarf) g.append("path").attr("class", "me-scarf").attr("d", "M-3.7,-21.4h7.4v2.4h-7.4z").attr("fill", o.scarf);
+        padG = padFlat(g, o, -6.2, 12.4, -24.2, 15);                // on the back, over the shirt
+      }
+      // The head: a face from the front, hair (or a hat) from behind.
+      g.append("circle").attr("class", "me-head").attr("cx", 0).attr("cy", -26.3).attr("r", 4.5).attr("fill", front ? o.skin : o.hair);
+      if (front) g.append("path").attr("class", "me-eye").attr("d", "M-1.6,-26.2h.01M1.6,-26.2h.01");
+      const hatC = o.hatC || (o.hat === "cap" ? "#2f6b4f" : "#b5462e");
+      if (o.hat === "beanie") {
+        g.append("path").attr("class", "me-hat").attr("d", front ? "M-4.6,-27.3a4.6,4.6 0 0 1 9.2,0z" : "M-4.6,-25.6a4.6,5 0 0 1 9.2,0z").attr("fill", hatC);
+        g.append("circle").attr("class", "me-hat").attr("cx", 0).attr("cy", -32.4).attr("r", 1.4).attr("fill", hatC);
+      } else if (o.hat === "cap") {
+        g.append("path").attr("class", "me-hat").attr("d", front ? "M-4.3,-27.6a4.3,4.2 0 0 1 8.6,0zM-4.9,-27.5q4.9,2.3 9.8,0" : "M-4.4,-26.4a4.4,4.6 0 0 1 8.8,0z").attr("fill", hatC);
+      } else if (front) g.append("path").attr("class", "me-hair").attr("d", "M-4.4,-26.4a4.5,4.5 0 0 1 8.8,0q-1.6,-1.9-4.4,-1.6q-2.8,-.3-4.4,1.6z").attr("fill", o.hair);
+      return { g, legs, arms, padG, kind: front ? "front" : "back" };
+    }
     function drawMe() {
       meG.selectAll("*").remove();
       const o = outfit;
@@ -1232,43 +1292,38 @@
       fig.append("ellipse").attr("class", "me-shadow").attr("cx", 0).attr("cy", 0).attr("rx", 7.5).attr("ry", 2.3);
       fig.append("ellipse").attr("class", "me-halo").attr("cx", -.5).attr("cy", -14.5).attr("rx", 9.5).attr("ry", 16);
       const body = fig.append("g").attr("class", "me-body");
-      const legs = [0, 1].map(() => {
-        const g = body.append("g");
-        return { low: g.append("path").attr("class", "me-leg").attr("stroke", o.shorts ? o.skin : o.pants),
-          up: g.append("path").attr("class", "me-leg").attr("stroke", o.pants), shoe: g.append("path").attr("class", "me-shoe") };
-      });
-      // The pad on the back (the back is to the left: the body is mirrored to face the way you walk).
-      const padG = body.append("g").attr("class", "me-pad");
-      padG.append("rect").attr("x", -11).attr("y", -25).attr("width", 7.2).attr("height", 15.5).attr("rx", 1.6).attr("fill", o.pad);
-      padG.append("path").attr("d", "M-11,-20.5h7.2M-11,-15h7.2").attr("class", "me-pad-seam");
-      body.append("path").attr("class", "me-strap").attr("d", "M-4.6,-21.5Q0,-17 2.6,-10.5");
-      body.append("rect").attr("class", "me-torso").attr("x", -4.8).attr("y", -21.5).attr("width", 9.6).attr("height", 12.5).attr("rx", 3.2).attr("fill", o.jacket ? o.jacket : o.shirt);
-      if (o.jacket) body.append("path").attr("class", "me-zip").attr("d", "M1.2,-21V-9.5");
-      if (o.scarf) body.append("path").attr("class", "me-scarf").attr("d", "M-3.6,-21.3h7.4v2.4h-7.4zM2.2,-19.2l1,4.2").attr("fill", o.scarf);
-      const arm = body.append("path").attr("class", "me-arm").attr("stroke", o.jacket || (o.longSleeves ? o.shirt : o.skin));
-      body.append("circle").attr("class", "me-head").attr("cx", .6).attr("cy", -26.3).attr("r", 4.5).attr("fill", o.skin);
-      if (o.hat === "beanie") {
-        body.append("path").attr("class", "me-hat").attr("d", "M-4.1,-27.2a4.8,4.6 0 0 1 9.4,0z").attr("fill", o.hatC || "#b5462e");
-        body.append("circle").attr("class", "me-hat").attr("cx", .6).attr("cy", -32.3).attr("r", 1.4).attr("fill", o.hatC || "#b5462e");
-      } else if (o.hat === "cap") {
-        body.append("path").attr("class", "me-hat").attr("d", "M-3.9,-27.4a4.6,4.4 0 0 1 9,0zM4.6,-27.6h3.6").attr("fill", o.hatC || "#2f6b4f");
-      } else body.append("path").attr("class", "me-hair").attr("d", "M-3.9,-26.8a4.6,4.6 0 0 1 8.4,-2.4q-3.2,.6-5,2.6z").attr("fill", o.hair);
-      meParts = { fig, body, legs, arm, padG };
+      meParts = { body, side: drawSide(body.append("g"), o), front: drawFacing(body.append("g"), o, true), back: drawFacing(body.append("g"), o, false) };
       poseMe();
     }
-    // Legs swing with the distance walked; the body bobs; the pad comes off at a boulder.
+    // Legs swing (from the side) or step (head-on) with the distance walked; the
+    // body bobs; the pad comes off at a boulder.
     function poseMe() {
       if (!meParts) return;
-      const { body, legs, arm, padG } = meParts, m = mePose.moving, sw = m ? Math.sin(mePose.phase * 1.35) * 3 : 0, bob = m ? -Math.abs(Math.cos(mePose.phase * 1.35)) * .9 : 0;
-      body.attr("transform", `translate(0,${f2(bob)})${mePose.facing < 0 ? " scale(-1,1)" : ""}`);
-      [sw, -sw].forEach((d, i) => {
-        const hx = i ? 1.9 : -1.9, fx = hx + d, kx = hx + d * .55;
-        legs[i].up.attr("d", `M${f2(hx)},-10.5L${f2(kx)},-5.2`);
-        legs[i].low.attr("d", `M${f2(hx)},-10.5L${f2(kx)},-5.2L${f2(fx)},-1.2`);
-        legs[i].shoe.attr("d", `M${f2(fx - 1.2)},-.6h3`);
-      });
-      arm.attr("d", `M1.2,-19.5L${f2(2.6 - sw * .7)},-13.2`);
-      padG.attr("display", mePose.padDown && !m ? "none" : null);
+      const { body, side, front, back } = meParts, m = mePose.moving, f = mePose.facing;
+      const s = m ? Math.sin(mePose.phase * 1.35) : 0, sw = s * 3, bob = m ? -Math.abs(Math.cos(mePose.phase * 1.35)) * .9 : 0;
+      const view = f === "u" || f === "up" ? back : f === "d" || f === "down" ? front : side;
+      for (const v of [side, front, back]) v.g.attr("display", v === view ? null : "none");
+      body.attr("transform", `translate(0,${f2(bob)})`);
+      if (view === side) {
+        side.g.attr("transform", f === "l" || f === -1 ? "scale(-1,1)" : null);
+        [sw, -sw].forEach((d, i) => {
+          const hx = i ? 1.9 : -1.9, fx = hx + d, kx = hx + d * .55;
+          side.legs[i].up.attr("d", `M${f2(hx)},-10.5L${f2(kx)},-5.2`);
+          side.legs[i].low.attr("d", `M${f2(hx)},-10.5L${f2(kx)},-5.2L${f2(fx)},-1.2`);
+          side.legs[i].shoe.attr("d", `M${f2(fx - 1.2)},-.6h3`);
+        });
+        side.arms[0].attr("d", `M1.2,-19.5L${f2(2.6 - sw * .7)},-13.2`);
+      } else {
+        // Each foot lifts in turn; the arms swing a little the other way.
+        [-1, 1].forEach((sd, i) => {
+          const lift = Math.max(0, i ? -s : s) * 2.2, hx = sd * 2, fx = sd * 2.3, fy = -1.2 - lift;
+          view.legs[i].up.attr("d", `M${f2(hx)},-10.5L${f2(fx)},${f2(-5.6 - lift * .5)}`);
+          view.legs[i].low.attr("d", `M${f2(hx)},-10.5L${f2(fx)},${f2(-5.6 - lift * .5)}L${f2(fx)},${f2(fy)}`);
+          view.legs[i].shoe.attr("d", `M${f2(fx - 1.2)},${f2(fy + .6)}h2.4`);
+          view.arms[i].attr("d", `M${f2(sd * 4.6)},-19.6L${f2(sd * 5.7)},${f2(-13.4 + (i ? s : -s) * .9)}`);
+        });
+      }
+      view.padG.attr("display", mePose.padDown && !m ? "none" : null);
       meG.classed("moving", m);
     }
     const hereB = S.boulders.find(bo => bo.b.name === state.here);
@@ -1572,7 +1627,7 @@
       const k = T.k;
       badgeSel.attr("transform", bo => `translate(${f2(T.applyX(bo.b.x + bo.form.R * .75) + 4)},${f2(T.applyY(-bo.b.y - bo.form.H * .85) - Math.min(10, k * 1.2))})`);
     }
-    // Where you are, and how you're moving: { phase, moving, facing, padDown }.
+    // Where you are, and how you're moving: { phase, moving, facing (l, r, u, d), padDown }.
     // While following a walking climber, the map slides under them (and redraws
     // only when the slide runs out of margin); a still climber lets the margin go.
     function setMe(p, pose) {

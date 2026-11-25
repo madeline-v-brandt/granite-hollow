@@ -313,6 +313,20 @@ test("water is in the way: no walking across the pond", () => {
   for (let i = 1; i < p.pts.length; i++) assert(W.clear(p.pts[i - 1], p.pts[i]), "no leg crosses water");
   assert(p.minutes > Math.hypot(200, 200) / 30);
 });
+test("trips keep to the trails; walking yourself takes the shortcut, and is quicker", () => {
+  const W = net(), Wm = Travel.make({ trails: [[[0, 0], [0, 150], [0, 300]], [[0, 300], [150, 300], [300, 300]], [[0, 300], [-150, 300], [-300, 300]]],
+    blocked: p => Math.hypot(p[0] - 150, p[1] - 150) < 80, rate: Travel.MANUAL });
+  // From the west end to a spot 30 m off the trail near the lot: the woods are the short way.
+  const trip = W.plan([-300, 300], [-30, 30], { trails: true }), mine = Wm.plan([-300, 300], [-30, 30]);
+  assert(trip.pts.length > 2 && near(trip.minutes, 570 / 45 + 30 / 30, 1e-3), "the trip goes by the trails: " + trip.minutes);
+  assert(mine.pts.length === 2 && near(mine.minutes, Math.hypot(270, 270) / 35, 1e-6), "you cut through: " + mine.minutes);
+  assert(mine.minutes < trip.minutes - 2, "the shortcut saves time");
+  // A short hop off the trail is still walked straight.
+  const hop = W.plan([0, 100], [-40, 100], { trails: true });
+  assert(hop.pts.length === 2 && near(hop.minutes, 40 / 30, 1e-6));
+  // The trail itself, walking yourself: a little quicker than a trip.
+  assert(near(Wm.plan([0, 0], [0, 300]).minutes, 300 / 50, 1e-6));
+});
 test("a walk can stop part way, and what it costs so far is known", () => {
   const W = net(), p = W.plan([0, 0], [300, 300]);
   const half = Travel.along(p, 300);

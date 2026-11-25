@@ -95,6 +95,15 @@ In headless Chrome only, not yet in a real browser (`scripts/browser/walk.js`):
   - Two of the browser tests now write saves from another page, because the game saves itself when its page is hidden.
   - The leak test now removes visible names before looking for hidden ones, so a sit start ("Kiosk Sit") no longer looks like its hidden parent line ("Kiosk").
 
+## After the first play-test (2026-11-25)
+
+Played in a real browser. The Go there animation was right; these changed:
+- **Walking speed on screen:** 17 m/s on a trail and 12 off it (was 14 and 9).
+- **Four facings:** the climber now faces away from you walking up the screen (the pad on show) and towards you walking down (a face, the pad peeking out behind), as well as left and right. Near a diagonal they keep the way they were facing, so it doesn't flicker.
+- **Walking yourself takes a little less time:** 50 m a game minute on a trail and 35 off it (`Travel.MANUAL`), about 10% and 14% less than before.
+- **Trips keep to the trails** (Go there, the trail map's Walk): `plan(from, to, { trails: true })` weighs time off the trail 2.5× when choosing the route (it still charges the real time), so a trip only leaves the trail for the last stretch, or walks a short hop (under 110 m) straight. Times from the lot still match every area's walking time.
+- **Shortcuts pay:** walking yourself (the keys, or a tap or click on the map) goes straight through the woods when that's quicker, at the faster rate. Between areas that saves about 20% on average, and up to half where the trails loop round (The Schoolhouse to Hawkwatch: 12 minutes by the trails, about 6 cutting through). Hover cards on the map show the walk-it-yourself time, since a click walks it that way; panels and the trail map show Go there's.
+
 ## Not done yet
 
 - **Seeing it in a real browser.** In Stage 1, a real Mac at 1.8× density showed occasional 4–8 s pauses at zoom 6 with no long tasks, probably raster or GPU work. Walking around for a few minutes in a real browser will show whether they're still there.

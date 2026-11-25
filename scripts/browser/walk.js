@@ -23,7 +23,7 @@ const SLOT = "granite-hollow-save-v1";
   await p.keyboard.down("d"); await sleep(1500); await p.keyboard.up("d"); await sleep(700);
   let s = await g();
   const m1 = Math.hypot(s.pos[0] - a0[0], s.pos[1] - a0[1]), t1 = clockOf(s) - c0;
-  console.log(`keys: walked ${m1.toFixed(1)} m in ${t1.toFixed(2)} game minutes = ${(m1 / t1).toFixed(1)} m/min (45 on a trail, 30 off it) | hint now:`, await p.evaluate(() => document.querySelector("#map-hint").hidden ? "(hidden)" : "shown"));
+  console.log(`keys: walked ${m1.toFixed(1)} m in ${t1.toFixed(2)} game minutes = ${(m1 / t1).toFixed(1)} m/min (walking yourself: 50 on a trail, 35 off it) | hint now:`, await p.evaluate(() => document.querySelector("#map-hint").hidden ? "(hidden)" : "shown"));
 
   // Wander around the Tailgate's boulders: you stop at a boulder or go round it, never through it.
   await p.evaluate(async () => { window.__S = Illu.parkScene(await (await fetch("game-data.json")).json()); });

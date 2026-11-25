@@ -565,7 +565,7 @@
       onGround: (x, y) => goToPoint([x, y]),
       onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
-        const mins0 = minutesTo({ sector: b.sector, boulder: b.id });
+        const mins0 = minutesTo({ sector: b.sector, boulder: b.id }, true);
         if (K.boulder(b.id) < 1) return `<strong>Unfamiliar boulder</strong><div class="sub">${b.height_ft} ft · ${esc(b.angle)}</div>It isn't in your guidebook. Walk over and have a look.${mins0 ? `<br>${mins0} min walk` : ""}`;
         if (!K.all()) {
           const a = K.boulderStats(b.id);
@@ -591,8 +591,11 @@
 
     // ---- the ground: where you can stand, and how fast you walk there
     const LOT = [0, 0];                                  // the trailhead, by the kiosk
-    const Wk = Travel.make({ trails: S.trails.map(t => t.pts), blocked: p => S.inWater(p, 0) });
-    const SPEED = { trail: 14, off: 9 };                 // metres a second on screen (the same 3 : 2 as the clock's rates)
+    // Two planners: trips the game walks for you keep to the trails at the old pace
+    // (Wk); walking yourself (keys, a tap) is a little quicker and takes shortcuts (Wm).
+    const trailPts = S.trails.map(t => t.pts), wet = p => S.inWater(p, 0);
+    const Wk = Travel.make({ trails: trailPts, blocked: wet }), Wm = Travel.make({ trails: trailPts, blocked: wet, rate: Travel.MANUAL });
+    const SPEED = { trail: 17, off: 12 };                // metres a second on screen (about the clock's 50 : 35)
     const [bx0, bx1, by0, by1] = S.bounds, edge = 60;
     const inPark = p => p[0] > bx0 + edge && p[0] < bx1 - edge && p[1] > by0 + edge * .6 && p[1] < by1 - edge;
     const boulderAt = p => S.boulders.find(bo => Math.hypot(p[0] - bo.b.x, p[1] - bo.b.y) < bo.form.R * .9 + .5);
@@ -636,21 +639,36 @@
       timeChecks();
       if (d.over) stop();
     }
-    const plan = to => { if (!validPos(G.pos)) G.pos = pointOf(G.loc); return Wk.plan(G.pos, Array.isArray(to) ? to : pointOf(to)); };
+    // A trip's route (along the trails), or the way you'd walk it yourself (manual: a tap on the map).
+    const plan = (to, manual = false) => {
+      if (!validPos(G.pos)) G.pos = pointOf(G.loc);
+      const dest = Array.isArray(to) ? to : pointOf(to);
+      return manual ? Wm.plan(G.pos, dest) : Wk.plan(G.pos, dest, { trails: true });
+    };
     const minutesCache = new Map();
     // Minutes to walk from where you are to a place ({ sector, boulder }): 0 if you're there, at least 1 otherwise.
-    function minutesTo(to) {
+    // Go there's time by default; manual is the time a click on the map would take.
+    function minutesTo(to, manual = false) {
       if (sameLoc(G.loc, to)) return 0;
       if (!validPos(G.pos)) G.pos = pointOf(G.loc);
-      const key = G.pos.map(v => Math.round(v)).join(",") + "|" + to.sector + "|" + to.boulder;
-      if (!minutesCache.has(key)) { if (minutesCache.size > 400) minutesCache.clear(); const p = plan(to); minutesCache.set(key, p ? Math.round(p.minutes) : 99); }
+      const key = G.pos.map(v => Math.round(v)).join(",") + "|" + to.sector + "|" + to.boulder + "|" + manual;
+      if (!minutesCache.has(key)) { if (minutesCache.size > 400) minutesCache.clear(); const p = plan(to, manual); minutesCache.set(key, p ? Math.round(p.minutes) : 99); }
       return Math.max(1, minutesCache.get(key));
     }
     const minutesToLot = () => { const p = plan(LOT); return p ? Math.round(p.minutes) : 0; };
 
     // ---- moving: the keys (WASD and the arrows), a tap, or a trip
     const keys = new Set();
-    let walk = null, raf = null, last = null, phase = 0, facing = 1, stillTimer = null;
+    let walk = null, raf = null, last = null, phase = 0, facing = "d", stillTimer = null;
+    // Which way the climber faces (l, r; u is away from you, d towards you). Near a
+    // diagonal it keeps the way it was facing, so it doesn't flicker.
+    function face(dx, dy) {
+      const ax = Math.abs(dx), ay = Math.abs(dy);
+      if (ax < .01 && ay < .01) return;
+      if (ax > ay * 1.2) facing = dx > 0 ? "r" : "l";
+      else if (ay > ax * 1.2) facing = dy > 0 ? "u" : "d";
+      else if ((facing === "l" || facing === "r") ? dx * (facing === "r" ? 1 : -1) <= 0 : dy * (facing === "u" ? 1 : -1) <= 0) facing = ax >= ay ? (dx > 0 ? "r" : "l") : (dy > 0 ? "u" : "d");
+    }
     const fade = $("#map-fade");
     const pose = moving => ({ phase, moving, facing, padDown: G.loc.boulder != null });
     function frame(now) {
@@ -671,6 +689,7 @@
       if (keys.has("left")) dx--; if (keys.has("right")) dx++; if (keys.has("up")) dy++; if (keys.has("down")) dy--;
       const n = Math.hypot(dx, dy); if (!n) return;
       const trail = onTrail(G.pos), v = (trail ? SPEED.trail : SPEED.off) * dt, mx = dx / n * v, my = dy / n * v;
+      face(dx, dy);
       const from = G.pos;
       let to = [from[0] + mx, from[1] + my];
       // Something in the way: veer around it (a boulder's curve, a shoreline), the smallest turn first.
@@ -683,10 +702,9 @@
       }
       const moved = Math.hypot(to[0] - from[0], to[1] - from[1]);
       if (!moved) return;
-      if (Math.abs(to[0] - from[0]) > .01) facing = to[0] > from[0] ? 1 : -1;
       G.pos = to; phase += moved;
       if (!G.walked) { G.walked = true; showHint(); }
-      spend(moved / (trail ? Wk.rate.trail : Wk.rate.off));
+      spend(moved / (trail ? Wm.rate.trail : Wm.rate.off));
       if (!G.day.over) moved_();
     }
     // Where you are changed: arriving at a boulder or an area (walking past things on a trip is quiet).
@@ -700,10 +718,11 @@
 
     // A trip: walked at a stroll when it's short, hurried along when it's longer, and
     // with a quick fade for long ones (you walk off, and arrive walking in). It
-    // costs the full walk's time either way, charged as you go.
+    // costs the full walk's time either way, charged as you go. A tap on the map
+    // walks the way you would yourself (shortcuts and all); Go there keeps to the trails.
     function goTo(to, opts = {}) {
       if (G.day.over) return;
-      const dest = Array.isArray(to) ? to : pointOf(to), path = Wk.plan(G.pos, dest);
+      const W = opts.tap ? Wm : Wk, path = plan(to, !!opts.tap);
       if (!path) { toast("No way through", "There's water in the way.", "info"); return; }
       const w = G.day.weather, knownRain = G.day.rainWarned ? Mech.rainStart(w) : null;
       if (path.minutes >= 1 && G.day.minute + path.minutes >= Math.min(w.dusk, knownRain ?? Infinity)) {
@@ -711,7 +730,7 @@
         toast(raining ? "Rain's coming" : "Not enough daylight", raining ? "It'll be raining before you get there." : "It'll be dark before you get there. Head home instead.", "info"); return;
       }
       stop();
-      const M_ = path.metres, real = d3.sum(path.pts.slice(1), (q, i) => Math.hypot(q[0] - path.pts[i][0], q[1] - path.pts[i][1]) / (path.rates[i] === Wk.rate.trail ? SPEED.trail : SPEED.off));
+      const M_ = path.metres, real = d3.sum(path.pts.slice(1), (q, i) => Math.hypot(q[0] - path.pts[i][0], q[1] - path.pts[i][1]) / (path.rates[i] === W.rate.trail ? SPEED.trail : SPEED.off));
       const lead = Math.min(45, M_ * .2), phases = [];
       if (reduceMotion) phases.push({ d0: 0, d1: M_, ms: 0 });
       else if (real <= 3) phases.push({ d0: 0, d1: M_, ms: real * 1000 });
@@ -746,7 +765,7 @@
     function goAlong(w, d) {
       const a = Travel.along(w.path, d), before = G.pos;
       G.pos = a.p; phase += Math.hypot(a.p[0] - before[0], a.p[1] - before[1]);
-      if (Math.abs(a.dir[0]) > .05) facing = a.dir[0] > 0 ? 1 : -1;
+      face(a.dir[0], a.dir[1]);
       const cost = a.minutes - w.paid; w.paid = a.minutes; w.d = d;
       spend(cost);
       if (walk === w) moved_(true);

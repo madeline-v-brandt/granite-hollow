@@ -12,9 +12,21 @@
 // step around a boulder, and the brooks have footbridges or stepping stones).
 // The result is a polyline with the rate of each leg, so a walk can be charged
 // as it happens, and stopped part way.
+//
+// Two ways of walking (decided after Stage 4's play-test):
+// - Trips the game walks for you (Go there, the trail map's Walk) keep to the
+//   trails: plan(from, to, { trails: true }) weighs time off the trail more
+//   heavily when choosing the route (it still charges the real time), so it
+//   only leaves a trail for the last stretch, or for a short hop.
+// - Walking yourself (the keys, or a tap on the map) is a little quicker
+//   (MANUAL), and goes straight through the woods when that's shorter. Knowing
+//   the shortcuts is its own reward.
 (function (root) {
   "use strict";
-  const RATE = { trail: 45, off: 30 };          // metres per game minute
+  const RATE = { trail: 45, off: 30 };          // metres per game minute: trips the game walks for you
+  const MANUAL = { trail: 50, off: 35 };        // walking yourself: a little less time for the same ground
+  const TRAIL_BIAS = 2.5;                       // how much more a trip dislikes leaving the trail (route choice only)
+  const DIRECT_OK = 110;                        // a trip shorter than this (metres, in a straight line) just walks it
   const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
   function make({ trails, blocked = () => false, rate = RATE }) {
@@ -63,13 +75,15 @@
     }
     const legs = (pts, r) => pts.slice(1).map(() => r);
 
-    function plan(from, to) {
+    function plan(from, to, opt = {}) {
       if (dist(from, to) < .05) return { pts: [from, to], rates: [rate.off], metres: 0, minutes: 0 };
+      // Keeping to the trails: off-trail legs weigh more when choosing the route.
+      const bias = opt.trails && !(dist(from, to) <= DIRECT_OK && clear(from, to)) ? TRAIL_BIAS : 1;
       // The graph: the trail junctions, plus the start (S) and the end (E). Each edge
       // carries its cost in minutes and how to draw it.
       const N = nodes.length, S = N, E = N + 1, adj = Array.from({ length: N + 2 }, () => []);
       const edge = (u, v, cost, draw) => { if (isFinite(cost)) adj[u].push({ v, cost, draw }); };
-      const off = (a, b) => (clear(a, b) ? dist(a, b) / rate.off : Infinity);
+      const off = (a, b) => (clear(a, b) ? bias * dist(a, b) / rate.off : Infinity);
       edge(S, E, off(from, to), () => [[from, to], [rate.off]]);
       T.forEach(t => {
         edge(t.a, t.b, t.len / rate.trail, () => [t.pts, legs(t.pts, rate.trail)]);
@@ -133,6 +147,6 @@
     return { p: b.slice(), minutes, leg: n - 2, dir: [b[0] - a[0], b[1] - a[1]], end: true };
   }
 
-  const Travel = { make, along, RATE };
+  const Travel = { make, along, RATE, MANUAL, TRAIL_BIAS, DIRECT_OK };
   if (typeof module !== "undefined") module.exports = Travel; else root.Travel = Travel;
 })(typeof window !== "undefined" ? window : globalThis);
