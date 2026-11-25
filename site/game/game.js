@@ -177,7 +177,7 @@
     if (!G.visited.includes(START_AREA)) G.visited.push(START_AREA);
     UI.recenter = true;                                   // the camera starts the day on you
     G.day = { no: G.dayNo, minute: 9 * 60 + Math.floor(Math.random() * 40), weather: w, startEnergy: s.energy,
-      attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null,
+      attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null, bishop: Math.random() < 0.13,
       over: false, warned: false, levelBefore: Mech.levelInfo(G.player.xp).level };
     const intro = first && v2()
       ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk's trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot. Everything else is waiting for a first ascent.`
@@ -192,7 +192,17 @@
     } else note(`Day ${G.dayNo}: ${w.sky}, ${w.temp}°F, ${w.label.toLowerCase()} conditions.`);
     if (v2()) K.visitArea(START_AREA);
     // The community climbs too: every day since the last one is simulated, once.
-    if (v2()) safely("the crag's history", () => World.step(D, G, G.date, { today: { date: G.date, wet: !!G.day.rainedOut } }));
+    if (v2()) safely("the crag's history", () => {
+      const ev = World.step(D, G, G.date, { today: { date: G.date, wet: !!G.day.rainedOut } });
+      // Someone climbed a line you'd spotted (rare, and always told kindly).
+      for (const it of ev.filter(x => x.kind === "snipe")) {
+        const b = D.problems[it.p].boulder, who = World.whoName(D, it.by);
+        G.day.last.text += ` Word from ${who}: they climbed ${pname(it.p)} on ${b.name}, the line you'd spotted. "Hope you don't mind. It's brilliant, you'll love it."`;
+        note(`${who} made the first ascent of ${pname(it.p)}, a line you'd spotted.`);
+      }
+    });
+    // Pickles is sometimes waiting by the car.
+    if (v2() && !first && !G.day.over && isAround("n:pickles") && Math.random() < 0.35) { G.day.met.push("n:pickles"); G.day.encounter = buildRegular("n:pickles", START_AREA); }
   }
   function note(text) { G.feed.unshift({ text, date: G.date, minute: G.day ? G.day.minute : 540 }); G.feed.length = Math.min(G.feed.length, 60); }
   function save() {
@@ -296,7 +306,7 @@
       if (newMax) text += ` Your hardest send yet.`;
       if (fa) text += " Nobody had documented an ascent of it. It's your first ascent, and it's yours to name.";
       else if (first && v2() && G.world.est[i] && G.world.est[i].by !== "you") text += " " + ascentLine(i);
-      if (tip && first) text += ` Good beta from ${D.climbers[tip.from][0]}.`;
+      if (tip && first) text += ` Good beta from ${whoOf(tip.from)}.`;
       G.day.last = { kind: "send", title: fa ? `First ascent on ${p.boulder.name}, V${p.grade}` : `${style === "Repeat" ? "Repeat" : "Sent"}: ${titleOf(i)}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
       note(`${fa ? "First ascent:" : style} ${pname(i)}${vg(i) ? ` (${vg(i)})` : ""}, +${fmt(xp)} XP.`);
       if (fa) UI.faNote = G.feed[0];                        // renamed along with the problem
@@ -460,7 +470,9 @@
 
   // ============================================================== encounters
   function maybeEncounter(sector) {
-    if (G.day.met.length >= 3 || Math.random() > 0.55) return;
+    if (G.day.met.length >= 3) return;
+    if (v2()) { const w = regularFor(sector); if (w) { G.day.met.push(w); G.day.encounter = buildRegular(w, sector); return; } }
+    if (Math.random() > 0.55) return;
     const pool = D.npcsBySector.get(sector).filter(ci => !G.day.met.includes(ci) && (!v2() || G.world.npc["c" + ci]));
     if (!pool.length) return;
     const weight = ci => ({ local_hero: 4, regular: 2.5, occasional: 1, tourist: 1 })[D.climbers[ci][2]] || 1;
@@ -499,45 +511,173 @@
     }[type];
     let line = pick(greet);
     if (w.cond >= 0.3) line += " Friction's amazing today."; else if (w.cond <= -0.3) line += " Pretty greasy out here though.";
-    // A recommendation: something they liked that suits you.
+    const { rec, recLine } = recommend("c" + ci, sector, D.liked[ci], h);
+    return { ci, who: "c" + ci, sector, line, rec, recLine, beta: betaFor(sector), accepted: false, betaTaken: false };
+  }
+  // A recommendation: something they liked that suits you (or the best fit here).
+  function recommend(who, sector, liked, h) {
     const documented = i => !v2() || !!G.world.est[i];        // under the new rules, only what's been climbed
-    const cands = D.liked[ci].filter(i => !G.ps[i]?.sent && documented(i));
-    let ranked = cands.map(i => [i, playerFit(i)]).filter(x => x[1] > -4).sort((a, b) => b[1] - a[1]);
-    let theirs = true;
-    if (!ranked.length) {
-      theirs = false;
-      ranked = D.sectorProblems.get(sector).filter(i => !G.ps[i]?.sent && documented(i)).map(i => [i, playerFit(i)]).sort((a, b) => b[1] - a[1]);
-    }
+    let ranked = (liked || []).filter(i => !G.ps[i]?.sent && documented(i)).map(i => [i, playerFit(i)]).filter(x => x[1] > -4).sort((a, b) => b[1] - a[1]);
+    let theirs = ranked.length > 0;
+    if (!ranked.length) ranked = D.sectorProblems.get(sector).filter(i => !G.ps[i]?.sent && documented(i)).map(i => [i, playerFit(i)]).sort((a, b) => b[1] - a[1]);
     const rec = ranked.length ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))][0] : null;
     let recLine = "";
     if (rec != null) {
-      K.tell(rec, "c" + ci, G.date);                         // they've told you about it, so now you know
+      K.tell(rec, who, G.date);                              // they've told you about it, so now you know
       const p = D.problems[rec], why = whyFor(rec);
       const where = p.sector === sector ? `right here on ${p.boulder.name}` : `over at ${p.sector}`;
       recLine = `You should try ${titleOf(rec)}, ${where}. ${theirs ? "One of my favorites. " : ""}I think ${why.slice(0, 2).join(" and ")}.`;
-      if (Math.abs(h - G.player.height) <= 5) recLine += " We're about the same height, so trust me.";
+      if (h != null && Math.abs(h - G.player.height) <= 5) recLine += " We're about the same height, so trust me.";
     }
-    // Beta for a project you're working in this sector.
+    return { rec, recLine };
+  }
+  // Beta for a project you're working in this sector.
+  function betaFor(sector) {
     const projects = D.sectorProblems.get(sector).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && !G.ps[i].tipped);
-    let beta = null;
-    if (projects.length && Math.random() < 0.7) {
-      const pi = projects.sort((a, b) => G.ps[b].att - G.ps[a].att)[0], p = D.problems[pi];
-      const worst = p.tagList.filter(t => BETA_TIP[t]).sort((a, b) => (G.player.skills[a] ?? Mech.morph(G.player, p)) - (G.player.skills[b] ?? Mech.morph(G.player, p)))[0];
-      beta = { p: pi, text: `Saw you working ${pref(pi)}. ${BETA_TIP[worst] || "Try it with more confidence on the first move."}` };
+    if (!projects.length || Math.random() >= 0.7) return null;
+    const pi = projects.sort((a, b) => G.ps[b].att - G.ps[a].att)[0], p = D.problems[pi];
+    const worst = p.tagList.filter(t => BETA_TIP[t]).sort((a, b) => (G.player.skills[a] ?? Mech.morph(G.player, p)) - (G.player.skills[b] ?? Mech.morph(G.player, p)))[0];
+    return { p: pi, text: `Saw you working ${pref(pi)}. ${BETA_TIP[worst] || "Try it with more confidence on the first move."}` };
+  }
+
+  // ---- the regulars (Stage 5): people you get to know. Who's around, where,
+  // and what they say. Names, places and lines only ever come through K.
+  const REGULAR_TALK = {
+    gus: { hello: ["Ranger Gus. Welcome to the Hollow. You're one of the first climbers allowed back in since '87, you know.", "Morning! Gus. I look after the park. Mostly I look after Pickles."],
+      again: ["Morning! Pack it in, pack it out. You know the drill.", "Pickles has been asking about you. Well. Staring at your car.", "If you see anyone feeding the geese, tell them Gus said no."] },
+    rowan: { hello: ["Oh! Hi. Sorry, I was sketching. I'm Rowan. This boulder has the best shadows in the morning.", "Hi, I'm Rowan. I come up here to draw the rocks and occasionally climb one."],
+      again: ["Hey, you're back! I was hoping someone would come up here.", "I've drawn this spot about six times now. It keeps changing with the light.", "Want to see what I've got so far? It's mostly lines. Some of them are even climbing lines.", "You climb like you're listening to the rock. Is that a weird thing to say? That's a weird thing to say."] },
+    hollis: { hello: ["Hollis Pruitt. I'm keeping notes on everything that goes up out here. Somebody has to.", "Hollis. I've documented every problem in this park. Some of them twice, in case the first one was wrong."],
+      again: ["Back again! I've updated the notes. Twice.", "Did you know the schoolhouse kids used these boulders as a recess spot? I have a whole page on it.", "Every line out here has a story. Most of them are mine, now."] },
+    otis: { hello: ["Otis! Isn't it perfect sending weather?", "Name's Otis. Perfect day for it, isn't it?"],
+      again: ["Perfect sending weather!", "I've been on the same slab since August. It's a relationship now.", "Some days you send, some days you sit on your pad and eat a sandwich. Both are climbing."] },
+    bea: { hello: ["I'm Bea! Have you tried jumping for it? You should always try jumping for it.", "Hi! Bea. Did you see that? I almost stuck it. Almost!"],
+      again: ["Did you see that? I almost stuck it! Almost!", "My mom drops me off on her way to work. Best deal ever.", "Okay but what if you just jumped?"] },
+    dez: { hello: ["Dez. Good to meet you.", "…Dez. Hi."],
+      again: ["Mm. Good conditions.", "You're getting strong.", "Nice to see you out."] },
+  };
+  const isAround = w => {
+    const n = World.NAMED[w.slice(2)];
+    if (!n || !n.regular || G.dayNo < (n.arrive || 0)) return false;
+    return n.dog || n.old ? true : !!G.world.npc[w];
+  };
+  // Who you run into on arriving in an area: Pickles by the lot, the Bishop on
+  // the odd day he's out, the regulars mostly in their home areas.
+  function regularFor(sector) {
+    const met = w => G.day.met.includes(w);
+    if (sector === "The Tailgate" && isAround("n:pickles") && !met("n:pickles") && Math.random() < 0.5) return "n:pickles";
+    if (G.day.bishop && isAround("n:bishop") && !met("n:bishop") && World.NAMED.bishop.home.includes(sector)) return "n:bishop";
+    const regs = World.CLIMBING_REGULARS.concat("n:gus").filter(w => isAround(w) && !met(w)).sort(() => Math.random() - .5);
+    for (const w of regs) if (Math.random() < (World.NAMED[w.slice(2)].home.includes(sector) ? 0.3 : 0.05)) return w;
+    return null;
+  }
+  // An area you haven't found that the community has known about for a while
+  // (5+ of your climbing days), so explorers get there first. The nearest one.
+  function directionsTo() {
+    const W = G.world, known = new Set(W.found.map(b => D.boulders[b].sector));
+    const ok = D.sectors.filter(s => K.area(s.name) < 1 && known.has(s.name) && G.dayNo - ((W.areas && W.areas[s.name]) ? W.areas[s.name][1] : -99) >= 5);
+    return ok.sort((a, b) => a.walk_min - b.walk_min)[0]?.name ?? null;
+  }
+  // A line on a boulder you know that you haven't noticed (too hard to read yet).
+  function hiddenLineFor(strong) {
+    const A = Mech.ability(G.player.xp), out = [];
+    for (const b of Object.keys(G.know.boulders).map(Number)) for (const p of D.boulders[b].problems) if (K.line(p) === "hidden" && !G.world.est[p]) out.push(p);
+    if (!out.length) return null;
+    const aim = strong ? A + 4 : A + 1.5;
+    out.sort((a, b) => Math.abs(D.problems[a].grade - aim) - Math.abs(D.problems[b].grade - aim) || a - b);
+    if (!strong && D.problems[out[0]].grade > A + 3) return null;
+    return out[Math.floor(Math.random() * Math.min(3, out.length))];
+  }
+  // Something of yours or theirs worth mentioning: your latest first ascent, or theirs.
+  function remarkFor(w) {
+    const W = G.world, since = addDays(G.date, -3);
+    const mine = Object.entries(W.est).filter(([p, e]) => e.by === "you" && e.date >= since && e.date < G.date).sort((a, b) => (a[1].date < b[1].date ? 1 : -1))[0];
+    if (mine && Math.random() < 0.6) return pick([`Saw your name in CragLog. ${pname(+mine[0])}! Nice.`, `I heard you got the first ascent of ${pname(+mine[0])}. What's it like?`]);
+    const theirs = Object.entries(W.est).filter(([p, e]) => e.by === w && e.date >= addDays(G.date, -10)).sort((a, b) => (a[1].date < b[1].date ? 1 : -1))[0];
+    if (theirs) {
+      const p = +theirs[0], b = D.problems[p].b, s = D.boulders[b].sector;
+      if (K.line(p) === "est") return `I finally put up ${pname(p)} on ${D.boulders[b].name}. You should try it.`;
+      return `I put up something new ${K.area(s) >= 1 ? "at " + s : World.AREAS[s]?.hint || "out in the woods"} this week. Still buzzing.`;
     }
-    return { ci, sector, line, rec, recLine, beta, accepted: false, betaTaken: false };
+    return "";
+  }
+  const BISHOP_YEARS = [1971, 1973, 1974, 1976, 1977, 1978, 1979, 1981, 1983, 1986];
+  const BISHOP_HOW = ["In work boots.", "Without a pad. We didn't have pads. We had a doormat.", "In the rain, mind you.", "Dot spotted me. Or I spotted her. One of the two.",
+    "Backwards, as I recall.", "Twice. The second time for fun.", "Wearing a tie. It was a Sunday.", "With a stick. No, that was the other one."];
+  function bishopClaim() {
+    const sentToday = G.day.sends.filter(s => s.style !== "Repeat").map(s => s.p), proj = Object.keys(G.ps).map(Number).filter(i => !G.ps[i].sent && G.ps[i].att >= 3 && K.visible(i));
+    const yy = String(pick(BISHOP_YEARS)).slice(2);
+    if (sentToday.length) return `${pname(pick(sentToday))}? Oh, I did that one in '${yy}. ${pick(BISHOP_HOW)} Nice to see somebody repeat it.`;
+    if (proj.length) return `Still on ${pname(pick(proj))}? I did that in '${yy}. ${pick(BISHOP_HOW)} Dot will tell you different, but Dot's not here, is she?`;
+    return pick([`Back in '${yy} we climbed everything out here. Everything. Nobody wrote any of it down, of course.`, `You know who put up the first problem in this park? Me. Well. Me and Dot. Mostly me.`,
+      `They call me the Bishop. Don't ask why. It's a long story, and most of it's true.`]);
+  }
+  function buildRegular(w, sector) {
+    const key = w.slice(2), n = World.NAMED[key], r = K.meet(w, G.date), first = r.n === 1;
+    const e = { who: w, sector, line: "", rec: null, recLine: "", beta: null, accepted: false, betaTaken: false };
+    if (key === "pickles") {
+      e.line = pick(first ? ["A scruffy dog trots over from the lot, tail going. His tag says PICKLES."] : ["Pickles trots over from the lot, tail going.", "Pickles is asleep under the kiosk. One ear lifts as you pass.",
+        "Pickles has found a stick and would like you to admire it.", "Pickles is supervising the parking lot. He wags when he sees you."]);
+      e.pet = true; return e;
+    }
+    if (key === "bishop") {
+      e.say = true;     // narration with his words in it, not a plain quote
+      e.line = first ? `A tall old man in a flannel shirt looks you up and down. “They call me the Bishop. I climbed here before you were born. ${bishopClaim()}”` : `“${bishopClaim()}”`;
+    } else {
+      const t = REGULAR_TALK[key];
+      e.line = pick(first ? t.hello : t.again);
+      if (key === "otis" && G.day.weather.cond <= -0.3 && !first) e.line += " Well. Perfect-ish.";
+      const rm = first ? "" : remarkFor(w); if (rm) e.line += " " + rm;
+    }
+    // What they offer: the way to an area, a line you haven't noticed, or a recommendation (and beta).
+    const strong = key === "dez" || key === "bishop" || (n.level || 0) >= 9;
+    const dirTo = directionsTo(), hidden = hiddenLineFor(strong);
+    const chanceDir = key === "hollis" || key === "gus" ? 0.7 : key === "bishop" ? 0.4 : 0.3;
+    if (dirTo && Math.random() < chanceDir) { e.dir = dirTo; e.dirLine = key === "bishop" ? `He taps the side of his nose. “Ever been ${World.AREAS[dirTo]?.hint || "further out"}? There's rock out there nobody's looked at properly since '79.”` : `Have you been ${World.AREAS[dirTo]?.hint || "further out"} yet? There's good rock out there.`; }
+    else if (hidden != null && Math.random() < (strong ? 0.6 : 0.25)) {
+      const b = D.problems[hidden].b;
+      e.reveal = hidden;
+      e.revealLine = key === "bishop" ? `“There's a line on ${D.boulders[b].name} nobody's done since me,” he says. “Ha.”` : key === "dez" ? `There's a line on ${D.boulders[b].name}. Hard. Nobody's touched it.` : `Have you seen the line on ${D.boulders[b].name}? It's easy to miss.`;
+    } else if (key !== "bishop") Object.assign(e, recommend(w, sector, null, n.h));
+    if (key !== "bishop") e.beta = betaFor(sector);
+    return e;
+  }
+  const whoOf = f => (typeof f === "number" ? (D.climbers[f] || ["someone"])[0] : World.whoName(D, f));
+  function askWay() {
+    const e = G.day.encounter; if (!e || !e.dir || e.dirTaken) return;
+    e.dirTaken = true;
+    if (K.hearOf(e.dir, e.who, G.date)) {
+      toast(`New area: ${e.dir}`, `${whoOf(e.who).replace(/^the /, "The ")} told you the way. It's on your trail map now.`, "find");
+      note(`${whoOf(e.who).replace(/^the /, "The ")} told you the way to ${e.dir}.`);
+    }
+    save(); renderAll();
+  }
+  function hearLine() {
+    const e = G.day.encounter; if (!e || e.reveal == null || e.revealTaken) return;
+    e.revealTaken = true;
+    if (K.tell(e.reveal, e.who, G.date)) {
+      toast("A line you hadn't noticed", `${pname(e.reveal)} on ${D.problems[e.reveal].boulder.name}. It's in your journal.`, "find");
+      note(`${whoOf(e.who).replace(/^the /, "The ")} pointed out ${pname(e.reveal)} on ${D.problems[e.reveal].boulder.name}.`);
+    }
+    save(); renderAll();
+  }
+  function petDog() {
+    const e = G.day.encounter; if (!e || !e.pet || e.petted) return;
+    const n = K.pet(e.who, G.date);
+    e.petted = n < 3 ? "He leans into your hand." : n < 10 ? "He leans his whole weight against your leg and sighs." : "He follows you a few steps toward the trail before Gus whistles him back.";
+    save(); renderAll();
   }
   function acceptTip() {
     const e = G.day.encounter; if (!e || e.rec == null) return;
     e.accepted = true;
-    if (!G.tips.some(t => t.p === e.rec && !t.done)) G.tips.push({ p: e.rec, from: e.ci, date: G.date, why: whyFor(e.rec), done: false });
-    note(`${D.climbers[e.ci][0]} recommended ${pname(e.rec)}.`);
+    if (!G.tips.some(t => t.p === e.rec && !t.done)) G.tips.push({ p: e.rec, from: e.ci ?? e.who, date: G.date, why: whyFor(e.rec), done: false });
+    note(`${whoOf(e.ci ?? e.who)} recommended ${pname(e.rec)}.`);
     save(); renderAll();
   }
   function takeBeta() {
     const e = G.day.encounter; if (!e || !e.beta) return;
     const st = pstate(e.beta.p); st.beta = Math.min(Mech.BETA_MAX, st.beta + 0.25); st.tipped = true; e.betaTaken = true;
-    note(`Got beta for ${pref(e.beta.p)} from ${D.climbers[e.ci][0]}.`);
+    note(`Got beta for ${pref(e.beta.p)} from ${whoOf(e.ci ?? e.who)}.`);
     toast("Beta unlocked", `${pname(e.beta.p)} will feel a bit easier now.`, "info");
     save(); renderAll();
   }
@@ -834,7 +974,8 @@
       const areas = D.sectors.filter(s => K.area(s.name) >= 1).map(s => {
         const a = K.areaStats(s.name), mins = minutesTo({ sector: s.name, boulder: null });
         const range = K.all() ? `V${s.lo}–V${s.hi}` : a.n ? `V${a.lo}–V${a.hi}` : a.boulders ? `${a.boulders} ${a.boulders === 1 ? "boulder" : "boulders"} found` : "not explored yet";
-        return { name: s.name, state: K.area(s.name), minutes: mins, sub: `${range} · ${G.loc.sector === s.name ? "you're here" : mins + " min walk"}` };
+        const told = K.area(s.name) === 1 && K.toldOf(s.name);
+        return { name: s.name, state: K.area(s.name), minutes: mins, sub: `${told ? `${World.whoName(D, told.from).replace(/^the /, "The ")} told you the way` : range} · ${G.loc.sector === s.name ? "you're here" : mins + " min walk"}` };
       });
       const hidden = D.sectors.some(s => K.area(s.name) < 1);
       paper.open({ areas, here: G.loc.sector, me: G.pos, view: P.viewBox(),
@@ -1063,13 +1204,29 @@
   }
   function npcHtml() {
     const e = G.day.encounter; if (!e) return "";
-    const [name, h, type, lvl] = D.climbers[e.ci];
-    const typeLabel = { local_hero: "local", regular: "regular", occasional: "weekend climber", tourist: "visiting" }[type];
-    return `<div class="npc"><div class="avatar" aria-hidden="true">${esc(name.slice(0, 2).toUpperCase())}</div><div>
-      <div class="nm">${esc(name)}<small>${h} cm · ${typeLabel} · climbs around V${Math.round(lvl)}</small></div>
-      <q>${esc(e.line)} ${esc(e.recLine)}</q>
+    let name, sub, initials;
+    if (e.who && e.who.startsWith("n:")) {
+      const i = World.whoInfo(D, e.who), r = K.met(e.who);
+      name = i.name.replace(/^the /, "The "); initials = i.type === "dog" ? "🐾" : name.replace(/^The /, "").split(" ").map(x => x[0]).join("").slice(0, 2).toUpperCase();
+      sub = [i.blurb.replace(/^is /, ""), i.type !== "dog" && !i.old ? `climbs around V${Math.round(i.level)}` : "", r && r.n > 1 ? `met ${r.n} times` : "first meeting"].filter(Boolean).join(" · ");
+    } else {
+      const [nm, h, type, lvl] = D.climbers[e.ci];
+      name = nm; initials = nm.slice(0, 2).toUpperCase();
+      sub = `${h} cm · ${{ local_hero: "local", regular: "regular", occasional: "weekend climber", tourist: "visiting" }[type]} · climbs around V${Math.round(lvl)}`;
+    }
+    const say = t => (e.say || e.pet ? `<p class="npc-say">${esc(t)}</p>` : `<q>${esc(t)}</q>`);
+    const quote = say([e.line, e.recLine].filter(Boolean).join(" ")) + (e.petted ? `<p class="npc-say">${esc(e.petted)}</p>` : "");
+    return `<div class="npc${e.who && e.who.startsWith("n:") ? " regular" : ""}"><div class="avatar" aria-hidden="true">${esc(initials)}</div><div>
+      <div class="nm">${esc(name)}<small>${esc(sub)}</small></div>
+      ${quote}
+      ${e.dir && !e.dirTaken ? say(e.dirLine) : ""}
+      ${e.dir && e.dirTaken ? `<p class="npc-say">${esc(`${e.who === "n:bishop" ? "He draws" : name + " draws"} you a little map to ${e.dir} on the back of a receipt.`)}</p>` : ""}
+      ${e.reveal != null ? say(e.revealLine) : ""}
       ${e.beta && !e.betaTaken ? `<q>${esc(e.beta.text)}</q>` : ""}
       <div class="acts">
+        ${e.pet && !e.petted ? `<button type="button" class="btn small primary" data-pet>Pet Pickles</button>` : ""}
+        ${e.dir ? (e.dirTaken ? `<button type="button" class="btn small primary" data-go-sector="${esc(e.dir)}">Go there</button>` : `<button type="button" class="btn small primary" data-dir>Ask the way</button>`) : ""}
+        ${e.reveal != null ? (e.revealTaken ? `<button type="button" class="btn small" data-go-boulder="${D.problems[e.reveal].b}">Go there</button>` : `<button type="button" class="btn small primary" data-reveal>Where exactly?</button>`) : ""}
         ${e.rec != null ? (e.accepted ? `<span class="chip good">Added to your journal</span>` : `<button type="button" class="btn small primary" data-accept>Add to my list</button>`) : ""}
         ${e.rec != null ? `<button type="button" class="btn small" data-go-problem="${e.rec}">Go there</button>` : ""}
         ${e.beta && !e.betaTaken ? `<button type="button" class="btn small" data-beta>Thanks for the beta</button>` : ""}
@@ -1236,6 +1393,14 @@
     const mine = playerSends(), pack = top => top.map(x => [x.p, dateOfEpoch(x.d), x.f ? 1 : 0]);
     return { y: pack(topSends(mine, ...rankWindow("12m"))), a: pack(topSends(mine, ...rankWindow("all"))) };
   }
+  // Local Buzz: what people are saying about the crag lately (K keeps it vague about places you don't know).
+  function buzzHtml() {
+    if (K.all()) return "";
+    const items = K.buzz({ days: 21, max: 5 });
+    if (!items.length) return "";
+    return `<section class="buzz" aria-label="Local Buzz"><h3>Local Buzz</h3><ul>${items.map(it => `<li><span class="buzz-d">${esc(shortDate(it.date).replace(/,? \d{4}$/, ""))}</span><span class="buzz-t">${esc(it.text)}</span>${
+      it.p != null ? `<button type="button" class="linklike" data-cl="${it.p}">See it</button>` : it.go && K.canGo(it.go) && !G.day.over ? `<button type="button" class="linklike" ${it.go.boulder != null ? `data-go-boulder="${it.go.boulder}"` : `data-go-sector="${esc(it.go.sector)}"`}>Go there</button>` : ""}</li>`).join("")}</ul></section>`;
+  }
   function cragHead() {
     const v = UI.cl.view;
     return `<div class="cl-brand"><b>Crag<i>Log</i></b><span class="meta" style="margin:0">Logs and comments from Granite Hollow climbers</span></div>
@@ -1244,8 +1409,29 @@
         <button type="button" data-cl-view="rankings" aria-pressed="${v === "rankings"}">Rankings</button>
         <button type="button" data-cl-view="leaders" aria-pressed="${v === "leaders"}">First to</button></div>`;
   }
+  // Under the new rules: who has put up the most problems since the reopening.
+  function faRankingsHtml() {
+    const rows = new Map();
+    for (const [p, e] of Object.entries(G.world.est)) {
+      if (e.old) continue;
+      const r = rows.get(e.by) || { who: e.by, n: 0, hardest: -1, last: "" };
+      r.n++; r.hardest = Math.max(r.hardest, e.grade); if (e.date > r.last) r.last = e.date;
+      rows.set(e.by, r);
+    }
+    if (!rows.has("you")) rows.set("you", { who: "you", n: 0, hardest: -1, last: "" });
+    const list = [...rows.values()].sort((a, b) => b.n - a.n || b.hardest - a.hardest || (a.who < b.who ? -1 : 1));
+    const me = list.findIndex(r => r.who === "you"), N = 15;
+    const label = r => (r.who === "you" ? esc(G.player.name) + ` <span class="you-tag">you</span>` : esc(World.whoName(D, r.who).replace(/^the /, "The ")) + (World.whoInfo(D, r.who).regular ? ` <span class="chip">regular</span>` : ""));
+    const row = (r, k) => `<tr class="${r.who === "you" ? "lb-me" : ""}"><td class="num">${k + 1}</td><td>${label(r)}</td><td class="num"><b>${r.n}</b></td><td class="num">${r.hardest >= 0 ? "V" + r.hardest : "–"}</td></tr>`;
+    const shown = list.slice(0, N).map(row);
+    if (me >= N) shown.push(`<tr><td colspan="4" class="meta" style="text-align:center">…</td></tr>`, row(list[me], me));
+    const total = list.reduce((a, r) => a + r.n, 0);
+    return `${cragHead()}
+      <p class="meta">First ascents since the park reopened: ${fmt(total)} problems by ${fmt(list.filter(r => r.n).length)} ${list.filter(r => r.n).length === 1 ? "climber" : "climbers"}. ${list[me].n ? `You've put up ${list[me].n}, #${me + 1} in the valley.` : "You haven't put up a problem yet."}</p>
+      <table><thead><tr><th>#</th><th>Climber</th><th class="num">FAs</th><th class="num">Hardest</th></tr></thead><tbody>${shown.join("")}</tbody></table>`;
+  }
   function rankingsHtml() {
-    if (!K.all()) return `${cragHead()}<p class="lede">Granite Hollow only reopened to climbing this season, so there are no rankings yet. They'll come back once the community has some history here.</p>`;
+    if (!K.all()) return faRankingsHtml();
     const r = UI.rk, [from, to] = rankWindow(r.window);
     const rows = [];
     D.npcSends.forEach((list, ci) => {
@@ -1388,7 +1574,7 @@
     list.sort(sorts[c.sort]);
     const total = list.length; list = list.slice(0, 60);
     const gradeOpts = sel => d3.range(0, 14).map(g => `<option value="${g}" ${g === sel ? "selected" : ""}>V${g}</option>`).join("");
-    return `${cragHead()}
+    return `${cragHead()}${buzzHtml()}
       <div class="cl-filters">
         <input type="search" id="cl-q" placeholder="Search problems, boulders or styles" value="${esc(c.q)}" aria-label="Search">
         <select id="cl-sector" aria-label="Sector"><option value="">All sectors</option>${D.sectors.filter(s => K.area(s.name) >= 1).map(s => `<option ${s.name === c.sector ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
@@ -1553,7 +1739,7 @@
       <h3>Tips from locals</h3>
       ${tips.length ? `<ul class="rowlist">${tips.map(t => { const p = D.problems[t.p];
         return `<li><button type="button" class="rowbtn" data-go-problem="${t.p}"><span><span class="t">${esc(nameGrade(t.p))} ${t.done ? `<span style="color:var(--plus);font-weight:500">✓ sent</span>` : ""}</span>
-          <span class="s">From ${esc(D.climbers[t.from][0])}: ${esc(t.why.slice(0, 2).join(", "))} · ${esc(p.sector)}</span></span><span class="v">${t.done ? "" : "Go"}</span></button></li>`; }).join("")}</ul>`
+          <span class="s">From ${esc(whoOf(t.from))}: ${esc(t.why.slice(0, 2).join(", "))} · ${esc(p.sector)}</span></span><span class="v">${t.done ? "" : "Go"}</span></button></li>`; }).join("")}</ul>`
         : `<p class="meta">Climbers you meet on the trail will tell you about problems that suit you. Sending one earns bonus XP.</p>`}
       <h3>To-do list</h3>
       ${todo.length ? `<ul class="rowlist">${todo.map(i => { const p = D.problems[i];
@@ -1585,6 +1771,9 @@
     on("[data-cl-back]", () => { UI.cl.problem = null; renderPanel(); });
     on("[data-todo]", n => { const i = +n.dataset.todo; if (!G.todo.includes(i)) G.todo.push(i); save(); renderAll(); });
     on("[data-accept]", acceptTip);
+    on("[data-dir]", askWay);
+    on("[data-reveal]", hearLine);
+    on("[data-pet]", petDog);
     on("[data-beta]", takeBeta);
     on("[data-dismiss]", () => { G.day.encounter = null; save(); renderPanel(); });
     on("[data-rate]", n => { const t = G.ticks[G.day.last.tick]; t.stars = +n.dataset.rate; save(); renderPanel(); });
@@ -1860,7 +2049,7 @@
       && Array.isArray(g.ticks) && g.ticks.every(t => t && isP(t.p) && typeof t.date === "string")
       && g.ps && typeof g.ps === "object" && Object.keys(g.ps).every(k => isP(+k))
       && (g.todo || []).every(isP)
-      && (g.tips || []).every(t => t && isP(t.p) && Number.isInteger(t.from) && t.from >= 0 && t.from < nC && Array.isArray(t.why))
+      && (g.tips || []).every(t => t && isP(t.p) && ((Number.isInteger(t.from) && t.from >= 0 && t.from < nC) || (typeof t.from === "string" && World.isWho(t.from) && t.from !== "you")) && Array.isArray(t.why))
       && g.day && g.day.weather && num(g.day.minute) && Array.isArray(g.day.sends) && g.day.sends.every(s => s && isP(s.p))
       && (g.loc == null || g.loc.boulder == null || (Number.isInteger(g.loc.boulder) && g.loc.boulder >= 0 && g.loc.boulder < D.boulders.length));
     if (!ok) throw new Error("This save file is damaged or incomplete.");

@@ -75,7 +75,10 @@
   // Can you see a line as something you could climb? Judged for you fresh, in
   // average conditions and without beta, so it doesn't change with the weather
   // or how tired you are. Only "Not yet" lines stay hidden. (Phase 2 discovery.)
-  function canSpot(player, p) {
+  // What you've proved counts too: anything at least a grade below your hardest
+  // send (best, a V-grade; -1 for none) is readable, whatever your level says.
+  function canSpot(player, p, best = -1) {
+    if (typeof best === "number" && best >= 1 && p.grade <= best - 1) return true;
     const fresh = { ...player, energy: 100, skin: 100 };
     return feel(sendChance(margin(fresh, p, null, { cond: 0 }))).key !== "nope";
   }

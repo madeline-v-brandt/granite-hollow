@@ -80,7 +80,7 @@
       return { boulders: bs.length, lines: ids.length, n: shown.length, open: ids.length - shown.length, lo: gs.length ? Math.min(...gs) : null, hi: gs.length ? Math.max(...gs) : null, sent: sentHere(ids) };
     }
     const canGo = to => (to.boulder != null ? boulder(to.boulder) >= 1 : area(to.sector) >= 1);
-    const canSpot = p => !!(Mech && Mech.canSpot(G().player, D.problems[p]));
+    const canSpot = p => !!(Mech && Mech.canSpot(G().player, D.problems[p], G().bestGrade ?? -1));
 
     // ---- what the map may show
     function mapView() {
@@ -140,9 +140,103 @@
       return hit == null ? null : D.boulders[D.problems[hit].b].sector;
     }
 
+    // ---- Stage 5: what people tell you, and who you know
+    // Someone tells you the way to an area: now you know where it is (Go there works).
+    function hearOf(s, from, date) {
+      if (all() || area(s) >= 1) return false;
+      knowArea(s, 1);
+      (k().told = k().told || {})[s] = { from, date };
+      return true;
+    }
+    const toldOf = s => (all() ? null : (k().told && k().told[s]) || null);
+    // You've met someone (a regular): how many times, and when.
+    function meet(w, date) {
+      if (all()) return { n: 1, first: date, last: date };
+      const m = (k().met = k().met || {}), r = m[w] || (m[w] = { n: 0, first: date, last: null });
+      if (r.last !== date) { r.n++; r.last = date; }
+      return r;
+    }
+    const met = w => (all() ? null : (k().met && k().met[w]) || null);
+    function pet(w, date) { const r = meet(w, date); r.pets = (r.pets || 0) + 1; r.petted = date; return r.pets; }
+
+    // Local Buzz: a few notable things from the crag's recent history, told the
+    // way word gets around. Precise about places you know; vague about the rest
+    // (never naming a boulder you haven't found, never unlocking Go there).
+    const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+    const stiff = g => (g >= 11 ? `a desperate-sounding V${g}` : g >= 8 ? `a hard V${g}` : g >= 6 ? `a stiff V${g}` : `a V${g}`);
+    function where(s, b) {
+      if (area(s) < 1) return (World && World.AREAS[s] && World.AREAS[s].hint) || "somewhere in the woods";
+      return b != null && boulder(b) >= 1 ? `on ${D.boulders[b].name} at ${s}` : `somewhere at ${s}`;
+    }
+    const goFor = (s, b) => (area(s) >= 1 ? { sector: s, boulder: b != null && boulder(b) >= 1 ? b : null } : null);
+    function buzzItem(n) { const it = buzzText(n); if (it && n.by) it.by = n.by; return it; }
+    function buzzText(n) {
+      const W = G().world, who = n.by ? World.whoName(D, n.by) : "";
+      const info = n.by ? World.whoInfo(D, n.by) : {};
+      if (n.kind === "fa" || n.kind === "snipe") {
+        if (n.by === "you" || n.p == null || !D.problems[n.p]) return null;
+        const pr = D.problems[n.p], s = D.boulders[pr.b].sector, e = W.est[n.p];
+        const g = e ? e.grade : pr.grade, seen = line(n.p) === "est" && boulder(pr.b) >= 1;
+        if (n.kind === "snipe") return { date: n.date, kind: n.kind, p: n.p, go: goFor(s, pr.b), text: `${cap(who)} climbed ${name(n.p)} (V${g}) on ${D.boulders[pr.b].name}, the line you'd spotted. Word is it's brilliant.` };
+        const known = area(s) >= 1, hint = (World.AREAS[s] || {}).hint || "out in the woods";
+        const named = info.regular || known ? who : "someone";
+        let text;
+        if (seen) text = `${cap(who)} put up ${name(n.p)} (V${g}) on ${D.boulders[pr.b].name} at ${s}${n.first ? ", the first problem there" : ""}.`;
+        else if (n.first) text = `Word is ${named} put up the first problem ${known ? "at " + s : hint}, ${stiff(g)}.`;
+        else text = `Word is ${named} put up ${stiff(g)} ${where(s, pr.b)}.`;
+        return { date: n.date, kind: n.kind, p: seen ? n.p : null, go: goFor(s, pr.b), text };
+      }
+      if (n.kind === "classic") {
+        if (n.p == null || !D.problems[n.p]) return null;
+        const pr = D.problems[n.p], s = D.boulders[pr.b].sector, seen = line(n.p) === "est" && boulder(pr.b) >= 1;
+        return { date: n.date, kind: n.kind, p: seen ? n.p : null, go: goFor(s, pr.b),
+          text: seen ? `${name(n.p)} (V${grade(n.p)}) ${where(s, pr.b)} is fast becoming a classic.` : `People keep talking about ${stiff(W.est[n.p] ? W.est[n.p].grade : pr.grade)} ${where(s, pr.b)}. It's becoming a classic.` };
+      }
+      // An area's name only appears once you know the area.
+      if (n.kind === "named") { const h = (World.AREAS[n.s] || {}).hint || "further out";
+        return { date: n.date, kind: n.kind, go: goFor(n.s, null), text: area(n.s) >= 1 ? `The boulders ${h} have a name now: people are calling them ${n.s}.` : `People have started climbing ${h}.` }; }
+      if (n.kind === "found") return { date: n.date, kind: n.kind, go: goFor(n.s, null), text: area(n.s) >= 1 ? `Climbers have started poking around ${n.s}.` : `Climbers have started poking around ${(World.AREAS[n.s] || {}).hint || "further out"}.` };
+      if (n.kind === "arrival") {
+        if (!(info.regular || info.type === "local_hero")) return null;
+        return { date: n.date, kind: n.kind, go: null, text: info.regular && info.blurb ? `${cap(who)}, who ${info.blurb}, has been turning up at the Hollow.` : `A strong local, ${who}, has been turning up at the Hollow.` };
+      }
+      return null;
+    }
+    // The most notable first: a line taken from you, the first problem in an area,
+    // a newly named area, the regulars, hard lines; routine news only when it's quiet.
+    function score(n, it) {
+      if (n.kind === "snipe") return 10;
+      if (n.first) return 8;
+      if (n.kind === "named" || n.kind === "found") return 7;
+      const reg = n.by && World.whoInfo(D, n.by).regular;
+      if (n.kind === "arrival") return reg ? 6 : 4;
+      if (n.kind === "fa") { const g = G().world.est[n.p] ? G().world.est[n.p].grade : 0; return (reg ? 5 : 0) + (g >= 8 ? 3 : g >= 6 ? 1 : 0) + (it.p != null ? 1 : 0); }
+      if (n.kind === "classic") return 2;
+      return 1;
+    }
+    function buzz(opts = {}) {
+      if (all() || !World) return [];
+      const g = G(), since = World.addDays(g.date, -(opts.days ?? 21)), cand = [];
+      for (const n of g.world.news) {
+        if (n.dev || n.date < since || n.date > g.date) continue;
+        const it = buzzItem(n);
+        if (it) cand.push([score(n, it), it]);
+      }
+      cand.sort((a, b) => b[0] - a[0] || (a[1].date < b[1].date ? 1 : a[1].date > b[1].date ? -1 : 0));
+      const out = [], perDate = {}, perWho = {};
+      for (const [, it] of cand) {
+        if (it.by && (perWho[it.by] || 0) >= 2) continue;          // a mix of people, not one person's week
+        if ((perDate[it.date] || 0) >= (opts.perDay ?? 2)) continue;
+        perDate[it.date] = (perDate[it.date] || 0) + 1; if (it.by) perWho[it.by] = (perWho[it.by] || 0) + 1;
+        out.push(it);
+        if (out.length >= (opts.max ?? 6)) break;
+      }
+      return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    }
+
     return { all, v2, est, area, boulder, line, visible, name, grade, boulderName, stats, knownBoulders, linesOn, guidebook,
       boulderStats, areaStats, canGo, canSpot, mapView, visitArea, visitBoulder, identify, tell, inspect, spottable,
-      inspected, lookAgain, identified, sameName,
+      inspected, lookAgain, identified, sameName, hearOf, toldOf, meet, met, pet, buzz,
       legend: p => (World && visible(p) ? World.legendOf(D, p) : null), faText: p => (World ? World.faText(D, est(p)) : "") };
   }
   const Know = { make };

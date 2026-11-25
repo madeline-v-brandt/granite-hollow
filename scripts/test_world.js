@@ -89,7 +89,7 @@ test("a new climber knows the kiosk's three areas and the notebook page, nothing
   assert.deepStrictEqual(Object.keys(g.know.areas).sort(), ["Hawkwatch", "The Schoolhouse", "The Tailgate"]);
   const gb = K.guidebook(), nb = World.notebook(D).map(n => n.p), known = new Set(nb.map(p => D.problems[p].b));
   assert(nb.every(p => gb.includes(p)), "CragLog lists the notebook's four problems");
-  assert(gb.every(p => nb.includes(p) || (known.has(D.problems[p].b) && g.world.est[p].date < START)), "plus anything the community put up on those two boulders in reopening week");
+  assert(gb.every(p => nb.includes(p) || (known.has(D.problems[p].b) && g.world.est[p].date <= START)), "plus anything the community put up on those two boulders before you arrive");
   assert(gb.length <= 8, "a few, not many");
   assert(D.problems.every((p, i) => gb.includes(i) || K.name(i) === null), "every other problem is nameless");
   assert(D.problems.every((p, i) => gb.includes(i) || K.grade(i) === null), "and gradeless");
@@ -334,6 +334,56 @@ test("a walk can stop part way, and what it costs so far is known", () => {
   const end = Travel.along(p, 1e6);
   assert(end.end && near(end.minutes, p.minutes, 1e-9));
   assert.strictEqual(W.plan([5, 5], [5, 5]).minutes, 0);
+});
+
+console.log("the community and the regulars (Stage 5)");
+test("your hardest send counts toward what you can read", () => {
+  const pl = { xp: xpFor(7.7), height: 165, ape: 2, energy: 100, skin: 100, skills: Object.fromEntries(Mech.PREF.map(t => [t, 0])) };
+  const v12 = D.problems.find(p => p.grade === 12), v13 = D.problems.find(p => p.grade === 13);
+  assert(!Mech.canSpot(pl, v12), "a V7 can't read a V12 on their own");
+  assert(Mech.canSpot(pl, v12, 13) && !Mech.canSpot(pl, v13, 13), "but having sent V13, V12s are readable (not other V13s)");
+  assert(!Mech.canSpot(pl, v12, -1) && !Mech.canSpot(pl, v12, 12));
+});
+test("the regulars arrive as you start climbing; Pickles and the Bishop never climb", () => {
+  const g = newSave("regs");
+  for (let n = 0; n < 40; n++) { g.date = World.addDays(g.date, 1); g.dayNo++; World.step(D, g, g.date); }
+  for (const w of World.CLIMBING_REGULARS) assert(g.world.npc[w], w + " has arrived by day 40");
+  assert(!g.world.npc["n:pickles"] && !g.world.npc["n:bishop"]);
+  assert(Object.values(g.world.est).every(e => e.by !== "n:pickles" && (e.by !== "n:bishop" || e.old)), "the dog and the Bishop are never in the ledger (except the notebook)");
+  assert(Object.values(g.world.est).some(e => World.CLIMBING_REGULARS.includes(e.by)), "the regulars put up problems");
+  assert.deepStrictEqual(World.check(D, g), []); assert.strictEqual(World.validate(D, g), null);
+});
+test("the community leaves the far areas alone at first", () => {
+  const g = newSave("far");
+  while (g.date < "2025-11-20") { g.date = World.addDays(g.date, 1); g.dayNo++; World.step(D, g, g.date); }
+  const far = new Set(D.sectors.filter(s => s.walk_min >= 21).map(s => s.name));
+  assert(!Object.values(g.world.est).some(e => e.by !== "you" && far.has(D.boulders[D.problems[Object.keys(g.world.est).find(k => g.world.est[k] === e)].b].sector)), "no NPC first ascents out at Grout Piles or Back Forty before late November");
+  assert(Object.keys(g.world.areas).length >= 3, "but the near areas are known, with the day they were found");
+});
+test("being told the way makes an area known (Go there works); meeting someone counts once a day", () => {
+  const g = newSave("told"), K = Know.make(D, () => g);
+  assert(!K.canGo({ sector: "Bracken Gully" }));
+  assert(K.hearOf("Bracken Gully", "n:hollis", g.date) && K.canGo({ sector: "Bracken Gully" }) && K.area("Bracken Gully") === 1);
+  assert.strictEqual(K.toldOf("Bracken Gully").from, "n:hollis");
+  assert(!K.hearOf("Bracken Gully", "n:hollis", g.date), "only once");
+  K.meet("n:rowan", g.date); K.meet("n:rowan", g.date); assert.strictEqual(K.met("n:rowan").n, 1);
+  g.date = World.addDays(g.date, 1); K.meet("n:rowan", g.date); assert.strictEqual(K.met("n:rowan").n, 2);
+  assert.strictEqual(K.pet("n:pickles", g.date), 1);
+  assert.strictEqual(World.validate(D, g), null);
+  g.know.met["n:rowan"].n = "lots"; assert(World.validate(D, g), "a bad met record is caught");
+});
+test("Local Buzz is precise about what you know and vague about the rest", () => {
+  const g = newSave("buzz"), K = Know.make(D, () => g);
+  while (g.date < "2025-12-15") { g.date = World.addDays(g.date, 1); g.dayNo++; World.step(D, g, g.date); }
+  const items = K.buzz({ days: 60, max: 50, perDay: 9 });
+  assert(items.length >= 5, "there's news: " + items.length);
+  const unknownBoulders = D.boulders.filter((b, i) => !g.know.boulders[i]).map(b => b.name);
+  const hiddenNames = D.problems.map((p, i) => i).filter(i => K.line(i) === "hidden").map(i => D.problems[i].name).filter(n => n.length > 6);
+  for (const it of items) {
+    for (const nm of unknownBoulders) assert(!it.text.includes(nm), `"${it.text}" names a boulder you haven't found (${nm})`);
+    for (const nm of hiddenNames) assert(!it.text.includes(nm) || items.some(x => x.p != null && K.name(x.p) && K.name(x.p).includes(nm)), `"${it.text}" names a line you don't know (${nm})`);
+    if (it.go) assert(K.canGo(it.go), "Go there only for places you know");
+  }
 });
 
 if (process.argv.includes("--curve")) {

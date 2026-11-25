@@ -29,16 +29,22 @@
   // Saves don't store these, so changing them changes future days, never history.
   const PARAMS = {
     calendarWeight: 0.25,                 // development clock: your climbing days + this × calendar days
-    target: { max: 0.9, tau: 60 },        // established ≈ problems × max × (1 − e^(−clock/tau))
+    target: { max: 0.9, tau: 65 },        // established ≈ problems × max × (1 − e^(−clock/tau)). Tuned (Stage 5,
+                                          // scripts/tune_crag.js) so a keen player sees ~70% climbed by the end of 2025
     closeRate: 0.3,                       // share of the gap to the target closed per day…
     fasPerNpc: 0.25,                      // …but at most this many FAs per active climber per day
     maxFasPerDay: 15,
+    trickle: 0.15,                        // past the target, the community still climbs about one new line a week while any are left
     gate: { perGrade: 6, soft: 4 },       // harder grades open later: × sigmoid((clock − 6 × grade) / 4)
     reserve: { frac: 0.1, weight: 0.05 }, // a slow reserve, so first ascents stay possible for a long time
     nextBand: { lo: 0.5, hi: 4, weight: 0.3 },   // the grades just above yours develop more slowly
     prodigy: { chance: 0.03, minLevel: 10, minGrade: 8 },   // a strong local's early hard FA
     community: { base: 4, perEstablished: 0.08, perPlayerFa: 2, maxArrivalsPerDay: 3 },
-    explore: { perNpc: 0.12, maxPerDay: 2, walkScale: 8 },
+    explore: { perNpc: 0.015, maxPerDay: 1, walkScale: 8,   // the community knows every boulder by about February–April 2026
+      reach: { start: 9, perDay: 0.09 },  // the community only goes as far as start + perDay × days since reopening (minutes from the lot):
+                                          // the 16-minute areas from late November, Back Forty (24) from mid-February  // the community only goes as far as start + perDay × days since reopening (minutes from the lot)
+      spreadDays: 10 },                   // boulders you find become common knowledge this many days later
+    regularBoost: 1.4,                    // the regulars put up more than their share
     dryDays: 0.75,                        // the share of days the community can climb (your own day uses its weather)
     repeats: { climbChance: 0.35, perClimber: 2, rateChance: 0.6 },
     classic: { reps: 15, stars: 3.0 },
@@ -47,13 +53,37 @@
   };
 
   // ---- lore -----------------------------------------------------------------
-  // Climbers who aren't from the data's 600: "n:<key>".
+  // Climbers who aren't from the data's 600: "n:<key>". All fictional.
+  // The regulars (Stage 5) are the cast you get to know: they turn up again,
+  // remember you, and have home areas where you're most likely to meet them.
+  //   arrive   the climbing day (yours) from which they're around
+  //   home     where they're usually found (they wander now and then)
+  //   dog      Pickles: never climbs, never in the ledger
+  //   old      an old-era name: never climbs now (the Bishop is around, though)
+  //   blurb    who they are, as a verb phrase ("…, who is the park ranger, …")
+  // Two of them have stories still to come: Pickles, who may one day decide
+  // you're his person, and Rowan, someone you might fall for.
   const NAMED = {
-    gus: { name: "Ranger Gus", h: 180, level: 3.2, likes: "slab|technical|mantle", type: "local_hero", active: true },
+    gus: { name: "Ranger Gus", h: 180, level: 3.2, likes: "slab|technical|mantle", type: "local_hero", active: true, regular: true, home: ["The Tailgate"], arrive: 0,
+      blurb: "is the park ranger" },
     dot: { name: "Dot", h: 157, old: true },
-    bishop: { name: "the Bishop", h: 196, old: true },
+    bishop: { name: "the Bishop", h: 196, old: true, regular: true, home: ["The Schoolhouse", "Millrace Caves", "The Tailgate", "Hawkwatch"], arrive: 4,
+      blurb: "climbed here in the seventies, or says he did" },
     anon: { name: "an unknown climber", old: true },
+    pickles: { name: "Pickles", dog: true, regular: true, home: ["The Tailgate"], arrive: 0, blurb: "is the parking-lot dog" },
+    rowan: { name: "Rowan Ellery", h: 172, level: 5.8, likes: "slab|technical|highball", type: "regular", regular: true, home: ["Hawkwatch", "The Schoolhouse"], arrive: 3,
+      blurb: "sketches the boulders between burns" },
+    hollis: { name: "Hollis Pruitt", h: 178, level: 5.2, likes: "technical|crimpy|traverse", type: "regular", regular: true, home: ["The Schoolhouse", "The Tailgate"], arrive: 2,
+      blurb: "has documented everything, twice" },
+    otis: { name: "Otis Fairweather", h: 183, level: 4.4, likes: "slab|mantle|juggy", type: "regular", regular: true, home: ["Hemlock Hollow", "Millrace Caves"], arrive: 6,
+      blurb: "thinks every day is perfect sending weather" },
+    bea: { name: "Bea Marchetti", h: 158, level: 9.6, likes: "dyno|powerful|overhang", type: "local_hero", regular: true, home: ["Bracken Gully", "Millrace Caves"], arrive: 10,
+      blurb: "is seventeen and jumps for everything" },
+    dez: { name: "Dez Kowalczyk", h: 175, level: 13.4, likes: "powerful|overhang|compression|roof", type: "local_hero", regular: true, home: ["Millrace Caves", "The Grout Piles"], arrive: 18,
+      blurb: "is the strongest climber in the valley, and the quietest" },
   };
+  // The regulars who climb (and so arrive in the community and the ledger), apart from Gus, who arrives first anyway.
+  const CLIMBING_REGULARS = Object.keys(NAMED).filter(k => NAMED[k].regular && !NAMED[k].dog && !NAMED[k].old && k !== "gus").map(k => "n:" + k);
   // The four problems on the surviving page of the kiosk notebook: old-era
   // climbs, documented on reopening day. Two on The Billboard, two on Gus's Rock.
   const NOTEBOOK = [
@@ -133,7 +163,8 @@
     if (w === "you") return { name: "you", h: null, level: null, likes: "", type: "you" };
     if (w[0] === "c") { const c = D.climbers[+w.slice(1)]; return c ? { name: c[0], h: c[1], type: c[2], level: c[3], likes: c[4] || "" } : { name: "a climber", h: null, level: 0, likes: "", type: "tourist" }; }
     const n = NAMED[w.slice(2)];
-    return n ? { name: n.name, h: n.h, type: n.type || "old", level: n.level ?? 0, likes: n.likes || "", old: !!n.old } : { name: "a climber", h: null, level: 0, likes: "", type: "tourist" };
+    return n ? { name: n.name, h: n.h, type: n.type || (n.dog ? "dog" : "old"), level: n.level ?? 0, likes: n.likes || "", old: !!n.old || !!n.dog, regular: !!n.regular, home: n.home || [], blurb: n.blurb || "" }
+      : { name: "a climber", h: null, level: 0, likes: "", type: "tourist" };
   }
   const whoName = (D, w) => whoInfo(D, w).name;
 
@@ -208,7 +239,7 @@
     const tags = dataOf(D).tags[p], grade = D.problems[p].grade;
     const ok = active.filter(w => { const i = whoInfo(D, w); return !i.old && i.level >= grade + minLevelOver; });
     if (!ok.length) return null;
-    const k = pickWeighted(r, ok, w => { const i = whoInfo(D, w); const shared = tags.filter(t => i.likes.includes(t)).length; return (TYPE_WEIGHT[i.type] || 1) * (1 + 0.4 * shared); });
+    const k = pickWeighted(r, ok, w => { const i = whoInfo(D, w); const shared = tags.filter(t => i.likes.includes(t)).length; return (TYPE_WEIGHT[i.type] || 1) * (1 + 0.4 * shared) * (i.regular ? PARAMS.regularBoost : 1); });
     return k < 0 ? null : ok[k];
   }
   function establish(D, W, p, who, date, extra) {
@@ -230,27 +261,40 @@
     // Arrivals: the community grows with the crag and with word of your FAs.
     const C = P.community;
     const want = Math.min(sd.order.length, Math.floor(C.base + C.perEstablished * estN + C.perPlayerFa * Math.sqrt(playerFas)));
-    for (let n = Object.keys(W.npc).length, added = 0; n < want && added < C.maxArrivalsPerDay; n++, added++) {
+    const fromOrder = Object.keys(W.npc).filter(w => !CLIMBING_REGULARS.includes(w)).length;
+    for (let n = fromOrder, added = 0; n < want && added < C.maxArrivalsPerDay; n++, added++) {
       const w = sd.order[n]; W.npc[w] = { arrived: d, fas: 0 };
       if (whoInfo(D, w).type === "local_hero") { const it = { date: d, kind: "arrival", by: w }; news(W, it); events.push(it); }
+    }
+    // The regulars turn up as you start climbing here.
+    for (const w of CLIMBING_REGULARS) if (!W.npc[w] && dayNo >= NAMED[w.slice(2)].arrive) {
+      W.npc[w] = { arrived: d, fas: 0 };
+      const it = { date: d, kind: "arrival", by: w }; news(W, it); events.push(it);
     }
     const active = Object.keys(W.npc);
 
     // Exploring: the community finds boulders, nearest first; yours become theirs (word spreads).
-    const found = new Set(W.found);
-    if (G.know) for (const b of Object.keys(G.know.boulders)) if (!found.has(+b)) { found.add(+b); W.found.push(+b); }
+    // Word of the boulders you've found spreads after a while (straight away for
+    // ones you were told about, since someone already knew).
+    const E = P.explore, found = new Set(W.found), spreadBy = addDays(d, -E.spreadDays);
+    const looked = (G.know && G.know.looked) || {};
+    if (G.know) for (const b of Object.keys(G.know.boulders)) if (!found.has(+b) && (!looked[b] || looked[b] <= spreadBy)) { found.add(+b); W.found.push(+b); }
     const sectorsFound = new Set([...found].map(b => D.boulders[b].sector));
-    const E = P.explore, expect = active.length * E.perNpc;
+    W.areas = W.areas || {};
+    for (const s of sectorsFound) if (!W.areas[s]) W.areas[s] = [d, dayNo];
+    // The community ventures further out as the season goes on.
+    const reach = E.reach.start + E.reach.perDay * Math.max(0, daysBetween(REOPENED, d));
+    const expect = active.length * E.perNpc;
     let nExplore = Math.min(E.maxPerDay, Math.floor(expect) + (r() < expect % 1 ? 1 : 0));
     while (nExplore-- > 0) {
-      const unfound = D.boulders.map((b, i) => i).filter(i => !found.has(i));
+      const unfound = D.boulders.map((b, i) => i).filter(i => !found.has(i) && dd.walkOf[i] <= reach);
       if (!unfound.length) break;
       const k = pickWeighted(r, unfound, i => Math.exp(-dd.walkOf[i] / E.walkScale) * (sectorsFound.has(D.boulders[i].sector) ? 3 : 1));
       if (k < 0) break;
       const b = unfound[k]; found.add(b); W.found.push(b);
       const s = D.boulders[b].sector;
       if (!sectorsFound.has(s)) {
-        sectorsFound.add(s);
+        sectorsFound.add(s); W.areas[s] = [d, dayNo];
         const it = { date: d, kind: (AREAS[s] || {}).origin === "community" ? "named" : "found", s, b };
         news(W, it); events.push(it);
       }
@@ -268,10 +312,11 @@
         if (pr.grade > A + NB.lo && pr.grade <= A + NB.hi) w *= NB.weight;
         return w;
       };
-      const open = [];
+      const open = [], climbedIn = new Set(Object.keys(W.est).map(k => D.boulders[D.problems[k].b].sector));
       for (const b of found) for (const p of D.boulders[b].problems) if (!W.est[p] && !protectedLine(G, p, ctx)) open.push(p);
       const target = D.problems.length * P.target.max * (1 - Math.exp(-clock / P.target.tau));
       let nFa = Math.min(P.maxFasPerDay, active.length * P.fasPerNpc, Math.max(0, target - estN) * P.closeRate);
+      if (open.length) nFa = Math.max(nFa, P.trickle);
       nFa = Math.floor(nFa) + (r() < nFa % 1 ? 1 : 0);
       for (let tries = 0; nFa > 0 && open.length && tries < nFa * 4; tries++) {
         const k = pickWeighted(r, open, p => lineWeight(p));
@@ -280,7 +325,8 @@
         if (!who) continue;
         open.splice(k, 1); nFa--;
         establish(D, W, p, who, d);
-        if (D.problems[p].grade >= 6 || who.startsWith("n:")) { const it = { date: d, kind: "fa", p, by: who }; news(W, it); events.push(it); }
+        const s = D.boulders[D.problems[p].b].sector, first = !climbedIn.has(s); climbedIn.add(s);
+        if (D.problems[p].grade >= 6 || who.startsWith("n:") || first) { const it = { date: d, kind: "fa", p, by: who, ...(first ? { first: true } : {}) }; news(W, it); events.push(it); }
       }
       // Now and then a strong local puts up something hard, early.
       const PR = P.prodigy;
@@ -446,11 +492,14 @@
     if (!Array.isArray(W.news) || W.news.length > 400) return "bad news";
     if (!W.snipe || !(W.snipe.last == null || num(W.snipe.last))) return "bad snipe";
     if (!W.hold || typeof W.hold !== "object") return "bad hold";
+    if (W.areas != null && (typeof W.areas !== "object" || !Object.values(W.areas).every(a => Array.isArray(a) && isDay(a[0]) && num(a[1])))) return "bad areas found";
     const lv = v => v === 1 || v === 2;
     if (!k.areas || !Object.entries(k.areas).every(([s, v]) => typeof s === "string" && lv(v))) return "bad areas";
     if (!k.boulders || !Object.entries(k.boulders).every(([b, v]) => /^\d+$/.test(b) && +b < nB && lv(v))) return "bad boulders";
     if (!k.lines || !Object.entries(k.lines).every(([p, l]) => isP(p) && l && isDay(l.date) && ["spot", "told", "tried", "migrated", "kiosk", "dev"].includes(l.how) && (l.from == null || isWho(l.from)))) return "bad lines";
     if (!isDay(k.newsSeen)) return "bad newsSeen";
+    if (k.told != null && (typeof k.told !== "object" || !Object.values(k.told).every(t => t && isDay(t.date) && isWho(t.from)))) return "bad told";
+    if (k.met != null && (typeof k.met !== "object" || !Object.entries(k.met).every(([w, m]) => isWho(w) && m && num(m.n) && isDay(m.first) && (m.last == null || isDay(m.last)) && (m.pets == null || num(m.pets))))) return "bad met";
     if (k.looked != null && (typeof k.looked !== "object" || !Object.entries(k.looked).every(([b, d]) => /^\d+$/.test(b) && +b < nB && isDay(d)))) return "bad looked";
     return null;
   }
@@ -497,7 +546,7 @@
     return true;
   }
 
-  const World = { REOPENED, BEFORE, PARAMS, NAMED, NOTEBOOK, LEGENDS, AREAS, KIOSK_AREAS,
+  const World = { REOPENED, BEFORE, PARAMS, NAMED, CLIMBING_REGULARS, NOTEBOOK, LEGENDS, AREAS, KIOSK_AREAS,
     create, initialKnow, step, recordSend, migrate, validate, check, cleanName, isMine, nameFa, faCount, isWho, whoInfo, whoName,
     faText, legendOf, devRevealAll, devEstablish, seedFrom, newSeed, stream, addDays, daysBetween, notebook: D => dataOf(D).notebook };
   if (typeof module !== "undefined") module.exports = World; else root.World = World;

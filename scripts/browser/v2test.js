@@ -40,6 +40,9 @@ function leaks(g, all) {
   const K = Know.make(D, () => g), hits = [];
   // Take out the names you can see first, so a sit start ("Kiosk Sit") doesn't look like its hidden parent ("Kiosk").
   const shown = D.problems.map((p, i) => K.visible(i) ? K.name(i) : null).filter(Boolean).sort((a, b) => b.length - a.length);
+  // …and the places you know, so a hidden "Millrace" isn't found inside "Millrace Caves".
+  shown.push(...D.sectors.filter(x => K.area(x.name) >= 1).map(x => x.name), ...D.boulders.filter((x, i) => K.boulder(i) >= 1).map(x => x.name));
+  shown.sort((a, b) => b.length - a.length);
   for (const n of shown) all = all.split(n).join(" ");
   const word = n => new RegExp("(^|[^\\p{L}])" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "($|[^\\p{L}])", "u");
   D.problems.forEach((p, i) => { if (K.line(i) === "hidden" && p.name.length > 3 && !Object.values(World.NAMED).some(n => n.name === p.name) && word(p.name).test(all)) hits.push("problem: " + p.name); });

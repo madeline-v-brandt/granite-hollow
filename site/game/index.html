@@ -657,6 +657,17 @@ svg#map:active { cursor: grabbing; }
 .npc .nm small { font-family: var(--body); font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
 .npc q { display: block; margin: 4px 0 8px; color: var(--ink-2); quotes: "\201C" "\201D"; }
 .npc .acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.npc.regular { border-left: 4px solid var(--gold); }
+.npc .npc-say { margin: 4px 0 8px; color: var(--ink-2); }
+.npc.regular .npc-say:first-of-type { font-style: italic; }
+/* CragLog: Local Buzz */
+.buzz { border: 1px solid var(--rule-ink); border-radius: 10px; background: var(--raised); padding: 8px 12px 6px; margin: 0 0 12px; }
+.buzz h3 { margin: 0 0 4px; font-size: 15px; }
+.buzz ul { list-style: none; margin: 0; padding: 0; }
+.buzz li { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px dashed var(--rule-ink); font-size: 14px; }
+.buzz li:first-child { border-top: 0; }
+.buzz-d { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.buzz .linklike { font-size: 13px; white-space: nowrap; }
 
 /* climber + logbook */
 .kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 4px; }
@@ -962,12 +973,12 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=19"></script>
-<script src="art.js?v=19"></script>
-<script src="world.js?v=19"></script>
-<script src="knowledge.js?v=19"></script>
-<script src="illustrate.js?v=19"></script>
-<script src="paint.js?v=19"></script>
-<script src="paper.js?v=19"></script>
-<script src="travel.js?v=19"></script>
-<script src="game.js?v=19"></script>
+<script src="mechanics.js?v=20"></script>
+<script src="art.js?v=20"></script>
+<script src="world.js?v=20"></script>
+<script src="knowledge.js?v=20"></script>
+<script src="illustrate.js?v=20"></script>
+<script src="paint.js?v=20"></script>
+<script src="paper.js?v=20"></script>
+<script src="travel.js?v=20"></script>
+<script src="game.js?v=20"></script>
