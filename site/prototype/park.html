@@ -271,15 +271,25 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .seep { fill: color-mix(in oklab, var(--floor), #3e4a3a 45%); opacity: .7; } .sundew { fill: #c43c3c; opacity: calc(.9 * (1 - var(--snow))); }
 .road { fill: none; stroke: #8d8a84; stroke-width: 9; } .road-edge { fill: none; stroke: color-mix(in oklab, var(--floor), #4a4236 30%); stroke-width: 11.5; opacity: .6; }
 .road-line { fill: none; stroke: #e8c64a; stroke-width: .35; stroke-dasharray: 3 3; }
-.lot { fill: #9a978f; stroke: color-mix(in oklab, var(--floor), #4a4236 35%); stroke-width: 1.2px; vector-effect: non-scaling-stroke; } .stall { fill: none; stroke: #f2efe6; stroke-width: .25; opacity: .8; }
-.map[data-season="winter"] :is(.road, .lot) { fill: #c9ccd0; stroke: #c9ccd0; }
+.lot { fill: #9a978f; stroke: none; } .lot-edge { fill: none; stroke: color-mix(in oklab, var(--floor), #4a4236 35%); stroke-width: 1.2px; vector-effect: non-scaling-stroke; } .stall { fill: none; stroke: #f2efe6; stroke-width: .25; opacity: .8; }
+.map[data-season="winter"] .road { stroke: #c9ccd0; } .map[data-season="winter"] .lot { fill: #c9ccd0; }
 .car-shadow { fill: #1e222c; opacity: .25; } .car-body { stroke: #2a2420; stroke-width: .6px; vector-effect: non-scaling-stroke; } .car-roof { stroke: #2a2420; stroke-width: .5px; vector-effect: non-scaling-stroke; }
 .car.c0 :is(.car-body, .car-roof) { fill: #b8483a; } .car.c1 :is(.car-body, .car-roof) { fill: #3f6f94; } .car.c2 :is(.car-body, .car-roof) { fill: #e3d9bd; } .car.c3 :is(.car-body, .car-roof) { fill: #4e7a4e; }
 .car-roof { filter: brightness(1.12); } .car-glass { fill: #3a4450; opacity: .8; } .car-light { fill: #c43c2c; } .car-snow { fill: var(--snow-white); opacity: var(--snow); }
 /* water */
 .lake .shore { fill: color-mix(in oklab, var(--floor), #5a5040 22%); opacity: .6; }
 .lake .water { fill: color-mix(in oklab, var(--water), var(--floor) 18%); }
-.lake .water-deep { fill: color-mix(in oklab, var(--water), #1d4a66 30%); opacity: .55; }
+.lake .water-deep { fill: color-mix(in oklab, var(--water), #1d4a66 30%); opacity: .38; }
+.lake .water-deeper { fill: color-mix(in oklab, var(--water), #163c55 45%); fill-opacity: .28; }
+.lake .shallows { fill: color-mix(in oklab, var(--water), color-mix(in oklab, var(--floor), #f4f1df 40%) 45%); fill-opacity: .35; }
+.lake.pit .shallows { fill-opacity: .25; }
+/* The water's reflections: the shore's trees in the season's colours, the sky. */
+.refl { fill: color-mix(in oklab, var(--crown), #1d3a4a 18%); fill-opacity: calc(.62 * (1 - var(--ice, 0))); }
+.refl.decid { fill-opacity: calc(.62 * (.12 + .88 * var(--leaf)) * (1 - var(--ice, 0))); }
+.refl-break { fill: none; stroke: color-mix(in oklab, var(--water), #ffffff 30%); stroke-width: .45; stroke-linecap: round; stroke-opacity: calc(.75 * (1 - var(--ice, 0))); }
+.sheen { fill: color-mix(in oklab, var(--sky, #d9e7f1), #ffffff 45%); fill-opacity: calc(.32 * (1 - var(--ice, 0))); }
+.wet-edge { fill: none; stroke: #f6fbfd; stroke-width: .8px; vector-effect: non-scaling-stroke; stroke-opacity: calc(.55 * (1 - var(--ice, 0))); }
+.reeds { fill: none; stroke: color-mix(in oklab, var(--meadow), #4d5a2a 45%); stroke-width: .18; stroke-linecap: round; opacity: calc(1 - var(--ice, 0) * .5); }
 .lake.pit .water { fill: color-mix(in oklab, var(--water), #1f5a52 40%); } .lake.pit .water-deep { fill: #16403e; opacity: .5; }
 .ripple { fill: none; stroke: #f4fbff; stroke-width: .9px; vector-effect: non-scaling-stroke; opacity: calc(.45 * (1 - var(--ice, 0))); stroke-linecap: round; }
 .lily { fill: #5e9a46; opacity: calc(var(--lily, 0) * .9); } .lily-flower { fill: #fff3f6; opacity: var(--lily, 0); }
@@ -298,7 +308,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .dry-stone { fill: #c4bfb4; stroke: #6a665e; stroke-width: .4px; vector-effect: non-scaling-stroke; opacity: .85; }
 .race { fill: none; stroke: color-mix(in oklab, var(--water), #2a4a5a 15%); stroke-width: 1.5; stroke-linecap: round; }
 .bridge-deck { fill: #a8743f; stroke: #3d2a16; stroke-width: .5px; vector-effect: non-scaling-stroke; } .bridge-planks { fill: none; stroke: #5a3e22; stroke-width: .06; } .bridge-shadow { fill: #1e222c; opacity: .25; }
-.island { fill: color-mix(in oklab, var(--grass-c), var(--floor) 30%); stroke: #c9c4b8; stroke-width: .5; }
 .clear.mossy { fill: color-mix(in oklab, var(--floor), #557a3c 30%); opacity: .75; }
 .field-tuft { fill: color-mix(in oklab, var(--grass-c), var(--meadow) 30%); opacity: .35; }
 .heap { fill: #b4b0a6; stroke: #6a665e; stroke-width: .5px; vector-effect: non-scaling-stroke; } .heap-shadow { fill: #1e222c; opacity: .2; }

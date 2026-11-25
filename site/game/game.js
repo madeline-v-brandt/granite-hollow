@@ -3,6 +3,9 @@
 (function () {
   "use strict";
   const SAVE_KEY = "granite-hollow-save-v1";
+  // The page's version (game.js?v=N), passed on to the data files it fetches, so a
+  // new version never runs on a copy of the crag the browser kept from the last one.
+  const ASSET_V = (() => { try { const v = new URL(document.currentScript.src).searchParams.get("v"); return v ? "?v=" + encodeURIComponent(v) : ""; } catch (e) { return ""; } })();
   // Development mode (?dev, remembered for the tab; ?dev=0 leaves it): its own save
   // slot, the Phase 2 rules for new climbers, the dev tools, and never the leaderboard.
   const DEV = (() => { try { const q = new URLSearchParams(location.search); if (q.has("dev")) sessionStorage.setItem("gh-dev", q.get("dev") === "0" ? "0" : "1"); return sessionStorage.getItem("gh-dev") === "1"; } catch (e) { return false; } })();
@@ -17,7 +20,7 @@
   const justMigrated = new WeakSet();      // saves converted this session: they get a welcome back
   const START_DATE = "2025-09-06";
   const START_AREA = "The Tailgate";      // every climbing day starts in the lot, which is part of The Tailgate
-  const PARK_SPOT = [-24, -4.6];          // where you get out of the car: behind it, in the lot's north row (art.js parks it there)
+  const PARK_SPOT = [-20, -4.6];          // where you get out of the car: behind it, in the lot's north row (art.js parks it there)
   const WORLD_MIN_ZOOM = 3.2;              // the world view never zooms out past an area; the paper map shows the park
   const fmt = d3.format(",");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -814,7 +817,7 @@
     // (Wk); walking yourself (keys, a tap) is a little quicker and takes shortcuts (Wm).
     const trailPts = S.trails.map(t => t.pts), wet = p => S.inWater(p, 0);
     const Wk = Travel.make({ trails: trailPts, blocked: wet }), Wm = Travel.make({ trails: trailPts, blocked: wet, rate: Travel.MANUAL });
-    const SPEED = { trail: 17, off: 12 };                // metres a second on screen (about the clock's 50 : 35)
+    const SPEED = { trail: 20, off: 14 };                // metres a second on screen (about the clock's 50 : 35)
     const [bx0, bx1, by0, by1] = S.bounds, edge = 60;
     const inPark = p => p[0] > bx0 + edge && p[0] < bx1 - edge && p[1] > by0 + edge * .6 && p[1] < by1 - edge;
     const boulderAt = p => S.boulders.find(bo => Math.hypot(p[0] - bo.b.x, p[1] - bo.b.y) < bo.form.R * .9 + .5);
@@ -827,9 +830,26 @@
     function approach(id) {
       const bo = S.boulders[id], R = bo.form.R;
       for (const [ax, ay] of [[-.55, -1.45], [.55, -1.45], [-1.5, -.4], [1.5, -.4], [0, 1.6]]) { const p = [bo.b.x + ax * R, bo.b.y + ay * R]; if (!solid(p)) return p; }
-      return [bo.b.x - R * .55, bo.b.y - R * 1.45];
+      return freeSpot([bo.b.x - R * .55, bo.b.y - R * 1.45]);
     }
-    const pointOf = to => (to.boulder != null ? approach(to.boulder) : to.sector ? [D.sectorBy.get(to.sector).x, D.sectorBy.get(to.sector).y] : LOT);
+    // The nearest open spot to p: not in a boulder (with a little room round it), water or a car.
+    // Areas' centres can fall inside a boulder (The Schoolhouse's is in The Blackboard).
+    const roomy = q => !solid(q) && !S.boulders.some(bo => Math.hypot(q[0] - bo.b.x, q[1] - bo.b.y) < bo.form.R * 1.1 + 1.2);
+    function freeSpot(p) {
+      if (roomy(p)) return p;
+      for (let r = 1.5; r <= 45; r += 1.5) for (let k = 0; k < 16; k++) {
+        const a = -Math.PI / 2 + k * Math.PI / 8, q = [p[0] + Math.cos(a) * r, p[1] + Math.sin(a) * r];   // south (in front) first
+        if (roomy(q)) return q;
+      }
+      return p;
+    }
+    const sectorSpot = new Map();
+    const pointOf = to => {
+      if (to.boulder != null) return approach(to.boulder);
+      if (!to.sector) return LOT;
+      if (!sectorSpot.has(to.sector)) { const s = D.sectorBy.get(to.sector); sectorSpot.set(to.sector, freeSpot([s.x, s.y])); }
+      return sectorSpot.get(to.sector);
+    };
     const zoneR = s => (s.name === "Hawkwatch" ? S.baldR : s.radius);
     // Where a point is, in the game's terms: at a boulder (close enough to climb), in
     // an area, or between them. A little stickiness keeps the edges from flickering.
@@ -849,6 +869,7 @@
     }
     const sameLoc = (a, b) => a.sector === b.sector && a.boulder === b.boulder;
     if (!validPos(G.pos)) G.pos = pointOf(G.loc);
+    if (solid(G.pos)) { G.pos = freeSpot(G.pos); save(); }          // a save left inside a boulder (an area's centre, before this was fixed)
 
     // ---- walking costs daylight, a little at a time
     function spend(minutes) {
@@ -865,7 +886,9 @@
     const plan = (to, manual = false) => {
       if (!validPos(G.pos)) G.pos = pointOf(G.loc);
       const dest = Array.isArray(to) ? to : pointOf(to);
-      return manual ? Wm.plan(G.pos, dest) : Wk.plan(G.pos, dest, { trails: true });
+      // Both keep to the trails for anything far (past Travel.DIRECT_OK); a tap
+      // nearby walks straight there. Only the keys cut through the woods.
+      return manual ? Wm.plan(G.pos, dest, { trails: true }) : Wk.plan(G.pos, dest, { trails: true });
     };
     const minutesCache = new Map();
     // Minutes to walk from where you are to a place ({ sector, boulder }): 0 if you're there, at least 1 otherwise.
@@ -915,7 +938,8 @@
       const from = G.pos;
       let to = [from[0] + mx, from[1] + my];
       // Something in the way: veer around it (a boulder's curve, a shoreline), the smallest turn first.
-      if (solid(to)) {
+      // (If you're somehow inside something already, any step gets you out.)
+      if (solid(to) && !solid(from)) {
         to = from;
         for (const deg of [25, -25, 50, -50, 75, -75]) {
           const a = deg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a), q = [from[0] + mx * c - my * sn, from[1] + mx * sn + my * c];
@@ -970,7 +994,7 @@
       if (G.day.over || UI.busy && !walk) return;
       if (S.inWater(p, 0)) { toast("That's water", "Pick somewhere on dry ground.", "info"); return; }
       if (!inPark(p)) return;
-      goTo(p, { tap: true });
+      goTo(solid(p) ? freeSpot(p) : p, { tap: true });
     }
     function stepWalk(now, dt) {
       const w = walk, ph = w.phases[w.i];
@@ -1015,13 +1039,14 @@
 
     // The keyboard. WASD and the arrows walk (not while typing, or with a dialog or the trail map open); E inspects.
     const KEY = { w: "up", arrowup: "up", s: "down", arrowdown: "down", a: "left", arrowleft: "left", d: "right", arrowright: "right" };
-    const typing = t => t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    // Only a text field keeps the keys: anywhere else (a button or a menu in the side
+    // panel just clicked), WASD and the arrows walk.
+    const typing = t => t && (t.isContentEditable || t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && /^(text|search|email|number|password|url|tel)$/i.test(t.type || "text")));
     const blockedKeys = () => $("#game").hidden || modalOpen() || (paper && paper.isOpen()) || G.day.over;
     document.addEventListener("keydown", e => {
       if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return;
       const k = e.key.toLowerCase(), dir = KEY[k];
       if (dir) {
-        if (k.startsWith("arrow") && e.target && e.target.closest && e.target.closest(".side")) return;   // arrows still scroll the side panel
         if (blockedKeys()) return;
         e.preventDefault();
         if (walk) stop();
@@ -2379,7 +2404,7 @@
     bg.hidden = !on;
     if (!on || bg.dataset.loaded) return;
     bg.dataset.loaded = "1";
-    fetch("paper-map.svg?v=2").then(r => r.ok ? r.text() : "").then(t => {
+    fetch("paper-map.svg" + ASSET_V).then(r => r.ok ? r.text() : "").then(t => {
       if (!t) return;
       bg.innerHTML = t;
       const svg = bg.querySelector("svg"); if (!svg) return;
@@ -2588,7 +2613,7 @@
     if (!window.World) await loadScript("world.js");
     if (!window.Know) await loadScript("knowledge.js");
     if (!window.Travel) await loadScript("travel.js");
-    D = await fetch("game-data.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch("game-data.json" + ASSET_V).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
     prepData();
     K = Know.make(D, () => G);
     connectDownloads();

@@ -1,6 +1,6 @@
 # Phase 2, Stage 6: polish
 
-Started 2026-11-25, from the user's notes after playing Stages 4 and 5.
+Started 2026-11-25, from the user's notes after playing Stages 4 and 5. **Done** the same day, after several rounds of play-testing; this was Phase 2's last stage.
 
 ## Walking was laggy (fixed)
 
@@ -25,11 +25,14 @@ Started 2026-11-25, from the user's notes after playing Stages 4 and 5.
   - North-row cars nose north. South-row cars are turned round to face the road (cars can now carry a rotation).
   - Cars are solid: you walk round them.
 - **The trailhead kiosk** moved west of the trail, to (−6.5, 9), clear of The Tollbooth, which used to hide it.
-- **Second round (play-test feedback, 2026-11-25; screenshot `lot-wider.png`):**
-  - **A wider lot, a U round a grass bay.** The lot is x −35..35 (was −27..27). The Billboard's foot (x −10..15, y −4..−13) used to spill out of its 20 m island and its tall face rose over the north lane. The island is now a bay 36 m wide, open to the verge at the top, so the whole rock stands on grass. Stall lines at ±21, ±27, ±33; the cars at ±24 and ±30; `PARK_SPOT` is now (−24, −4.6). The paper map's lot matches.
-  - **Every car faces up**, the south row included (it was turned to face the road).
-  - **The kiosk moved back** to (−2, 16), north of where The Billboard's top reaches; it was hidden behind it at (−6.5, 9).
-  - **The Tollbooth moved** from (14.8, 5.8), where it sat on the lot's corner and the trailhead path, to (−22, 12) on the mown verge west of the trail. Its position is set by hand in `src/climbrec/simulate/layout.py` (`MOVED`, applied after every random draw, so nothing else moves); `game-data.json` and `site/map/map-data.json` were regenerated, and only its x and y changed. Boulders keep their indexes, so saves are unaffected. The landing page's `paper-map.svg` was re-exported.
+- **Second and third rounds (play-test feedback, 2026-11-25; screenshots `lot-west.png`, `paper-lot-west.png`):**
+  - **The lot is a plain rectangle west of The Billboard** (x −69..−15, y −18..4; the user didn't like a U-shaped lot round The Billboard, tried in between). Two rows of 6 m stalls (lines at x −65, −59 … −17), the south row broken by the drive down to the road at x −41. Every car faces up. Your car is the east end of the north row, nearest the trailhead; `PARK_SPOT` is (−20, −4.6).
+  - **The path to the trails runs straight** from the lot's north-east corner (−15.5, 4.5) to the Tailgate's trail junction (20.2, 40.2), replacing the Tailgate trail, which began in the old lot's middle behind The Billboard (`LOT_PATH` in `illustrate.js`, put in after the trees, which are kept off it; the user found a curving path with a sharp turn awkward). From the car to the junction is 61 m. The trail index (`trailDist`) learns it at the end of `parkScene`, after the landmarks and cairns are placed, so the junction's signpost stays in the fork between the two trails north of it (rebuilding it earlier had moved the signpost down onto the junction); walking on the path counts as the trail.
+  - **The woods stayed put.** The trees are placed with the old lot's footprint in the zones, so every random draw is as before; the new lot (and drive) is cleared of trees afterwards, and the old footprint becomes a mown lawn round The Billboard (`lawn`).
+  - **The trail map** shows the lot in its new place, the P sign west of it, and puts "You are here" below the marker near the kiosk so the labels don't overlap. The landing page's `paper-map.svg` was re-exported.
+  - **The kiosk** is at (4, 17.5), beside the path (4.6 m off it) and north of where The Billboard's top reaches (it was hidden behind it at (−6.5, 9)).
+  - **The Tollbooth** is at (−22, 12), left of the kiosk on the verge north of the lot, placed by hand in `src/climbrec/simulate/layout.py` (`MOVED`, applied after every random draw, so nothing else moves); `game-data.json` and `site/map/map-data.json` were regenerated, and only its x and y changed. Boulders keep their indexes, so saves are unaffected.
+  - **The data files now carry the page's version** (`ASSET_V` in `game.js`: `game-data.json?v=N`, `paper-map.svg?v=N`). GitHub Pages lets a browser keep files for 10 minutes, and the user's browser ran the new game on the old crag data (The Tollbooth in its old place).
 - **The tree in the lot is gone.** The grass verge next to the lot let one maple grow on the asphalt at (−9.3, 2.7). Trees are now kept off the lot and its drive. The check comes after every random draw for the tree, so the rest of the woods is unchanged.
 
 ## Trails
@@ -89,7 +92,7 @@ Started 2026-11-25, from the user's notes after playing Stages 4 and 5.
 - **Who's out:** each day, each regular who's around is out (Gus about 45% of days, the others 55%) at a boulder in one of their home areas. This is decided by the day (`peopleToday`), so a reload doesn't move them. The Bishop is only out on his days.
 - **How they're drawn:** standing figures with their own look (`LOOKS` in `game.js`) and their pad down, placed where no tree stands in front of them (`P.setPeople`, `P.personAt`). They're part of the map drawing, so they cost nothing while you walk. They're drawn the same size as you at every zoom (`sizePeople` rescales them when the zoom changes, since you're sized in screen pixels); a `look.size` below 1 would make someone a child.
 - **Meeting them:** walk up to someone, or click them (you walk over and stop beside them), and you start talking. Strangers still approach you on arrival, at most three a day.
-- **Pickles:** naps by Pickles' Rock at The Tailgate, about 100 m north-east of the car. He used to be the park drawing's landmark, about 1.7 m long beside a climber now about 6 m tall, so players couldn't find him. He's now drawn with the people (`drawDog` in `paint.js`; the game hides the landmark copy): about half your height long at any zoom, and clickable like them. Walk up to him or click him to say hello. He no longer turns up on arriving at The Tailgate, since you can see him asleep by his rock. He sometimes still greets you by the car in the morning.
+- **Pickles** (grey, since 2026-11-25): naps by Pickles' Rock at The Tailgate, about 100 m north-east of the car. He used to be the park drawing's landmark, about 1.7 m long beside a climber now about 6 m tall, so players couldn't find him. He's now drawn with the people (`drawDog` in `paint.js`; the game hides the landmark copy): about half your height long at any zoom, and clickable like them. Walk up to him or click him to say hello. He no longer turns up on arriving at The Tailgate, since you can see him asleep by his rock. He sometimes still greets you by the car in the morning.
 
 ### Sitting with someone
 
@@ -117,10 +120,34 @@ Started 2026-11-25, from the user's notes after playing Stages 4 and 5.
 
 Screenshots: `docs/screenshots/phase2-stage6/landing.png`, `landing-dark.png`, `landing-phone.png`, `kiosk-notebook.png`.
 
+## Walking (play-test feedback, 2026-11-25)
+
+- **The arrows walk whatever has focus.** Clicking anything in the side panel (a CragLog tab, a sort menu) used to leave the arrows scrolling the panel or changing the menu, until you clicked the map again. Now only a text field keeps the keys.
+- **No arriving inside a boulder.** Walk to an area went to its centre, and The Schoolhouse's centre is inside The Blackboard, where you were stuck. Areas now take the nearest open spot to their centre (`freeSpot` in `game.js`: no boulder within its radius × 1.1 + 1.2 m, no water, no car), as do a tap on a boulder's body and a boulder's last-resort approach point. A save found inside something is moved out on load, and a climber somehow inside a boulder can always step out.
+- **Walking is a bit quicker on screen:** 20 m/s on trails and 14 off (was 17 and 12). The clock's rates are unchanged.
+- **A tap on somewhere far keeps to the trails** (past `Travel.DIRECT_OK`, 110 m). Taps used the cheapest route, which cut through the woods between areas: Hawkwatch to The Schoolhouse was 221 m through the trees, and is now 543 m by the trails (6.3 → 10.9 minutes). The keys still cut through, so the shortcut is still yours to take.
+- **Test:** `scripts/browser/walk_fixes.js`.
+
+## Last round: the lot's entrance, boulder shapes, water (play-test feedback, 2026-11-25)
+
+- **The lot's entrance meets the road.** The drive used to run on over the road. It now stops at the road's edge with rounded curb returns, and the curb line is drawn as an open line (`lot-edge`), so there's no seam where the drive joins the road. Trees are kept back far enough south of the lot that their crowns (drawn upward) don't overlap it.
+- **Boulders without floating pieces or spikes** (`boulders-fixed.png`):
+  - *Floating slabs* (the overhanging forms: prow, beak, wave, leaner): the top jutted out with nothing visible under it, so it read as a pale flap. Now the solid's far and under sides are drawn first in deep shade (`back` in the form, `.r-back`), the shoulder under any overhang drops to half height (as the prow's already did), giving the lip a shaded underside, and the overhang casts a soft shadow on the ground (`overhang`). The wave's overhang (.36 → .26) and every undercut (.45 → .32) are a little gentler.
+  - *Spikes and notches* (slab and tiered forms): the shoulders were placed before the step lowered half the top, so they folded over it. They're now placed after the step (no change to the random draws).
+- **Lakes with bays and points** (`lakeShape` in `illustrate.js`): a lobed outline (harmonics 2–7 on top of the old noise), tried with up to 80 seeds; of the shapes that fit, the least convex is kept. A shape fits if no boulder, trail or ruin is in the water and it stays inside the circle the scenery leaves for it (`art.js`, 1.2 × r). Where a brook or the millrace meets it the shore reaches out to them, and along the dam the shore is the dam's straight line (`reservoir-dam.png`). Mill Pond is now 0.76 of its old circle's area, and the reservoir 0.73. The trees around them were placed again (their random draws depend on where the water is), so the woods look a little different everywhere; nothing else moved.
+- **The water, drawn better** (`lake-mill-pond-seasons.png`, `lake-reservoir-seasons.png`):
+  - pale shallows round the shore, then deeper, then deepest a little off centre
+  - a wet line at the water's edge
+  - reeds in clumps along the shallows (not by the dam)
+  - the sky's colour in long soft streaks (`--sky`, so it follows the time of day)
+  - **Seasonal reflections:** the treeline mirrored along the far (north) shore, in short dabs broken by ripple lines, in the colour slots of the trees standing behind each stretch of shore (`.refl c-<slot>`). So it's pale green in spring, deep green in summer, red and orange at peak foliage, faint where the leaves are gone, and hidden under winter ice.
+  - The prototype page (`site/prototype/park.html`) has the same water and lot styles.
+
 ## Checked
 
 - Node tests (36).
-- The leak test, normal mode, walking (now checks you're walked back to the car at dusk) and Stage 5, all in headless Chrome.
-- Screenshots of the lot, a junction, the climber walking, and a problem's logs.
+- In headless Chrome: the leak test, normal mode, walking (checks you're walked back to the car at dusk), Stage 5, and `walk_fixes.js`.
+- Screenshots of the lot, a junction, the climber walking, a problem's logs, the landing page, the lakes through the seasons and the fixed boulders.
+- The user played each round in a real browser and sent the next round's notes; the last round (the lot's entrance, boulder shapes, water) was checked in headless Chrome only.
 
-None of this has been seen in a real browser yet.
+**Not done in Stage 6** (left for later, build only when asked): the small hop walking uphill, the canopy hiding the climber, the Pickles and Rowan stories, climbing partners, and bringing "First to" back online.

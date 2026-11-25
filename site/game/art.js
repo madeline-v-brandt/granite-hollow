@@ -242,14 +242,15 @@
       const p = freeSpot([s.x, s.y], s.radius * d0, pad);
       if (p) marks.push({ kind, x: +p[0].toFixed(1), y: +p[1].toFixed(1), rot: Math.round((r() - .5) * 30), ...extra });
     };
-    // The lot (x -35..35, y -30..4; see buildMap): a few cars nosed into its
+    // The lot (x -69..-15, y -18..4, west of The Billboard; see paint.js): a few cars in its
     // spaces, two rows of four, with the drive and the P sign down the middle.
     // Their own random stream, so the landmarks placed after them stay put.
     const rc = rand("lot-cars");
-    // The spaces are the painted stalls: x between the lines at ±21, ±27, ±33; the
-    // north row from y -2 to 4 and the south row from y -30 to -24. Every car faces
-    // north (up the map); the first is yours (PARK_SPOT in game.js is behind it).
-    [[-24, -.6, 0], [-30, -.6, 0], [24, -.6, 0], [30, -.6, 0], [-24, -27.6, 0], [-30, -27.6, 0], [24, -27.6, 0], [30, -27.6, 0]]
+    // The spaces are the painted stalls, 6 m wide between lines at x -65, -59 … -17;
+    // the north row from y -2 to 4 and the south row from y -18 to -12. Every car
+    // faces north (up the map); the first is yours, nearest the trailhead
+    // (PARK_SPOT in game.js is behind it).
+    [[-20, -.6, 0], [-26, -.6, 0], [-50, -.6, 0], [-62, -.6, 0], [-20, -15.6, 0], [-26, -15.6, 0], [-56, -15.6, 0], [-62, -15.6, 0]]
       .forEach(([x, y, rot], i) => { if (rc() < .55 || i === 0) marks.push({ kind: "car", x, y, rot, c: Math.floor(rc() * 4) }); });
     for (let i = 0; i < 4; i++) if (r() < .8 || i === 0) r();   // the old cars' draws, so everything after them keeps its place
     place("The Schoolhouse", "foundation", .95, 16);

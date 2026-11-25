@@ -348,13 +348,18 @@
       g.append("path").attr("class", "road-edge").attr("d", `M${f1(bx0 - 400)},38H${f1(bx1 + 400)}`);
       g.append("path").attr("class", "road").attr("d", `M${f1(bx0 - 400)},38H${f1(bx1 + 400)}`);
       g.append("path").attr("class", "road-line").attr("d", `M${f1(bx0 - 400)},38H${f1(bx1 + 400)}`);
-      // The lot is a U round a grass bay, open to the verge, where The Billboard stands
-      // facing the road: the bay holds its whole foot (x -10..15, y -4..-13), and its
-      // tall face rises over the grass behind, not the lot. The bay's curb is open at the top.
-      g.append("path").attr("class", "lot").attr("d", `M-3.5,40V30H-32Q-35,30 -35,27V-1Q-35,-4 -32,-4H-18V14Q-18,17 -15,17H15Q18,17 18,14V-4H32Q35,-4 35,-1V27Q35,30 32,30H3.5V40Z`);
-      g.append("path").attr("class", "island").attr("d", `M-18,-4V14Q-18,17 -15,17H15Q18,17 18,14V-4`);
+      // The lot: a plain rectangle west of The Billboard (x -69..-15, y -18..4), its
+      // drive down to the road; you walk out of its east end, past The Billboard, to the trails.
+      // The drive meets the road at its edge with rounded curb returns, and has no
+      // curb line where it joins the road: the fill is closed, the curb an open line.
+      const LOT_D = `M-48,33.9Q-45,33.9 -45,30.9V18H-66Q-69,18 -69,15V-1Q-69,-4 -66,-4H-18Q-15,-4 -15,-1V15Q-15,18 -18,18H-37V30.9Q-37,33.9 -34,33.9`;
+      g.append("path").attr("class", "lot lot-fill").attr("d", LOT_D + "Z");
+      g.append("path").attr("class", "lot-edge").attr("d", LOT_D);
       const stalls = [];
-      for (const y of [-4, 30]) for (const x of [-33, -27, -21, 21, 27, 33]) stalls.push(`M${x},${y}v${y < 0 ? 6 : -6}`);
+      for (let x = -65; x <= -17; x += 6) {
+        stalls.push(`M${x},-4v6`);                                        // north row
+        if (x !== -41) stalls.push(`M${x},18v-6`);                        // south row, round the drive
+      }
       g.append("path").attr("class", "stall").attr("d", stalls.join(""));
     }
     // Patches of sand: The Sandbox at the schoolhouse.
@@ -415,10 +420,48 @@
       }
       for (const z of S.water) {
         const g = waterL.append("g").attr("class", "lake" + (z.pit ? " pit" : ""));
-        const d = ringD(z.ring());
+        const d = ringD(z.ring()), off = (k, dx, dy) => ringD(z.ring(k).map(p => [p[0] + z.R * dx, p[1] - z.R * dy]));
         g.append("path").attr("class", "shore").attr("d", ringD(z.ring(1.04)));
         g.append("path").attr("class", "water").attr("d", d);
-        g.append("path").attr("class", "water-deep").attr("d", ringD(z.ring(.72).map(p => [p[0] + z.R * .03, p[1] - z.R * .02])));
+        // Depth: pale shallows round the shore, then deeper water, deepest a little off centre.
+        g.append("path").attr("class", "shallows").attr("fill-rule", "evenodd").attr("d", d + ringD(z.ring(.86)));
+        g.append("path").attr("class", "water-deep").attr("d", off(.72, .03, .02));
+        g.append("path").attr("class", "water-deeper").attr("d", off(.44, .05, .03));
+        if (!z.pit) {
+          // Reflections of the trees on the far (north) shore, upside down in the water, in
+          // whatever colours the season has given them (the crowns' own colour slots), faint
+          // where the leaves are gone and hidden under ice. Clipped to the water.
+          const cid = "lake-clip-" + z.name.replace(/\W+/g, "");
+          defs.append("clipPath").attr("id", cid).append("path").attr("d", d);
+          const rg = g.append("g").attr("class", "reflections").attr("clip-path", `url(#${cid})`), bySlot = new Map();
+          // The treeline mirrored along the far shore: just inside each stretch of shore
+          // that faces you, soft wide dabs in the colour of the trees standing behind it.
+          const near = S.trees.filter(t => Math.abs(t.x - z.c[0]) < z.R + 40 && Math.abs(t.y - z.c[1]) < z.R + 40 && z.depth([t.x, t.y]) < 0 && z.depth([t.x, t.y]) > -34);
+          const rf = Art.rand("refl" + z.name), shore = z.ring(1, Math.round(z.R * 1.6)), breaks = [];
+          shore.forEach((p, i) => {
+            const q0 = shore[(i + shore.length - 1) % shore.length], q1 = shore[(i + 1) % shore.length], ny = q0[0] - q1[0];   // outward normal's north part (the ring runs anticlockwise)
+            if (ny <= .15 * Math.hypot(q1[0] - q0[0], q1[1] - q0[1])) return;
+            let t = null, bd = 1e9;
+            for (const c of near) { const dy = c.y - p[1], dx = Math.abs(c.x - p[0]); if (dy < -2 || dx > 9) continue; const dd = dx * 1.6 + dy; if (dd < bd) { bd = dd; t = c; } }
+            if (!t) return;
+            const k = `${t.kind}-${t.ever ? t.v % 2 : t.v}`, depth = 1.2 + Math.min(9, t.size * 5.5) * (1 - bd / 60);
+            if (!bySlot.has(k)) bySlot.set(k, { ever: t.ever, d: [] });
+            for (let j = 0; j < 2; j++) bySlot.get(k).d.push(ell(p[0] + (rf() - .5) * 3, -p[1] + depth * (.35 + rf() * .3), 1.6 + rf() * 1.6, depth * (.4 + rf() * .25) + .5));
+            // Ripples break the reflection into bands.
+            for (let j = 0; j < 2; j++) breaks.push(`M${f1(p[0] - 2 - rf() * 2)},${f1(-p[1] + 1 + rf() * depth)}h${f1(3 + rf() * 4)}`);
+          });
+          for (const [k, L] of bySlot) rg.append("path").attr("class", `refl c-${k}${L.ever ? "" : " decid"}`).attr("d", L.d.join(""));
+          rg.append("path").attr("class", "refl-break lod-a").attr("d", breaks.join(""));
+          // The sky in the water: a few long soft streaks across the open middle.
+          const sr = Art.rand("sheen" + z.name), sheen = [];
+          for (let i = 0; i < Math.round(z.R / 9); i++) {
+            const a = sr() * TAU, e = z.edge(a) * Math.sqrt(sr()) * .65, x = z.c[0] + Math.cos(a) * e, y = -(z.c[1] + Math.sin(a) * e), w = 6 + sr() * 16;
+            sheen.push(ell(x, y, w, .35 + sr() * .45));
+          }
+          g.append("path").attr("class", "sheen").attr("d", sheen.join(""));
+        }
+        // The wet line where water meets the bank.
+        g.append("path").attr("class", "wet-edge").attr("d", ringD(z.ring(.992)));
         // Ripples: little paired arcs, more toward the middle.
         const rr = Art.rand("ripple" + z.name), rip = [];
         for (let i = 0; i < Math.round(z.R * z.R / 260); i++) {
@@ -433,6 +476,16 @@
             pads.push(`M${f2(x)},${f2(y)}L${f2(x + Math.cos(cut) * r)},${f2(y + Math.sin(cut) * r * .7)}A${f2(r)},${f2(r * .7)} 0 1,1 ${f2(x + Math.cos(cut + .5) * r)},${f2(y + Math.sin(cut + .5) * r * .7)}Z`); }
           g.append("path").attr("class", "lily").attr("d", pads.join(""));
           g.append("path").attr("class", "lily-flower lod-a").attr("d", d3.range(9).map(() => { const a = rr() * TAU, e = z.edge(a) * (.72 + rr() * .2); return circ(z.c[0] + Math.cos(a) * e, -(z.c[1] + Math.sin(a) * e), .32); }).join(""));
+        }
+        if (!z.pit) {
+          // Reeds in clumps along the shallows, away from the dam.
+          const rd = Art.rand("reeds" + z.name), reeds = [];
+          for (let i = 0; i < Math.round(z.R / 7); i++) {
+            const a = rd() * TAU; if (z.dam && Math.abs(((a - z.dam.a + Math.PI * 3) % TAU) - Math.PI) < .6) continue;
+            const e = z.edge(a) * (.9 + rd() * .06), cx = z.c[0] + Math.cos(a) * e, cy = -(z.c[1] + Math.sin(a) * e);
+            for (let j = 0; j < 6 + Math.floor(rd() * 6); j++) { const x = cx + (rd() - .5) * 3.2, y = cy + (rd() - .5) * 1.4, hgt = 1.2 + rd() * 1.4, lean = (rd() - .5) * .8; reeds.push(`M${f2(x)},${f2(y)}q${f2(lean * .3)},${f2(-hgt * .6)} ${f2(lean)},${f2(-hgt)}`); }
+          }
+          g.append("path").attr("class", "reeds lod-a").attr("d", reeds.join(""));
         }
         g.append("path").attr("class", "ice").attr("d", ringD(z.ring(.99)));
         g.append("path").attr("class", "ice-crack lod-a").attr("d", d3.range(5).map(() => { const a = rr() * TAU, e = z.edge(a) * rr() * .7, x = z.c[0] + Math.cos(a) * e, y = -(z.c[1] + Math.sin(a) * e), L = 4 + rr() * 9, b = rr() * TAU; return `M${f1(x)},${f1(y)}l${f1(Math.cos(b) * L)},${f1(Math.sin(b) * L * .6)}l${f1(Math.cos(b + .6) * L * .6)},${f1(Math.sin(b + .6) * L * .4)}`; }).join(""));
@@ -668,6 +721,7 @@
       const clipId = `bclip-${bo.id}`;
       defs.append("clipPath").attr("id", clipId).append("path").attr("d", hullD);
       g.append("path").attr("class", "r-contact").attr("d", smoothRing(F.base.map(p => [p[0] * 1.14, p[1] * 1.3 + R * .1]))).attr("fill", "url(#soft-dark)");
+      if (F.overhang) g.append("path").attr("class", "r-contact r-overhang").attr("d", smoothRing(F.overhang.map(p => [p[0] * 1.05, p[1] * 1.15 + R * .05]))).attr("fill", "url(#soft-dark)");
       {
         // Planes, but weathered: every edge bows a little (the same curve for both
         // faces that share it, so they meet without seams), the tones sit a bit
@@ -729,6 +783,9 @@
         };
         const fillOf = f => Art.mix(f.fill, F.rock.mid, .09);
         const body0 = g.append("g").attr("clip-path", `url(#${clipId})`);
+        // The solid's far and under sides first, in deep shade: wherever the near faces
+        // leave a gap (under an overhang's lip), you see rock in shadow, not the ground.
+        if (F.back && F.back.length) body0.append("path").attr("class", "r-back").attr("d", F.back.map(pts => "M" + pts.map(p => f2(p[0]) + "," + f2(p[1])).join("L") + "Z").join("")).attr("fill", Art.mix(F.rock.deep, F.rock.shade, .35)).attr("stroke", Art.mix(F.rock.deep, F.rock.shade, .35)).attr("stroke-width", .15);
         for (const f of F.faces) body0.append("path").attr("class", "r-facet").attr("d", facetD(f)).attr("fill", fillOf(f)).attr("stroke", fillOf(f));
         // Soft, uneven transitions: along each edge inside the rock, a few stacked feathered bands of the
         // two faces' blended tone. Each band swells and narrows and drifts to one side or the other, so the

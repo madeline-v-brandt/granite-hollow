@@ -351,7 +351,7 @@
     // Stage 6: more forms. An overhanging wall along a whole side (no point), a
     // block leaning out over an undercut, a block with a step in its top, a thin
     // flake, a long rounded loaf, and a wedge that ramps up to one end.
-    wave: { n: 8, aspect: 1.3, top: .62, hs: 1, w: [.1, .4], fractures: 3, crown: .06, lean: .4, wave: .36 },
+    wave: { n: 8, aspect: 1.3, top: .62, hs: 1, w: [.1, .4], fractures: 3, crown: .06, lean: .4, wave: .26 },
     leaner: { n: 7, aspect: 1.1, top: .7, hs: 1, w: [.1, .45], fractures: 2, crown: .08, lean: .5, under: true },
     tiered: { n: 8, aspect: 1.2, top: .78, hs: 1, w: [.1, .5], fractures: 3, crown: .04, lean: 0, step: .24 },
     fin: { n: 6, aspect: 1.9, top: .58, hs: 1, w: [.05, .3], fractures: 3, crown: .24, lean: 0 },
@@ -400,19 +400,11 @@
     }
     if (P.hook || P.wave || P.under) for (const p of B) {          // undercut: the foot is narrower on the side the top leans over
       const along = (p[0] * lean[0] + p[1] * lean[1]) / (Math.hypot(p[0], p[1]) || 1);
-      if (along > 0) { const k = 1 - .45 * Math.pow(along, 1.2); p[0] *= k; p[1] *= k; }
+      if (along > 0) { const k = 1 - .32 * Math.pow(along, 1.2); p[0] *= k; p[1] *= k; }
     }
     // Each corner is weathered (rolled over) or fractured (sharp); fractures come in pairs, making flat faces.
     const w = B.map(() => P.w[0] + r() * (P.w[1] - P.w[0]));
     for (let k = 0; k < P.fractures; k++) { const i = Math.floor(r() * n); w[i] = r() * .1; w[(i + 1) % n] = r() * .1; }
-    // A shoulder between the base and the top: high and close to the wall where sharp, low and set back where weathered.
-    const M = B.map((b0, i) => {
-      const t = T[i], wi = w[i], out = norm([b0[0], b0[1], 0]);
-      const f = .12 + .3 * wi, bulge = wi * R * .06;
-      // Under a prow's nose the shoulder drops to half height: the wall below is the undercut, the face above it the nose's underside.
-      if (P.hook && (b0[0] * lean[0] + b0[1] * lean[1]) / (Math.hypot(b0[0], b0[1]) || 1) > .1) return [b0[0] + (t[0] - b0[0]) * .22, b0[1] + (t[1] - b0[1]) * .22, t[2] * .52];
-      return [b0[0] + (t[0] - b0[0]) * f + out[0] * bulge, b0[1] + (t[1] - b0[1]) * f + out[1] * bulge, t[2] * (.88 - .3 * wi)];
-    });
     // The top: two tilted planes meeting at a raised crease, never one flat lid.
     // A slab breaks in a step instead: the down-slope sheet sits lower, with a riser between.
     const a0 = Math.floor(r() * n), b0i = (a0 + Math.floor(n / 2) + (r() < .5 ? 0 : 1)) % n;
@@ -424,10 +416,20 @@
       for (const k of lowSide === "A" ? sideA : sideB) T[k][2] -= H * P.step;
       Tlo = [T[a0], T[b0i]].map(p => [p[0], p[1], p[2] - H * P.step]);
     }
+    // (After the step, so a slab's lower sheet has its shoulders under it, not folded over it.)
+    // A shoulder between the base and the top: high and close to the wall where sharp, low and set back where weathered.
+    const M = B.map((b0, i) => {
+      const t = T[i], wi = w[i], out = norm([b0[0], b0[1], 0]);
+      const f = .12 + .3 * wi, bulge = wi * R * .06;
+      // Under a prow's nose (or any overhanging side) the shoulder drops to half height: the wall below is the undercut,
+      // the face above it the overhang's underside, drawn in shade, which gives the lip its thickness.
+      if ((P.hook || P.wave || P.under) && (b0[0] * lean[0] + b0[1] * lean[1]) / (Math.hypot(b0[0], b0[1]) || 1) > .1) return [b0[0] + (t[0] - b0[0]) * .22, b0[1] + (t[1] - b0[1]) * .22, t[2] * .52];
+      return [b0[0] + (t[0] - b0[0]) * f + out[0] * bulge, b0[1] + (t[1] - b0[1]) * f + out[1] * bulge, t[2] * (.88 - .3 * wi)];
+    });
     const crease = [(T[a0][0] + T[b0i][0]) / 2 + (r() - .5) * R * .1, (T[a0][1] + T[b0i][1]) / 2 + (r() - .5) * R * .1, (T[a0][2] + T[b0i][2]) / 2 + P.crown * H];
     const arc = (i, j) => { const out = []; for (let k = i; ; k = (k + 1) % n) { out.push(T[k]); if (k === j) break; } return out; };
     // Faces, kept if they face you, toned by the drawing's light (back to front: walls, shoulders, top).
-    const V = norm([0, -1, FS]), faces = [], body = [0, 0, H * .4];
+    const V = norm([0, -1, FS]), faces = [], back = [], body = [0, 0, H * .4];
     const addFace = (pts, tier) => {
       let nrm = newell(pts);
       const ctr = pts.reduce((s2, p) => s2.map((x, i) => x + p[i] / pts.length), [0, 0, 0]);
@@ -435,6 +437,8 @@
       else if (tier < 2 && dot(nrm, sub(ctr, body)) < 0) nrm = nrm.map(x => -x);
       if (tier === 2 && nrm[2] < 0) nrm = nrm.map(x => -x);
       if (dot(nrm, V) <= .03) {
+        const q = pts.map(proj), area = q.reduce((a, p, i) => { const n2 = q[(i + 1) % q.length]; return a + p[0] * n2[1] - n2[0] * p[1]; }, 0);
+        back.push(area < 0 ? q.reverse() : q);           // all wound the same way, so drawn as one path none of them cancel out
         // The underside of a prow's nose: you'd only glimpse it, but drawn deep and dark it gives the overhang its thickness.
         if (P.hook && nrm[2] < -.1 && dot([nrm[0], nrm[1], 0], [lean[0], lean[1], 0]) > 0) faces.push({ pts: pts.map(proj), tier: -1, depth: -ctr[1], t: .04, up: nrm[2] });
         return;
@@ -469,7 +473,9 @@
       return { x: cc[0] + (p[0] - cc[0]) * u, y: cc[1] + (p[1] - cc[1]) * u, r: R * (.035 + r() * .035), c: 0 }; });
     const sends = problems.reduce((s2, p) => s2 + (p.sends || 0), 0);
     const chalk = d3range(clamp(Math.round(sends / 90), 0, 6)).map(() => { const f = fronts[Math.floor(r() * fronts.length)] || faces[0], cc = centroid(f.pts); return { x: cc[0] + (r() - .5) * R * .2, y: cc[1] + (r() - .5) * R * .1, r: .12 + r() * .08 }; });
-    return { ...v2, style: "facet", H, H0: v2.H0, faces, hull, base, top: T.map(proj), topC, lichen, chalk, lean, under: null };
+    // An overhang's shadow on the ground: the top's outline, straight down.
+    const overhang = P.hook || P.wave || P.under ? T.map(p => proj([p[0], p[1], 0])) : null;
+    return { ...v2, style: "facet", H, H0: v2.H0, faces, back, overhang, hull, base, top: T.map(proj), topC, lichen, chalk, lean, under: null };
   }
 
   const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
@@ -560,7 +566,11 @@
 
     // ---- lines on the ground: trails, brooks, stone walls
     const trails = D.trails.map(t => ({ to: t.to, pts: trailPoints(t) }));
-    const trailDist = lineIndex(trails.map(t => t.pts));
+    let trailDist = lineIndex(trails.map(t => t.pts));
+    // The path from the lot: straight from its north-east corner to the Tailgate's trail
+    // junction (it replaces the Tailgate trail's first stretch, which began in the old
+    // lot's middle). Put in after the trees, which keep their places; they're kept off it.
+    const LOT_PATH = [[-15.5, 4.5], D.trails[0].end.slice()];
     // Brooks bend around boulders rather than running under them.
     const skirt = pts => pts.map(p => {
       let q = p;
@@ -604,16 +614,65 @@
     const bald = ragged("bald", [hw.x - 2, hw.y + 6], hw.radius * 1.02, .42);
     zones.push({ kind: "bald", name: "Hawkwatch", ...bald });
     // Water: Mill Pond, the reservoir (flat along its dam) and the quarry's flooded pit.
+    // The lakes are lobed, with bays and points, not round blobs (2026-11-25). The shape is
+    // tried with a few seeds until it fits what's around it: the brooks and the millrace
+    // still reach the water, no boulder, trail or ruin is in it, and it stays inside the
+    // circle the scenery (art.js) keeps clear for it.
+    function lakeShape(f, flat) {
+      const c = [f.x, f.y], r0 = f.r, n = noise("zone" + f.name), N = 360;
+      const millMark = AS.marks.find(m => m.kind === "mill");
+      const wet = [], dry = [];                                    // [angle, distance]: must be in the water / must stay out of it
+      const at = p => [Math.atan2(p[1] - c[1], p[0] - c[0]), Math.hypot(p[0] - c[0], p[1] - c[1])];
+      for (const st of AS.streams) for (const p of [st.pts[0], st.pts[st.pts.length - 1]]) { const [a, d] = at(p); if (d < r0 * .98) wet.push([a, d + 2]); }   // (not the outflow below a dam)
+      if (millMark && !f.dam_toward) wet.push([Math.atan2(millMark.y - c[1], millMark.x - c[0]), r0 * .95 + 2]);
+      for (const b of D.boulders) { const [a, d] = at([b.x, b.y]); if (d < r0 * 1.6) dry.push([a, d - b.r * 2.2 - 3]); }
+      for (const t of D.trails) for (const p of trailPoints(t, 6)) { const [a, d] = at(p); if (d < r0 * 1.6) dry.push([a, d - 4]); }
+      for (const m of AS.marks) { const [a, d] = at([m.x, m.y]); if (d < r0 * 1.6) dry.push([a, d - 6]); }
+      const angd = (a, b) => Math.abs(((a - b + Math.PI * 3) % TAU) - Math.PI);
+      // Of the shapes that fit, the least convex: the most bays and points.
+      let best = null, bestScore = Infinity, fallback = null;
+      const areaOf = q => Math.abs(q.reduce((a, p, i) => { const m = q[(i + 1) % q.length]; return a + p[0] * m[1] - m[0] * p[1]; }, 0)) / 2;
+      for (let tries = 0; tries < 80; tries++) {
+        const rr = rand("lake" + f.name + tries);
+        const lobes = [[2, .1 + rr() * .14], [3, .12 + rr() * .18], [4, .05 + rr() * .08], [5, .03 + rr() * .05], [7, .015 + rr() * .02]].map(([k, amp]) => [k, amp, rr() * TAU]);
+        const raw = a => {
+          let r = r0 * (.9 + .2 * fbm(n, Math.cos(a) * 1.8 + 3, Math.sin(a) * 1.8 + 3, 3));
+          for (const [k, amp, ph] of lobes) r *= 1 + amp * Math.cos(k * a + ph);
+          return r;
+        };
+        const samples = d3range(N).map(i => raw(i / N * TAU)), mx = Math.max(...samples), scale = Math.min(1, r0 * 1.15 / mx);
+        let edge = a => {
+          let r = raw(a) * scale;
+          // Where a brook or the millrace meets it, the shore reaches out to meet them.
+          for (const [aw, d] of wet) if (d > r) { const da = angd(a, aw); if (da < .32) r += (d - r) * smooth(.32, .1, da); }
+          // Along the dam the shore is the dam's straight line, and eases back into the shape beyond its ends.
+          if (flat) { const da = angd(a, flat.a), aw = flat.half + .06; if (da < aw + .35) { const line = flat.r / Math.cos(Math.min(da, 1.2)); r = da < aw ? line : line + (r - line) * smooth(aw, aw + .35, da); } }
+          return r;
+        };
+        // Fits? Each requirement is checked across a few degrees either side.
+        const ok = dry.every(([a, d]) => [-.06, 0, .06].every(o => edge(a + o) <= d))
+          && Math.min(...samples) * scale > r0 * .55;
+        if (!fallback) fallback = edge;
+        if (ok) {
+          const pts = d3range(180).map(i => { const a = i / 180 * TAU, r = edge(a); return [Math.cos(a) * r, Math.sin(a) * r]; });
+          const score = areaOf(pts) / areaOf(hullOf(pts));
+          if (score < bestScore) { bestScore = score; best = edge; }
+        }
+      }
+      const edge = best || fallback;
+      return { c, R: r0 * 1.15, edge, depth: p => { const dx = p[0] - c[0], dy = p[1] - c[1]; return edge(Math.atan2(dy, dx)) - Math.hypot(dx, dy); },
+        ring: (k = 1, m = 160) => d3range(m).map(i => { const a = i / m * TAU, r = edge(a) * k; return [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]; }) };
+    }
     const water = [];
     for (const f of D.features.filter(f => f.kind === "water")) {
       let flat = null, dam = null;
       if (f.dam_toward) {
         const a = Math.atan2(f.dam_toward[1] - f.y, f.dam_toward[0] - f.x), rr = f.r * .9;
-        flat = { a, w: .42, r: rr };
+        flat = { a, w: .42, r: rr, half: Math.atan2(f.r * .3, rr) };
         const c = [f.x + Math.cos(a) * rr, f.y + Math.sin(a) * rr], half = f.r * .3, u = [-Math.sin(a), Math.cos(a)];
         dam = { a, c, p0: [c[0] - u[0] * half, c[1] - u[1] * half], p1: [c[0] + u[0] * half, c[1] + u[1] * half] };
       }
-      const z = { kind: "water", name: f.name, f, dam, ...ragged(f.name, [f.x, f.y], f.r, .3, 1.3, flat) };
+      const z = { kind: "water", name: f.name, f, dam, ...lakeShape(f, flat) };
       zones.push(z); water.push(z);
     }
     const qf = D.features.find(f => f.kind === "quarry");
@@ -633,12 +692,18 @@
       const mossy = s.name === "Hemlock Hollow" || s.name === "Bracken Gully";      // the shady areas: smaller clearings, moss underfoot
       zones.push({ kind, name: s.name, sector: s, mossy, ...ragged("clear" + s.name, [s.x, s.y], s.radius * (kind === "grout" ? 1.12 : mossy ? .84 : .98), .45) });
     }
-    // The lot and the road (the game's: lot x -35..35, y -30..4, road along y -38).
+    // The lot and the road (the game's: lot x -69..-15, y -18..4, west of The Billboard;
+    // road along y -38). The trees were placed when the lot was round The Billboard
+    // (x -27..27, y -30..4), so that old footprint stays in the zones while they're
+    // placed, keeping every other tree where it was; then it becomes a lawn and the
+    // new lot is cleared of trees after the fact (see after the trees).
     const rect = (x0, x1, y0, y1) => p => Math.min(p[0] - x0, x1 - p[0], p[1] - y0, y1 - p[1]);
-    const lot = { kind: "lot", name: "lot", c: [0, -12], R: 46, depth: rect(-37, 37, -31, 7) };
+    const oldLot = { kind: "lot", name: "old lot", c: [0, -12], R: 40, depth: rect(-29, 29, -31, 7) };
+    const oldDrive = { kind: "lot", name: "old drive", c: [0, -34], R: 12, depth: rect(-4, 4, -40, -28) };
+    const lot = { kind: "lot", name: "lot", c: [-42, -7], R: 40, depth: rect(-71, -13, -20, 6) };
+    const drive = { kind: "lot", name: "drive", c: [-41, -30], R: 14, depth: rect(-45, -37, -40, -16) };
     const road = { kind: "road", name: "Quarry Hill Road", c: [0, -38], R: 1e4, depth: p => 7 - Math.abs(p[1] + 38) };
-    const drive = { kind: "lot", name: "drive", c: [0, -34], R: 12, depth: rect(-4, 4, -40, -28) };
-    zones.push(lot, road, drive);
+    zones.push(oldLot, road, oldDrive);
     // The verge by the lot: mown grass and the trailhead.
     zones.push({ kind: "clearing", name: "verge", ...ragged("verge", [0, 14], 34, .3) });
 
@@ -735,9 +800,18 @@
       const t = { x: +p[0].toFixed(2), y: +p[1].toFixed(2), kind, ever, fg, size: +size.toFixed(3), v: Math.floor(R() * 3), shape: Math.floor(R() * 6), flip: R() < .5, crownR: crownR * (fg ? 1.08 : 1) };
       // None on the lot or its drive (the verge beside it once let one in). Checked
       // after every draw for this tree, so the rest of the woods stays where it was.
-      if (lot.depth(p) > -crownR * .7 || drive.depth(p) > -crownR * .7) continue;
+      if (oldLot.depth(p) > -crownR * .7 || oldDrive.depth(p) > -crownR * .7) continue;
+      // (Trees just south of the lot are kept back too: their crowns are drawn up over it.)
+      const up = [p[0], p[1] + crownR * 2.6];
+      if (lot.depth(p) > -crownR * 1.1 || lot.depth(up) > -crownR || drive.depth(p) > -crownR * .7 || drive.depth(up) > -crownR * .7 || segDist(p, LOT_PATH[0], LOT_PATH[1]) < 3.5 + crownR * .6) continue;
       trees.push(t); tIndex.add(p, t);
     }
+
+    // The old lot is a mown lawn now, round The Billboard and the trailhead; the new lot takes its place in the zones.
+    zones.splice(zones.indexOf(oldDrive), 1, drive);
+    zones.splice(zones.indexOf(oldLot), 1, lot, { kind: "clearing", name: "lawn", ...ragged("lawn", [2, -12], 27, .22) });
+    const [A, B] = LOT_PATH, n = Math.ceil(Math.hypot(B[0] - A[0], B[1] - A[1]) / 4);
+    trails[0].pts = Array.from({ length: n + 1 }, (_, i) => [A[0] + (B[0] - A[0]) * i / n, A[1] + (B[1] - A[1]) * i / n]);
 
     // ---- light under the canopy: soft pools of shade and light across the floor
     const washes = scatter(seed + "wash", bounds, 26).map(p => ({ x: p[0], y: p[1], r: 16 + R() * 22, tone: fbm(nGrove, p[0] / 40, p[1] / 40, 2) > .5 ? 1 : 0, seed: Math.floor(R() * 1e6) }));
@@ -897,6 +971,10 @@
     }
 
     const tiles = { size: TILE, nx: Math.ceil((bounds[1] - bounds[0]) / TILE), ny: Math.ceil((bounds[3] - bounds[2]) / TILE) };
+    // The trail index learns the lot's path only now, so the landmarks and cairns placed
+    // above (the junction's signpost among them) keep their places; the ground's
+    // details, drawn tile by tile later, and walking (on the trail or not) use it.
+    trailDist = lineIndex(trails.map(t => t.pts));
     const out = { bounds, tiles, zones, bald, baldC: bald.c, baldR, water, quarry, field, lot, road, streams, walls, trails, bridges, trees, boulders, landmarks, cairns, washes,
       rockGrid, rockAt, ROCK_T, openAt, inWater, trailDist, streamDist, wallDist, blocked, nearBoulder, elevAt, crowdedAt, detail, tIndex, marks: AS.marks, ms: 0 };
     out.ms = Date.now() - t0;
@@ -933,7 +1011,7 @@
       { kind: "bench", near: "The Lookout", gap: 3.5, foot: 1.8, prefer: Math.PI * .35, note: "best view in the park", find: "The reservoir one way, the quarry the other" },
     ],
     "The Tailgate": [
-      { kind: "kiosk", near: "at", exact: [-2, 16], foot: 2.5, note: "trailhead kiosk", find: "Maps, the guestbook and Ranger Gus's notices" },   // west of the trail, north of where The Billboard's top reaches
+      { kind: "kiosk", near: "at", exact: [4, 17.5], foot: 2.5, note: "trailhead kiosk", find: "Maps, the guestbook and Ranger Gus's notices" },   // beside the path from the lot (4.6 m off it), north of where The Billboard's top reaches
       { kind: "bins", near: "The Dumpster", gap: 2.5, foot: 2, prefer: Math.PI * .8, note: null, find: null },
       { kind: "dog", near: "Pickles' Rock", gap: 1.2, foot: 1, prefer: -Math.PI * .35, note: "Pickles, asleep", name: "Pickles", find: "The lot dog, napping in the shade" },
       { kind: "picnic", near: "The Cooler", gap: 3.5, foot: 2.5, prefer: Math.PI * .7, note: null, find: null },

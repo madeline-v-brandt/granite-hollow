@@ -117,9 +117,9 @@
       g.append("path").attr("d", `M${f1(bx0 - 14)},${f1(ry)}H${f1(bx1 + 14)}`).attr("stroke", "#7d6e58").attr("stroke-width", 6.2);
       g.append("path").attr("d", `M${f1(bx0 - 14)},${f1(ry)}H${f1(bx1 + 14)}`).attr("stroke", "#f6eed8").attr("stroke-width", 3.8);
       g.append("text").attr("class", "pp-road").attr("x", px(150, 0)[0]).attr("y", ry + 13).text("QUARRY HILL ROAD");
-      const [lx0, ly0] = px(-35, 4), [lx1, ly1] = px(35, -30);
+      const [lx0, ly0] = px(-69, 4), [lx1, ly1] = px(-15, -18);
       g.append("rect").attr("x", lx0).attr("y", ly0).attr("width", lx1 - lx0).attr("height", ly1 - ly0).attr("rx", 3).attr("fill", "#e2dccd").attr("stroke", "#8a8070").attr("stroke-width", .8);
-      const [pxp, pyp] = px(-43, -12);
+      const [pxp, pyp] = px(-78, -7);
       g.append("rect").attr("x", pxp - 6).attr("y", pyp - 6).attr("width", 12).attr("height", 12).attr("rx", 2).attr("fill", "#3f6f9a");
       g.append("text").attr("class", "pp-p").attr("x", pxp).attr("y", pyp + 4.2).text("P");
       // Trails: red dashes.
@@ -201,10 +201,13 @@
       if (s.me) {
         const [u, v] = px(s.me[0], s.me[1]);
         const right = u < MW - 120, gm = me.append("g").attr("transform", `translate(${f1(u)},${f1(v)})`);
+        // By the lot, the label goes below, clear of the trailhead kiosk's.
+        const kiosk = S.landmarks.find(l => l.kind === "kiosk"), low = kiosk && Math.hypot(s.me[0] - kiosk.x, s.me[1] - kiosk.y) < 50 ? -1 : 1;
         gm.append("circle").attr("r", 8.5).attr("fill", "#fff8e6").attr("fill-opacity", .85);
         gm.append("circle").attr("r", 5).attr("fill", "#c0392b").attr("stroke", "#4a3f30").attr("stroke-width", 1.2);
-        gm.append("path").attr("d", right ? "M8,-6C16,-14 24,-16 32,-15" : "M-8,-6C-16,-14 -24,-16 -32,-15").attr("fill", "none").attr("stroke", "#4a3f30").attr("stroke-width", 1);
-        gm.append("text").attr("class", "pp-you").attr("x", right ? 35 : -35).attr("y", -12).attr("text-anchor", right ? "start" : "end").text("You are here");
+        const sx = right ? 1 : -1, sy = low;
+        gm.append("path").attr("d", `M${8 * sx},${-6 * sy}C${16 * sx},${-14 * sy} ${24 * sx},${-16 * sy} ${32 * sx},${-15 * sy}`).attr("fill", "none").attr("stroke", "#4a3f30").attr("stroke-width", 1);
+        gm.append("text").attr("class", "pp-you").attr("x", right ? 35 : -35).attr("y", low < 0 ? 20 : -12).attr("text-anchor", right ? "start" : "end").text("You are here");
       }
       // The sidebar: title, key, and the areas you know.
       const known = s.areas.slice().sort((a, b) => (a.minutes ?? 99) - (b.minutes ?? 99));
