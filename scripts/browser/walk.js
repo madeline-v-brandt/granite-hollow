@@ -83,7 +83,7 @@ const SLOT = "granite-hollow-save-v1";
   }
   await sleep(600);
   s = await g();
-  console.log("dusk: day over", s.day.over, "| at the lot:", Math.hypot(s.pos[0], s.pos[1]) < 1, "|", s.day.reason, "| warnings:", [...new Set(toasts)].join(", "), "| summary:", await p.evaluate(() => (document.querySelector(".modal h2") || {}).textContent));
+  console.log("dusk: day over", s.day.over, "| back by the car:", Math.hypot(s.pos[0] + 20, s.pos[1] + 4.6) < 1, "|", s.day.reason, "| warnings:", [...new Set(toasts)].join(", "), "| summary:", await p.evaluate(() => (document.querySelector(".modal h2") || {}).textContent));
 
   // Frame rate while walking (headless Chrome; the real test is a real browser).
   await p.evaluate(() => { const b = document.querySelector(".modal [data-next]"); if (b) b.click(); }); await sleep(800);

@@ -7,6 +7,8 @@
 const { open, ready, click, sleep, GAME_DIR: GD } = require("./lib");
 global.Mech = require(GD + "mechanics.js"); global.World = require(GD + "world.js");
 const Know = require(GD + "knowledge.js"), D = require(GD + "game-data.json");
+global.Art = require(GD + "art.js");
+const DOG = require(GD + "illustrate.js").parkScene(D).landmarks.find(l => l.kind === "dog");
 const SLOT = "granite-hollow-save-v1";
 function leaks(g, all) {
   const K = Know.make(D, () => g), hits = [];
@@ -39,36 +41,44 @@ function leaks(g, all) {
   await put(s);
   console.log("set up:", s.date, "day", s.dayNo, "| regulars arrived:", World.CLIMBING_REGULARS.filter(w => s.world.npc[w]).map(w => World.whoName(D, w)).join(", "));
 
-  // Walk between areas, meeting people. Math.random is kept low so encounters happen.
+  // Each day, the regulars stand at boulders on the map (Stage 6): click each one,
+  // walk over, and use whatever they offer. Pickles is met at the Tailgate.
   const seen = {}, used = {}, texts = [];
-  const order = ["Hawkwatch", "The Schoolhouse", "The Tailgate", "Hawkwatch", "The Schoolhouse", "The Tailgate", "Hawkwatch", "The Schoolhouse", "The Tailgate", "Hawkwatch", "The Schoolhouse", "The Tailgate"];
-  for (let i = 0; i < order.length; i++) {
-    const area = order[i];
-    s = await g(); if (s.day.over) break;
-    // A new day for each visit (same weather), with the Bishop out every other day.
+  for (let day = 0; day < 5; day++) {
+    s = await g();
     s.date = World.addDays(s.date, 1); s.dayNo++; World.step(D, s, s.date); s.day.date = s.date; s.day.no = s.dayNo;
-    s.day.minute = 600; s.day.met = []; s.day.bishop = i % 2 === 0; s.day.encounter = null; await put(s);
-    await p.evaluate(() => { window.__r = Math.random; Math.random = () => window.__r() * 0.45; });   // people are about more than usual
-    const go = await p.evaluate(a => { const b = document.querySelector(`[data-go-sector="${a}"]`); if (b) { b.click(); return true; } return false; }, area);
-    if (!go) { await p.keyboard.press("m"); await sleep(300); await p.evaluate(a => { const b = document.querySelector(`[data-pp-go="${a}"]`); if (b) b.click(); }, area); }
-    for (let t = 0; t < 30 && await p.evaluate(() => !!document.querySelector("#act-rest[disabled]")); t++) await sleep(200);
-    await sleep(300);
-    await p.evaluate(() => { Math.random = window.__r; });
-    const card = await p.evaluate(() => { const n = document.querySelector(".npc"); return n ? { name: n.querySelector(".nm").childNodes[0].textContent, text: n.innerText.replace(/\s+/g, " "), regular: n.classList.contains("regular"),
-      acts: [...n.querySelectorAll("button")].map(b => b.textContent) } : null; });
-    if (!card) { console.log(`  ${area}: nobody about`); continue; }
-    seen[card.name] = (seen[card.name] || 0) + 1; texts.push(card.text);
-    const shot = async tag => { if (process.env.SHOTS) { const el = await p.$(".npc"); if (el) await el.screenshot({ path: `${process.env.SHOTS}/npc-${card.name.replace(/\W+/g, "-").toLowerCase()}-${tag}.png` }); } };
-    await shot(seen[card.name]);
-    console.log(`  ${area}: ${card.name}${card.regular ? " (regular)" : ""}: ${card.text.slice(0, 170)}${card.text.length > 170 ? "…" : ""}`);
-    for (const [sel, label] of [["[data-dir]", "ask the way"], ["[data-reveal]", "where exactly"], ["[data-pet]", "pet"], ["[data-accept]", "add tip"]]) {
-      if (await p.$(".npc " + sel)) {
-        await click(p, ".npc " + sel); await sleep(250); used[label] = (used[label] || 0) + 1;
-        const after = await p.evaluate(() => { const n = document.querySelector(".npc"); return n ? n.innerText.replace(/\s+/g, " ") : ""; });
-        const toast = await p.evaluate(() => [...document.querySelectorAll(".toast")].map(t => t.innerText.replace(/\s+/g, " ")).pop() || "");
-        console.log(`     ${label} → ${toast ? "toast: " + toast.slice(0, 110) + " | " : ""}${after.slice(-110)}`);
-        texts.push(after, toast);
+    s.day.minute = 600; s.day.met = []; s.day.bishop = day % 2 === 0; s.day.encounter = null; s.day.over = false;
+    s.day.levelBefore = Mech.levelInfo(s.player.xp).level;          // no level-up dialog in the way
+    await put(s);
+    const who = await p.evaluate(() => [...document.querySelectorAll("#map g.person")].map(e => e.dataset.who));
+    console.log(`  day ${day + 1}: on the map: ${who.join(", ") || "nobody"}`);
+    for (const w of [...who, "pickles"]) {
+      if (w === "pickles") {
+        // Pickles: stand a few steps from where he's napping, by Pickles' Rock, and step closer.
+        s = await g(); s.day.minute = 600; s.day.met = s.day.met.filter(x => x !== "n:pickles"); s.day.encounter = null;
+        s.pos = [DOG.x, DOG.y - 9]; s.loc = { sector: "The Tailgate", boulder: null }; await put(s);
+        await p.evaluate(() => document.body.focus()); await p.keyboard.down("w"); await sleep(900); await p.keyboard.up("w"); await sleep(800);
+      } else await p.evaluate(x => document.querySelector(`#map g.person[data-who="${x}"]`).dispatchEvent(new MouseEvent("click", { bubbles: true })), w);
+      for (let t = 0; t < 40 && await p.evaluate(() => !!document.querySelector("#act-rest[disabled]")); t++) await sleep(200);
+      await sleep(300);
+      await p.evaluate(() => { if (window.__r) { Math.random = window.__r; window.__r = null; } });
+      const card = await p.evaluate(() => { const n = document.querySelector(".npc"); return n ? { name: n.querySelector(".nm").childNodes[0].textContent, text: n.innerText.replace(/\s+/g, " "), regular: n.classList.contains("regular") } : null; });
+      if (!card) { const q = await g(); console.log(`     ${w}: walked over, but no conversation | met ${q.day.met} | minute ${q.day.minute} over ${q.day.over} | pos ${q.pos.map(v => v.toFixed(0))} | toast ${await p.evaluate(() => [...document.querySelectorAll(".toast")].map(t => t.innerText.replace(/\s+/g, " ")).pop() || "")}`); continue; }
+      seen[card.name] = (seen[card.name] || 0) + 1; texts.push(card.text);
+      const shot = async tag => { if (process.env.SHOTS) { const el = await p.$(".npc"); if (el) await el.screenshot({ path: `${process.env.SHOTS}/npc-${card.name.replace(/\W+/g, "-").toLowerCase()}-${tag}.png` }); } };
+      await shot(seen[card.name]);
+      console.log(`     ${card.name}: ${card.text.slice(0, 150)}${card.text.length > 150 ? "…" : ""}`);
+      for (const [sel, label] of [["[data-dir]", "ask the way"], ["[data-reveal]", "where exactly"], ["[data-pet]", "pet"], ["[data-accept]", "add tip"], ["[data-chat]", "sit and chat"]]) {
+        if (await p.$(".npc " + sel)) {
+          await click(p, ".npc " + sel); await sleep(250); used[label] = (used[label] || 0) + 1;
+          const after = await p.evaluate(() => { const n = document.querySelector(".npc"); return n ? n.innerText.replace(/\s+/g, " ") : ""; });
+          const toast = await p.evaluate(() => [...document.querySelectorAll(".toast")].map(t => t.innerText.replace(/\s+/g, " ")).pop() || "");
+          console.log(`       ${label} → ${toast && label !== "sit and chat" ? "toast: " + toast.slice(0, 90) + " | " : ""}${after.slice(-130)}`);
+          texts.push(after, toast);
+          if (label === "sit and chat") await shot("chat");
+        }
       }
+      await click(p, ".npc [data-dismiss]"); await sleep(100);
     }
   }
   s = await g();

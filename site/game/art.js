@@ -246,8 +246,11 @@
     // spaces, two rows of four, with the drive and the P sign down the middle.
     // Their own random stream, so the landmarks placed after them stay put.
     const rc = rand("lot-cars");
-    [[-20, -4.6], [-14, -4.6], [14, -4.6], [20, -4.6], [-20, -21.6], [-14, -21.6], [14, -21.6], [20, -21.6]]
-      .forEach(([x, y], i) => { if (rc() < .55 || i === 0) marks.push({ kind: "car", x, y, rot: 0, c: Math.floor(rc() * 4) }); });
+    // The spaces are the painted stalls: x between the lines at ±11, ±17, ±23; the
+    // north row from y -2 to 4 and the south row from y -30 to -24. Cars nose in,
+    // so the north row faces north and the south row (turned round) faces the road.
+    [[-20, -.6, 0], [-14, -.6, 0], [14, -.6, 0], [20, -.6, 0], [-20, -25.4, 180], [-14, -25.4, 180], [14, -25.4, 180], [20, -25.4, 180]]
+      .forEach(([x, y, rot], i) => { if (rc() < .55 || i === 0) marks.push({ kind: "car", x, y, rot, c: Math.floor(rc() * 4) }); });
     for (let i = 0; i < 4; i++) if (r() < .8 || i === 0) r();   // the old cars' draws, so everything after them keeps its place
     place("The Schoolhouse", "foundation", .95, 16);
     place("Millrace Caves", "mill", .95, 14);

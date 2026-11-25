@@ -91,12 +91,16 @@ function leaks(g, all) {
   console.log("after Inspect:\n  " + (await text(p)).split("\n").slice(0, 14).join("\n  "));
   // Try an unclimbed line until it goes; if this boulder has none, teleport to the next Tailgate boulder and look there.
   let fa = null;
-  const tryOpen = () => p.evaluate(() => { const row = [...document.querySelectorAll(".prob")].find(r => /^Unclimbed/.test(r.querySelector(".pname").textContent) && r.querySelector("[data-try]:not([disabled])")); if (!row) return false; row.querySelector("[data-try]").click(); return true; });
+  // The easiest-feeling unclimbed line first (fewest bars), as a player would: a hard one first can use up the day's energy.
+  const tryOpen = () => p.evaluate(() => { const rows = [...document.querySelectorAll(".prob")].filter(r => /^Unclimbed/.test(r.querySelector(".pname").textContent) && r.querySelector("[data-try]:not([disabled])"));
+    if (!rows.length) return false; const bars = r => r.querySelectorAll(".feel .bars i.on").length; rows.sort((a, b) => bars(a) - bars(b)); rows[0].querySelector("[data-try]").click(); return true; });
   for (const bi of [null, ...tailgate]) {
     if (bi != null) {
       await click(p, "#dev-btn"); await sleep(150);
       await p.evaluate(b => { document.querySelector("#dv-b").value = b; document.querySelector('[data-dv="teleport"]').click(); }, bi); await sleep(300);
       await click(p, "[data-inspect]"); await sleep(250);
+      // Wait for the boulder's lines (or "nothing here") rather than a fixed time.
+      await p.waitForFunction(() => document.querySelector(".prob") || /Nothing here/.test(document.querySelector("#tabbody").innerText), { timeout: 4000 }).catch(() => {});
     }
     for (let n = 0; n < 25 && !fa; n++) {
       if (!(await tryOpen())) break;

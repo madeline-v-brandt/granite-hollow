@@ -201,17 +201,30 @@
     { top: "#d3d8db", light: "#bec5ca", mid: "#9ea7b0", shade: "#677182", deep: "#454d5e", lichen: "#a3bd8f" },
   ];
   const RINGS = [0, .1, .22, .36, .5, .63, .75, .86, .94, 1];
+  // Variety (Stage 6): a boulder whose description doesn't name its shape gets one
+  // of its family's forms, from its own stream, so an overhang isn't always a
+  // hooked prow (the "bird beak") and a plain block isn't always the same block.
+  const FAMILY = { prow: [["prow", 3], ["wave", 4], ["leaner", 3]], block: [["block", 3], ["tiered", 2], ["fin", 1.5], ["loaf", 2], ["wedge", 1.5]], tower: [["tower", 3], ["fin", 1]] };
+  // Drawn heights (Stage 6): from the climber's height to four times it, by the
+  // boulder's real height. The climber stands about CLIMBER_M tall at walking zoom.
+  const CLIMBER_M = 5, FT_LO = 5, FT_HI = 20.5;
+  const drawnHeight = ft => CLIMBER_M * (1 + 3 * Math.pow(clamp(((ft || 10) - FT_LO) / (FT_HI - FT_LO), 0, 1), 1.1));
   function boulderForm(b, problems = []) {
     const r = rand("form" + b.name + b.sector);
-    let kind = BY_ANGLE[b.angle] || "block";
-    for (const [re, k] of FORMS) if (re.test(b.desc || "")) { kind = k; break; }
+    let kind = BY_ANGLE[b.angle] || "block", named = false;
+    for (const [re, k] of FORMS) if (re.test(b.desc || "")) { kind = k; named = true; break; }
+    const kind0 = kind;
+    if (!named && FAMILY[kind]) {
+      const rv = rand("variant" + b.name + b.sector)(), fam = FAMILY[kind], tot = fam.reduce((a, f) => a + f[1], 0);
+      let u = rv * tot; for (const [k, w] of fam) { u -= w; if (u <= 0) { kind = k; break; } }
+    }
     const R = b.r * 1.12, hm = (b.height_ft || 10) / 3.28 * 1.15;      // drawn a little large: boulders are the stars of the map
     const H = {
       dome: Math.max(hm * 1.35, R * .62), slab: Math.max(hm, R * .36), prow: clamp(hm * 1.4, 3.2, 9), beak: Math.max(hm * 1.4, R * 1.15),
       round: Math.min(Math.max(hm, R * .6), R * .78), roof: clamp(hm * 1.25, 2.6, 7), box: clamp(hm * 1.3, 2.6, 7), tower: clamp(hm * 1.45, 3, 9), block: clamp(hm * 1.35, 2.6, 8),
-    }[kind];
+    }[kind0];
     // An organic footprint: a few smooth harmonics, stretched and turned.
-    const N = 36, aspect = { dome: 1.15, slab: 1.5, prow: 1.2, beak: 1.3, round: 1.04, roof: 1.25, box: 1.08, tower: .95, block: 1.12 }[kind];
+    const N = 36, aspect = { dome: 1.15, slab: 1.5, prow: 1.2, beak: 1.3, round: 1.04, roof: 1.25, box: 1.08, tower: .95, block: 1.12, wave: 1.3, leaner: 1.1, tiered: 1.2, fin: 1.8, loaf: 1.6, wedge: 1.3 }[kind] ?? 1.12;
     const rough = { dome: .085, round: .06, slab: .08, box: .07 }[kind] ?? .1;
     // Seen at an angle: the footprint is foreshortened front to back, heights are not.
     const FS = .62, crownShift = [(r() - .5) * R * .3, (r() - .3) * R * .15];
@@ -314,7 +327,9 @@
       const x = xmin * .6 + (xmax - xmin) * .6 * r(), y = topAt(x) + (baseAt(x) - topAt(x)) * (.25 + r() * .5);
       chalk.push({ x, y, r: .12 + r() * .08 });
     }
-    return { kind, R, H, FS, rings, tones: toneAt, grad, gy0, gy1, soft, hull, base: rings[0], top, topC, veins, streaks, cracks, lichen, chalk, sheets, tones2, rock, lean, side };
+    // H0: the old height, still used to keep trees from standing in front of a
+    // boulder, so the woods didn't move when boulders got taller.
+    return { kind, H0: H * ((RECIPES[kind0] || RECIPES.block).hs), R, H, FS, rings, tones: toneAt, grad, gy0, gy1, soft, hull, base: rings[0], top, topC, veins, streaks, cracks, lichen, chalk, sheets, tones2, rock, lean, side };
   }
   // ---- faceted boulders (third version, prototyped on three Hawkwatch boulders) ----
   // Natural granite between a blob and a polyhedron: an angular footprint, steep
@@ -333,6 +348,15 @@
     box: { n: 6, aspect: 1.05, top: .8, hs: 1, w: [.1, .45], fractures: 3, crown: .05, lean: 0 },
     tower: { n: 7, aspect: .95, top: .8, hs: 1.1, w: [.1, .5], fractures: 3, crown: .07, lean: 0 },
     block: { n: 7, aspect: 1.1, top: .74, hs: 1, w: [.2, .7], fractures: 2, crown: .1, lean: 0 },
+    // Stage 6: more forms. An overhanging wall along a whole side (no point), a
+    // block leaning out over an undercut, a block with a step in its top, a thin
+    // flake, a long rounded loaf, and a wedge that ramps up to one end.
+    wave: { n: 8, aspect: 1.3, top: .62, hs: 1, w: [.1, .4], fractures: 3, crown: .06, lean: .4, wave: .36 },
+    leaner: { n: 7, aspect: 1.1, top: .7, hs: 1, w: [.1, .45], fractures: 2, crown: .08, lean: .5, under: true },
+    tiered: { n: 8, aspect: 1.2, top: .78, hs: 1, w: [.1, .5], fractures: 3, crown: .04, lean: 0, step: .24 },
+    fin: { n: 6, aspect: 1.9, top: .58, hs: 1, w: [.05, .3], fractures: 3, crown: .24, lean: 0 },
+    loaf: { n: 9, aspect: 1.6, top: .6, hs: 1, w: [.6, 1], fractures: 1, crown: .22, lean: 0 },
+    wedge: { n: 6, aspect: 1.35, top: .72, hs: 1, w: [.05, .3], fractures: 3, crown: .04, lean: 0, slope: [1, .15] },
   };
   // The drawing's own light: from the upper left and a little in front, so near
   // faces sit in the mid-tones and the far side goes dark (the clock's light is
@@ -340,7 +364,7 @@
   const FACET_LIGHT = (() => { const v = [-.5, -.42, .75], m = Math.hypot(...v); return v.map(x => x / m); })();
   function facetForm(b, problems, v2) {
     const r = rand("facet" + b.name + b.sector), kind = v2.kind, P = RECIPES[kind] || RECIPES.block;
-    const R = v2.R, H = v2.H * P.hs, FS = v2.FS;
+    const R = v2.R, H = drawnHeight(b.height_ft) * (kind === "slab" || kind === "wedge" ? 1.1 : 1), FS = v2.FS;
     const sub = (a, c) => a.map((x, i) => x - c[i]), dot = (a, c) => a[0] * c[0] + a[1] * c[1] + a[2] * c[2];
     const norm = v => { const m = Math.hypot(...v) || 1; return v.map(x => x / m); };
     const newell = pts => { const nn = [0, 0, 0]; pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; nn[0] += (p[1] - q[1]) * (p[2] + q[2]); nn[1] += (p[2] - q[2]) * (p[0] + q[0]); nn[2] += (p[0] - q[0]) * (p[1] + q[1]); }); return norm(nn); };
@@ -354,17 +378,27 @@
     });
     // The top edge: smaller, shifted along the lean, at uneven heights (or sloping, for a slab).
     // A slab rises toward its high side (mostly west), so its face turns away from the light and shows its tilt.
+    // Tall boulders (Stage 6) flare at the foot and taper to the top, so they read
+    // as a rock mass rather than a pillar. Drawing only: the footprint you walk
+    // around is still R.
+    const flare = clamp((H / R - 1.6) / 3.5, 0, .32);
+    if (flare) for (const p of B) { p[0] *= 1 + flare; p[1] *= 1 + flare * .7; }
+    const topK = 1 - flare * .9;
     const sd = P.slope || [0, 1], proj2 = p => p[0] * sd[0] + p[1] * sd[1];
     const c = [lean[0] * R * P.lean, lean[1] * R * P.lean], ps = B.map(proj2), lo = Math.min(...ps), hi = Math.max(...ps);
     const T = B.map(p => {
-      const k = P.top * (.88 + r() * .24), z = P.slope ? H * (.45 + .55 * Math.pow((proj2(p) - lo) / (hi - lo || 1), 1.1)) : H * (1 - P.crown * .6 + (r() - .5) * .2);
+      const k = P.top * topK * (.88 + r() * .24), z = P.slope ? H * (.45 + .55 * Math.pow((proj2(p) - lo) / (hi - lo || 1), 1.1)) : H * (1 - P.crown * .6 + (r() - .5) * .2);
       return [c[0] + p[0] * k, c[1] + p[1] * k, z];
     });
     if (P.hook) {          // the prow's nose: the top corner facing the lean juts out past the base
       let best = 0; B.forEach((p, i) => { if (p[0] * lean[0] + p[1] * lean[1] > B[best][0] * lean[0] + B[best][1] * lean[1]) best = i; });
       for (const [i, f] of [[best, 1], [(best + 1) % n, .35], [(best + n - 1) % n, .35]]) { T[i][0] += lean[0] * R * P.hook * f; T[i][1] += lean[1] * R * P.hook * f; T[i][2] *= 1 - .06 * f; }
     }
-    if (P.hook) for (const p of B) {          // undercut: the foot is narrower on the side the nose leans over
+    if (P.wave) {          // a wave: the whole side facing the lean juts out evenly, an overhanging wall rather than a nose
+      const along = p => (p[0] * lean[0] + p[1] * lean[1]) / (Math.hypot(p[0], p[1]) || 1);
+      T.forEach((t, i) => { const a = along(B[i]); if (a > .2) { const f = Math.min(1, (a - .2) / .5); t[0] += lean[0] * R * P.wave * f; t[1] += lean[1] * R * P.wave * f; } });
+    }
+    if (P.hook || P.wave || P.under) for (const p of B) {          // undercut: the foot is narrower on the side the top leans over
       const along = (p[0] * lean[0] + p[1] * lean[1]) / (Math.hypot(p[0], p[1]) || 1);
       if (along > 0) { const k = 1 - .45 * Math.pow(along, 1.2); p[0] *= k; p[1] *= k; }
     }
@@ -435,7 +469,7 @@
       return { x: cc[0] + (p[0] - cc[0]) * u, y: cc[1] + (p[1] - cc[1]) * u, r: R * (.035 + r() * .035), c: 0 }; });
     const sends = problems.reduce((s2, p) => s2 + (p.sends || 0), 0);
     const chalk = d3range(clamp(Math.round(sends / 90), 0, 6)).map(() => { const f = fronts[Math.floor(r() * fronts.length)] || faces[0], cc = centroid(f.pts); return { x: cc[0] + (r() - .5) * R * .2, y: cc[1] + (r() - .5) * R * .1, r: .12 + r() * .08 }; });
-    return { ...v2, style: "facet", H, faces, hull, base, top: T.map(proj), topC, lichen, chalk, lean, under: null };
+    return { ...v2, style: "facet", H, H0: v2.H0, faces, hull, base, top: T.map(proj), topC, lichen, chalk, lean, under: null };
   }
 
   const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
@@ -520,7 +554,7 @@
       const dx = p[0] - b.x, dy = p[1] - b.y;
       if (Math.hypot(dx, dy) < form.R * 1.15 + pad) return true;
       // In front (south) of a boulder: anything tall standing there would hide it.
-      return dy < 0 && dy > -(form.R + form.H + pad * 2.2) && Math.abs(dx) < form.R * 1.1 + pad;
+      return dy < 0 && dy > -(form.R + (form.H0 ?? form.H) + pad * 2.2) && Math.abs(dx) < form.R * 1.1 + pad;
     });
     const nearBoulder = (p, pad) => bIndex.some(p, 30 + pad, ({ b, form }) => Math.hypot(p[0] - b.x, p[1] - b.y) < form.R * 1.2 + pad);
 
@@ -699,6 +733,9 @@
       const fg = o.kind !== "forest" || -o.depth < 14 || td < 9 || nearBoulder(p, 14) || size > 1.3 || streamDist(p, 8) < 7 || wallDist(p, 8) < 5;
       if (fg) size *= 1.08;
       const t = { x: +p[0].toFixed(2), y: +p[1].toFixed(2), kind, ever, fg, size: +size.toFixed(3), v: Math.floor(R() * 3), shape: Math.floor(R() * 6), flip: R() < .5, crownR: crownR * (fg ? 1.08 : 1) };
+      // None on the lot or its drive (the verge beside it once let one in). Checked
+      // after every draw for this tree, so the rest of the woods stays where it was.
+      if (lot.depth(p) > -crownR * .7 || drive.depth(p) > -crownR * .7) continue;
       trees.push(t); tIndex.add(p, t);
     }
 
@@ -896,7 +933,7 @@
       { kind: "bench", near: "The Lookout", gap: 3.5, foot: 1.8, prefer: Math.PI * .35, note: "best view in the park", find: "The reservoir one way, the quarry the other" },
     ],
     "The Tailgate": [
-      { kind: "kiosk", near: "at", exact: [7, 9], foot: 2.5, note: "trailhead kiosk", find: "Maps, the guestbook and Ranger Gus's notices" },
+      { kind: "kiosk", near: "at", exact: [-6.5, 9], foot: 2.5, note: "trailhead kiosk", find: "Maps, the guestbook and Ranger Gus's notices" },   // west of the trail, clear of The Tollbooth
       { kind: "bins", near: "The Dumpster", gap: 2.5, foot: 2, prefer: Math.PI * .8, note: null, find: null },
       { kind: "dog", near: "Pickles' Rock", gap: 1.2, foot: 1, prefer: -Math.PI * .35, note: "Pickles, asleep", name: "Pickles", find: "The lot dog, napping in the shade" },
       { kind: "picnic", near: "The Cooler", gap: 3.5, foot: 2.5, prefer: Math.PI * .7, note: null, find: null },

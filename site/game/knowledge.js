@@ -157,6 +157,7 @@
       return r;
     }
     const met = w => (all() ? null : (k().met && k().met[w]) || null);
+    function chat(w, date) { const r = meet(w, date); r.chats = (r.chats || 0) + 1; return r; }
     function pet(w, date) { const r = meet(w, date); r.pets = (r.pets || 0) + 1; r.petted = date; return r.pets; }
 
     // Local Buzz: a few notable things from the crag's recent history, told the
@@ -236,7 +237,7 @@
 
     return { all, v2, est, area, boulder, line, visible, name, grade, boulderName, stats, knownBoulders, linesOn, guidebook,
       boulderStats, areaStats, canGo, canSpot, mapView, visitArea, visitBoulder, identify, tell, inspect, spottable,
-      inspected, lookAgain, identified, sameName, hearOf, toldOf, meet, met, pet, buzz,
+      inspected, lookAgain, identified, sameName, hearOf, toldOf, meet, met, pet, chat, buzz,
       legend: p => (World && visible(p) ? World.legendOf(D, p) : null), faText: p => (World ? World.faText(D, est(p)) : "") };
   }
   const Know = { make };

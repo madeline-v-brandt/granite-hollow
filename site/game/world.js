@@ -499,7 +499,7 @@
     if (!k.lines || !Object.entries(k.lines).every(([p, l]) => isP(p) && l && isDay(l.date) && ["spot", "told", "tried", "migrated", "kiosk", "dev"].includes(l.how) && (l.from == null || isWho(l.from)))) return "bad lines";
     if (!isDay(k.newsSeen)) return "bad newsSeen";
     if (k.told != null && (typeof k.told !== "object" || !Object.values(k.told).every(t => t && isDay(t.date) && isWho(t.from)))) return "bad told";
-    if (k.met != null && (typeof k.met !== "object" || !Object.entries(k.met).every(([w, m]) => isWho(w) && m && num(m.n) && isDay(m.first) && (m.last == null || isDay(m.last)) && (m.pets == null || num(m.pets))))) return "bad met";
+    if (k.met != null && (typeof k.met !== "object" || !Object.entries(k.met).every(([w, m]) => isWho(w) && m && num(m.n) && isDay(m.first) && (m.last == null || isDay(m.last)) && (m.pets == null || num(m.pets)) && (m.chats == null || num(m.chats))))) return "bad met";
     if (k.looked != null && (typeof k.looked !== "object" || !Object.entries(k.looked).every(([b, d]) => /^\d+$/.test(b) && +b < nB && isDay(d)))) return "bad looked";
     return null;
   }

@@ -16,7 +16,8 @@
   const rulesLive = () => RULES2_LIVE && !(DEV && devRules() === 1);
   const justMigrated = new WeakSet();      // saves converted this session: they get a welcome back
   const START_DATE = "2025-09-06";
-  const START_AREA = "The Tailgate";      // every climbing day starts at the trailhead, by the lot
+  const START_AREA = "The Tailgate";      // every climbing day starts in the lot, which is part of The Tailgate
+  const PARK_SPOT = [-20, -4.6];          // where you get out of the car: behind it, in the lot's north row (art.js parks it there)
   const WORLD_MIN_ZOOM = 3.2;              // the world view never zooms out past an area; the paper map shows the park
   const fmt = d3.format(",");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -173,7 +174,7 @@
     Object.assign(G.player, s);
     G.dayNo++;
     G.loc = { sector: START_AREA, boulder: null };
-    { const st = D.sectorBy.get(START_AREA); G.pos = [st.x, st.y]; }     // at the trailhead junction
+    G.pos = PARK_SPOT.slice();                            // by your car in the lot
     if (!G.visited.includes(START_AREA)) G.visited.push(START_AREA);
     UI.recenter = true;                                   // the camera starts the day on you
     G.day = { no: G.dayNo, minute: 9 * 60 + Math.floor(Math.random() * 40), weather: w, startEnergy: s.energy,
@@ -470,7 +471,7 @@
 
   // ============================================================== encounters
   function maybeEncounter(sector) {
-    if (G.day.met.length >= 3) return;
+    if (G.day.met.filter(x => typeof x === "number").length >= 3) return;      // strangers: three a day at most
     if (v2()) { const w = regularFor(sector); if (w) { G.day.met.push(w); G.day.encounter = buildRegular(w, sector); return; } }
     if (Math.random() > 0.55) return;
     const pool = D.npcsBySector.get(sector).filter(ci => !G.day.met.includes(ci) && (!v2() || G.world.npc["c" + ci]));
@@ -566,10 +567,54 @@
   function regularFor(sector) {
     const met = w => G.day.met.includes(w);
     if (sector === "The Tailgate" && isAround("n:pickles") && !met("n:pickles") && Math.random() < 0.5) return "n:pickles";
-    if (G.day.bishop && isAround("n:bishop") && !met("n:bishop") && World.NAMED.bishop.home.includes(sector)) return "n:bishop";
-    const regs = World.CLIMBING_REGULARS.concat("n:gus").filter(w => isAround(w) && !met(w)).sort(() => Math.random() - .5);
-    for (const w of regs) if (Math.random() < (World.NAMED[w.slice(2)].home.includes(sector) ? 0.3 : 0.05)) return w;
-    return null;
+    return null;            // everyone else is somewhere on the map today (peopleToday): walk up to them
+  }
+  // Who's out today, and where (Stage 6): each regular who's around is at one of
+  // their home areas' boulders, decided by the day (so a reload doesn't move them).
+  // The Bishop only on his days. Drawn on the map; walk up to someone to talk.
+  const LOOKS = {
+    gus: { shirt: "#5f6b2d", pants: "#4a4031", hat: "cap", hatC: "#5f6b2d", skin: "#d1a27c", hair: "#9a958c", pad: null, longSleeves: true },
+    bishop: { shirt: "#9b3b2f", stripes: "rgba(30,20,15,.35)", pants: "#4b4a52", hat: null, skin: "#e2b996", hair: "#e6e2da", pad: null, longSleeves: true },
+    rowan: { shirt: "#e0b04a", pants: "#3c4a5c", hat: null, skin: "#a8734f", hair: "#2b1d16", pad: "#5a7d5a", chalk: "#e3dccb" },
+    hollis: { shirt: "#5f7fa6", pants: "#6b6457", hat: "bucket", hatC: "#8a7a55", skin: "#f0c9a6", hair: "#7a5a3a", pad: "#c9772b", chalk: "#2f6b4f" },
+    otis: { shirt: "#c46a3a", pants: "#2e3440", hat: "headband", hatC: "#d0a23a", skin: "#7a5038", hair: "#1e1a18", pad: "#2e4f6e", chalk: "#b5462e" },
+    bea: { shirt: "#b0436e", stripes: "rgba(255,255,255,.4)", pants: "#2e3440", shorts: true, hat: null, skin: "#c08a64", hair: "#3a2418", pad: "#3f7fa6", chalk: "#d0a23a" },
+    dez: { shirt: "#3b3f46", pants: "#5b4a3a", hat: "beanie", hatC: "#6d5aa8", skin: "#5e3b2a", hair: "#151210", pad: "#a43b2f", chalk: "#e3dccb" },
+  };
+  let peopleCache = { key: "", list: [] };
+  function peopleToday() {
+    if (!v2()) return [];
+    const key = G.date + "|" + !!G.day.bishop + "|" + Object.keys(G.world.npc).length;
+    if (peopleCache.key === key) return peopleCache.list;
+    const r = World.stream(G.world.seed, "people|" + G.date), list = [];
+    for (const w of [...World.CLIMBING_REGULARS, "n:gus", "n:bishop"]) {
+      const key2 = w.slice(2), n = World.NAMED[key2], out = r(), pa = r(), pb = r(), ps = r();     // drawn whatever happens, so one person doesn't move another
+      if (!isAround(w) || (key2 === "bishop" ? !G.day.bishop : out > (key2 === "gus" ? .55 : .45))) continue;
+      const area = n.home[Math.floor(pa * n.home.length)], bs = D.boulders.filter(b => b.sector === area);
+      if (!bs.length) continue;
+      list.push({ who: w, name: n.name.replace(/^the /, "The "), b: bs[Math.floor(pb * bs.length)].id, side: ps < .5 ? -1 : 1, look: LOOKS[key2] || {} });
+    }
+    peopleCache = { key, list };
+    return list;
+  }
+  // Walking up to someone (within a few metres of them) starts a conversation, once a day each.
+  function meetNearby(pos) {
+    if (!v2() || G.day.over) return false;
+    // Pickles, napping by Pickles' Rock.
+    const dog = M.paint && M.paint.scene.landmarks.find(l => l.kind === "dog");
+    if (dog && isAround("n:pickles") && !G.day.met.includes("n:pickles") && Math.hypot(pos[0] - dog.x, pos[1] - dog.y) < 6) {
+      G.day.met.push("n:pickles"); G.day.encounter = buildRegular("n:pickles", "The Tailgate", { napping: true }); return true;
+    }
+    for (const p of peopleToday()) {
+      if (G.day.met.includes(p.who)) continue;
+      const at = M.paint && M.paint.personAt(p.who); if (!at) continue;
+      if (Math.hypot(pos[0] - at.x, pos[1] - at.y) < 7) { G.day.met.push(p.who); G.day.encounter = buildRegular(p.who, D.boulders[p.b].sector); return true; }
+    }
+    return false;
+  }
+  function personSpot(who) {
+    const at = M.paint.personAt(who); if (!at) return null;
+    return [at.x + at.side * 4.5, at.y - .5];          // beside them, on the far side from the rock
   }
   // An area you haven't found that the community has known about for a while
   // (5+ of your climbing days), so explorers get there first. The nearest one.
@@ -612,12 +657,15 @@
     return pick([`Back in '${yy} we climbed everything out here. Everything. Nobody wrote any of it down, of course.`, `You know who put up the first problem in this park? Me. Well. Me and Dot. Mostly me.`,
       `They call me the Bishop. Don't ask why. It's a long story, and most of it's true.`]);
   }
-  function buildRegular(w, sector) {
+  function buildRegular(w, sector, ctx = {}) {
     const key = w.slice(2), n = World.NAMED[key], r = K.meet(w, G.date), first = r.n === 1;
     const e = { who: w, sector, line: "", rec: null, recLine: "", beta: null, accepted: false, betaTaken: false };
     if (key === "pickles") {
-      e.line = pick(first ? ["A scruffy dog trots over from the lot, tail going. His tag says PICKLES."] : ["Pickles trots over from the lot, tail going.", "Pickles is asleep under the kiosk. One ear lifts as you pass.",
-        "Pickles has found a stick and would like you to admire it.", "Pickles is supervising the parking lot. He wags when he sees you."]);
+      e.line = ctx.napping
+        ? pick(first ? ["A scruffy dog is napping in the shade of the boulder. His tag says PICKLES. His tail thumps when he sees you."]
+          : ["Pickles is napping in the shade of his rock. His tail thumps twice when he sees you.", "Pickles opens one eye, decides you're a friend, and rolls over for a belly rub.", "Pickles is guarding a very important stick beside his rock."])
+        : pick(first ? ["A scruffy dog trots over from the lot, tail going. His tag says PICKLES."] : ["Pickles trots over from the lot, tail going.", "Pickles is asleep under the kiosk. One ear lifts as you pass.",
+          "Pickles has found a stick and would like you to admire it.", "Pickles is supervising the parking lot. He wags when he sees you."]);
       e.pet = true; return e;
     }
     if (key === "bishop") {
@@ -661,6 +709,39 @@
     }
     save(); renderAll();
   }
+  // Sitting down with someone for twenty minutes: a rest, in company, and a story.
+  const CHATS = {
+    gus: ["Gus tells you about the closure in '87: insurance, mostly, and one very loud town meeting. “Took thirty-eight years and a new county commissioner to get that gate open again.”",
+      "Gus explains that Pickles turned up at the lot as a puppy one spring and simply never left. “He's not my dog. I just feed him. Every day. And he sleeps in my truck.”",
+      "Gus points out the old quarry road through the trees, and the stone wall the farmers built before there was a park. “Everything out here was something else first.”"],
+    bishop: ["The Bishop tells you how the crag got its name. The story takes nineteen minutes, involves a mule, and doesn't seem to be about the crag.",
+      "The Bishop says Dot was the best climber he ever saw. He says it quietly, and for once he doesn't add anything funny.",
+      "The Bishop shows you how they used to tape their fingers in the seventies. It involves electrical tape. You decide not to try it."],
+    rowan: ["Rowan shows you a sketchbook full of boulders, each with tiny arrows for the moves. “I can't always climb them. But I can draw them.”",
+      "Rowan moved to the village in the spring for a job at the library, and found the park by accident on a walk. “I thought the rocks looked like they wanted to be climbed.”",
+      "You talk about nothing much for twenty minutes: the light on the rock, the best sandwich in the village, a song you both half-remember. It's nice."],
+    hollis: ["Hollis has a binder. An actual binder, with tabs. Every problem in the park is in it, with sketches, and some of them have footnotes.",
+      "Hollis explains that the schoolhouse boulders are named after the 1920s attendance book. “Somebody had to. It might as well be accurate.”",
+      "Hollis admits to never having made a first ascent. “I'm a historian. Someone has to write it down.” Then, quieter: “There's one I've been looking at, though.”"],
+    otis: ["Otis has been climbing since 1994, mostly at the same three crags. “People ask why. Well, look at it.” You look at it. He has a point.",
+      "Otis shares half his sandwich. It's an excellent sandwich. He's been on the same slab since August and says it's the best thing he's ever not done.",
+      "Otis tells you about the one time it was truly bad weather. Then he decides it wasn't that bad."],
+    bea: ["Bea demonstrates a dyno on a log. She doesn't stick it. She is delighted anyway.",
+      "Bea wants to know your hardest send, your favourite problem, your shoe size and whether you've ever fallen off the top of something. All at once.",
+      "Bea admits she's a bit scared of highballs. “Don't tell anyone. Especially Dez.”"],
+    dez: ["Dez doesn't say much. You sit and watch the light move across the rock. After a while: “That one's been bugging me for a month.”",
+      "Dez says the trick to hard climbing is resting properly. Then demonstrates, by lying down on the pad and closing their eyes.",
+      "Dez asks what you're working on, and listens properly to the whole answer. “You'll get it,” Dez says, as if it's a fact."],
+  };
+  function sitChat() {
+    const e = G.day.encounter; if (!e || !e.who || !e.who.startsWith("n:") || e.pet || e.chatted || UI.busy || G.day.over) return;
+    const key = e.who.slice(2), r = K.chat(e.who, G.date), lines = CHATS[key] || ["You sit and talk for a while."];
+    e.chatted = lines[(r.chats - 1) % lines.length];
+    G.day.minute += 20;
+    G.player.energy = Math.min(G.day.startEnergy, G.player.energy + 15);
+    note(`Sat and talked with ${whoOf(e.who).replace(/^the /, "the ")}.`);
+    afterAction();
+  }
   function petDog() {
     const e = G.day.encounter; if (!e || !e.pet || e.petted) return;
     const n = K.pet(e.who, G.date);
@@ -703,6 +784,8 @@
       // Clicking a boulder walks you to it; clicking open ground walks you to that spot.
       onBoulder: id => { const b = D.boulders[id]; goTo({ sector: b.sector, boulder: b.id }, { tap: true }); },
       onGround: (x, y) => goToPoint([x, y]),
+      // Clicking someone walks you over to them (and you say hello when you get there).
+      onPerson: who => { const p = personSpot(who); if (p) goToPoint(p); },
       onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
         const mins0 = minutesTo({ sector: b.sector, boulder: b.id }, true);
@@ -730,7 +813,7 @@
     $("#map-paper").onclick = () => togglePaper();
 
     // ---- the ground: where you can stand, and how fast you walk there
-    const LOT = [0, 0];                                  // the trailhead, by the kiosk
+    const LOT = PARK_SPOT;                               // your car, in the lot
     // Two planners: trips the game walks for you keep to the trails at the old pace
     // (Wk); walking yourself (keys, a tap) is a little quicker and takes shortcuts (Wm).
     const trailPts = S.trails.map(t => t.pts), wet = p => S.inWater(p, 0);
@@ -739,7 +822,10 @@
     const [bx0, bx1, by0, by1] = S.bounds, edge = 60;
     const inPark = p => p[0] > bx0 + edge && p[0] < bx1 - edge && p[1] > by0 + edge * .6 && p[1] < by1 - edge;
     const boulderAt = p => S.boulders.find(bo => Math.hypot(p[0] - bo.b.x, p[1] - bo.b.y) < bo.form.R * .9 + .5);
-    const solid = p => !inPark(p) || S.inWater(p, -.4) || !!boulderAt(p);
+    // Parked cars (art.js): about 3.8 m wide and 4.3 m long, nosed into their spaces.
+    const cars = S.marks.filter(m => m.kind === "car").map(m => ({ x0: m.x - 2.1, x1: m.x + 2.1, y0: m.y - (m.rot ? 3.5 : 1.2), y1: m.y + (m.rot ? 1.2 : 3.5) }));
+    const carAt = p => cars.some(c => p[0] > c.x0 && p[0] < c.x1 && p[1] > c.y0 && p[1] < c.y1);
+    const solid = p => !inPark(p) || S.inWater(p, -.4) || !!boulderAt(p) || carAt(p);
     const onTrail = p => S.trailDist(p, 4) < 2.6;
     // Where you stand to climb a boulder: in front of it (south-west), on open ground.
     function approach(id) {
@@ -849,6 +935,7 @@
     }
     // Where you are changed: arriving at a boulder or an area (walking past things on a trip is quiet).
     function moved_(quiet = false) {
+      if (!quiet && meetNearby(G.pos)) { renderAll(); showPrompt(); }
       const now = locAt(G.pos, G.loc);
       if (sameLoc(now, G.loc)) return;
       const prev = { ...G.loc };
@@ -917,6 +1004,7 @@
       G.pos = w.path.pts[w.path.pts.length - 1];
       const now = w.to ? { sector: w.to.sector, boulder: w.to.boulder } : locAt(G.pos, G.loc);
       arrive(w.from, now, { quiet: sameLoc(w.from, now) });
+      meetNearby(G.pos);                                 // walked over to someone
       save(); renderAll(); showPrompt();
     }
     // Stop a trip where it is (keys take over, the day ends, a new trip starts).
@@ -984,7 +1072,7 @@
         onGo: G.day.over ? null : name => { if (K.canGo({ sector: name })) travel({ sector: name, boulder: null }); } });
     }
     const lookAtMe = (ms = 0) => { P.setFollow(true, ms); $("#map-me").classList.remove("lost"); };
-    let knownKey = "all", outfitKey = "";
+    let knownKey = "all", outfitKey = "", peopleKey = "";
     function update() {
       if (!validPos(G.pos)) G.pos = pointOf(G.loc);       // a save from before Stage 4, or a loaded file
       if (UI.recenter) { UI.recenter = false; P.setMe(G.pos, pose(false)); P.setFollow(true, 0); }
@@ -993,6 +1081,8 @@
       if (key !== knownKey) { knownKey = key; P.setKnown(view); }
       const ok = G.day.no + "|" + G.day.weather.temp;
       if (ok !== outfitKey) { outfitKey = ok; P.setOutfit(outfitFor()); }
+      const pk = G.date + "|" + !!G.day.bishop + "|" + peopleToday().length + "|" + !!G.day.over;
+      if (pk !== peopleKey) { peopleKey = pk; P.setPeople(G.day.over ? [] : peopleToday()); }
       if (!walk && !keys.size) P.setMe(G.pos, pose(false));
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
       P.setMarks({
@@ -1015,15 +1105,24 @@
   function outfitFor() {
     const w = G.day.weather, t = w.temp;
     let h = 0; for (const c of String(G.id || "climber")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-    // Each shirt has pads that stand out against it.
+    const bits = (sh, n) => (h >>> sh) % n;
+    // Each shirt has pads that stand out against it. You own three shirts and
+    // wear a different one each day; your pad, pants and chalk bag are always yours.
     const SHIRT = [["#c2553a", ["#2f6b8f", "#3c7a3b", "#2e4f6e"]], ["#2f6b4f", ["#c9772b", "#a43b2f", "#55306b"]], ["#6d5aa8", ["#d0a23a", "#3c7a3b", "#c9772b"]],
       ["#d08a2c", ["#2f6b8f", "#55306b", "#2e4f6e"]], ["#3f7fa6", ["#c9772b", "#a43b2f", "#d0a23a"]], ["#b0436e", ["#2f6b8f", "#3c7a3b", "#d0a23a"]]];
     const JACKET = ["#8a3f2b", "#2e4f6e", "#5f6b2d", "#6b3b5e"], HAT = ["#b5462e", "#d0a23a", "#2f6b8f", "#6d5aa8"];
-    const [shirt, pads] = SHIRT[h % 6];
-    return { shirt, pad: pads[(h >>> 4) % 3], hatC: HAT[(h >>> 8) % 4],
-      shorts: t >= 72, pants: t >= 72 ? "#6b6457" : "#3f4f63", longSleeves: t < 62,
-      jacket: t < 50 ? JACKET[(h >>> 12) % 4] : false,
-      hat: t < 45 ? "beanie" : t >= 78 && /sun|bluebird|hot/i.test(w.sky) ? "cap" : null,
+    const PANTS = ["#3f4f63", "#5b4a3a", "#4a5a3f", "#2e3440", "#6a4b5c"], SHORTS = ["#6b6457", "#4f5d6b", "#7a5b3f"], BAG = ["#d0a23a", "#2f6b4f", "#b5462e", "#3f7fa6", "#e3dccb"];
+    const [, pads] = SHIRT[h % 6], pad = pads[bits(4, 3)];
+    const wardrobe = [h % 6, (h % 6 + 1 + bits(16, 2)) % 6, (h % 6 + 3 + bits(18, 2)) % 6];
+    const todays = wardrobe[(G.dayNo || 0) % 3], shirt = SHIRT[todays][0];
+    const stripes = (todays + bits(20, 4)) % 3 === 0 ? "rgba(255,255,255,.38)" : null;
+    const sunny = /sun|bluebird|clear|hot/i.test(w.sky);
+    const hat = t < 45 ? "beanie" : t >= 78 && sunny ? (bits(22, 2) ? "cap" : "bucket") : t >= 58 && t < 78 && bits(24, 3) === 0 ? "headband" : null;
+    return { shirt, stripes, pad, hatC: HAT[bits(8, 4)],
+      shorts: t >= 72, pants: t >= 72 ? SHORTS[bits(26, 3)] : PANTS[bits(10, 5)], longSleeves: t < 62,
+      hoodie: t >= 50 && t < 62 && bits(28, 2) === 0,
+      jacket: t < 50 ? JACKET[bits(12, 4)] : false,
+      hat, chalk: BAG[bits(14, 5)],
       scarf: t < 36 ? "#d9b24c" : false };
   }
 
@@ -1223,8 +1322,10 @@
       ${e.dir && e.dirTaken ? `<p class="npc-say">${esc(`${e.who === "n:bishop" ? "He draws" : name + " draws"} you a little map to ${e.dir} on the back of a receipt.`)}</p>` : ""}
       ${e.reveal != null ? say(e.revealLine) : ""}
       ${e.beta && !e.betaTaken ? `<q>${esc(e.beta.text)}</q>` : ""}
+      ${e.chatted ? `<p class="npc-say npc-story">${esc(e.chatted)}</p>` : ""}
       <div class="acts">
         ${e.pet && !e.petted ? `<button type="button" class="btn small primary" data-pet>Pet Pickles</button>` : ""}
+        ${e.who && e.who.startsWith("n:") && !e.pet && !e.chatted ? `<button type="button" class="btn small" data-chat ${UI.busy || G.day.over ? "disabled" : ""}>Sit and chat · 20 min</button>` : ""}
         ${e.dir ? (e.dirTaken ? `<button type="button" class="btn small primary" data-go-sector="${esc(e.dir)}">Go there</button>` : `<button type="button" class="btn small primary" data-dir>Ask the way</button>`) : ""}
         ${e.reveal != null ? (e.revealTaken ? `<button type="button" class="btn small" data-go-boulder="${D.problems[e.reveal].b}">Go there</button>` : `<button type="button" class="btn small primary" data-reveal>Where exactly?</button>`) : ""}
         ${e.rec != null ? (e.accepted ? `<span class="chip good">Added to your journal</span>` : `<button type="button" class="btn small primary" data-accept>Add to my list</button>`) : ""}
@@ -1565,7 +1666,7 @@
     if (UI.cl.view === "rankings") return rankingsHtml();
     if (UI.cl.view === "leaders") return leadersHtml();
     const c = UI.cl, q = c.q.trim().toLowerCase();
-    const doneOk = p => !c.done || (c.done === "sent" ? !!G.ps[p.id]?.sent : c.done === "tried" ? !!G.ps[p.id] && !G.ps[p.id].sent && G.ps[p.id].att > 0 : !G.ps[p.id]?.sent);
+    const doneOk = p => !c.done || (c.done === "fa" ? World.isMine(G, p.id) : c.done === "sent" ? !!G.ps[p.id]?.sent : c.done === "tried" ? !!G.ps[p.id] && !G.ps[p.id].sent && G.ps[p.id].att > 0 : !G.ps[p.id]?.sent);
     const gr = p => K.grade(p.id), st = new Map();
     const stats = p => { if (!st.has(p.id)) st.set(p.id, K.stats(p.id)); return st.get(p.id); };
     let list = K.guidebook().map(i => D.problems[i]).filter(p => gr(p) >= c.lo && gr(p) <= c.hi && (!c.sector || p.sector === c.sector) && doneOk(p) &&
@@ -1581,7 +1682,7 @@
         <select id="cl-sort" aria-label="Sort"><option value="logs" ${c.sort === "logs" ? "selected" : ""}>Most climbed</option><option value="stars" ${c.sort === "stars" ? "selected" : ""}>Highest rated</option><option value="grade" ${c.sort === "grade" ? "selected" : ""}>Grade</option><option value="fit" ${c.sort === "fit" ? "selected" : ""}>Best for you</option></select>
         <select id="cl-lo" aria-label="Lowest grade">${gradeOpts(c.lo)}</select>
         <select id="cl-hi" aria-label="Highest grade">${gradeOpts(c.hi)}</select>
-        <select id="cl-done" aria-label="Your ticks">${[["", "All problems"], ["unsent", "Not sent yet"], ["tried", "Tried, not sent"], ["sent", "Sent"]].map(([v, l]) => `<option value="${v}" ${c.done === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+        <select id="cl-done" aria-label="Your ticks">${[["", "All problems"], ["unsent", "Not sent yet"], ["tried", "Tried, not sent"], ["sent", "Sent"], ...(K.all() ? [] : [["fa", "My first ascents"]])].map(([v, l]) => `<option value="${v}" ${c.done === v ? "selected" : ""}>${l}</option>`).join("")}</select>
       </div>
       <p class="meta">${K.all() ? `${total} problems` : `${total} documented ${total === 1 ? "problem" : "problems"} you know of`}${total > 60 ? ", showing 60" : ""}.${K.all() ? "" : " Problems appear here once someone has climbed them, on boulders you know."}</p>
       <ul class="rowlist">${list.map(p => { const x = stats(p); return `<li><button type="button" class="rowbtn" data-cl="${p.id}"><span><span class="t">${esc(nameGrade(p.id))}${G.ps[p.id]?.sent ? ` <span style="color:var(--plus);font-weight:500">✓</span>` : ""}</span>
@@ -1617,6 +1718,19 @@
       <h3>Recent logs</h3>${mine}${entries || `<p class="meta">No logs yet.</p>`}`;
   }
 
+  // The first ascent, as the oldest entry in a problem's logs (someone else's: yours
+  // is already among your own ticks above).
+  const FA_NOTES = ["Cleaned it, climbed it, named it.", "Took a couple of sessions to brush the holds. Worth it.", "Couldn't believe nobody had done this. Get on it.",
+    "Spotted it from the trail last week. Went better than expected.", "Rock's a bit dirty still, but the moves are great.", "Saw the line, had to try it. Hope you like it.", "First go after cleaning. Lucky!"];
+  function faLogHtml(i, e) {
+    if (!e || e.by === "you") return "";
+    const info = World.whoInfo(D, e.by), name = info.name.charAt(0).toUpperCase() + info.name.slice(1);
+    if (e.old) return `<div class="logentry fa"><span class="who">${esc(name)}</span><div class="what">${e.old}s · First ascent (from the kiosk notebook)</div></div>`;
+    const note = info.old || info.type === "dog" ? "" : FA_NOTES[(i * 7 + e.date.charCodeAt(9)) % FA_NOTES.length];
+    return `<div class="logentry fa"><span class="who">${esc(name)}<small>${info.h ? info.h + " cm" : ""}</small></span>
+      <div class="what">${shortDate(e.date)} · First ascent${e.flash ? " · Flash" : ""}</div>${note ? `<p>${esc(note)}</p>` : ""}</div>`;
+  }
+
   // A problem's page under the new rules: what's been documented in this save's
   // Granite Hollow, or, for a line nobody has climbed, just what you can see.
   function cragLineHtml(i) {
@@ -1631,7 +1745,7 @@
       return `<div class="logentry"><span class="who">${esc(info.name)}<small>${info.h ? info.h + " cm" : ""}</small></span>
         <div class="what">${shortDate(date)} · ${{ F: "Flash", S: "Send" }[style] || "Send"}${stars != null ? ` · <span class="stars">${"★".repeat(stars) || "bomb"}</span>` : ""}${sg != null ? ` · suggests V${sg}` : ""}</div>
         ${c ? `<p>${esc(c)}</p>` : ""}</div>`;
-    }).join("") : "";
+    }).join("") + faLogHtml(i, e) : "";
     const head = state === "est"
       ? `<h2 style="margin-top:8px">${esc(pname(i))} <span class="grade" style="font-size:24px">${vg(i)}</span></h2>
         <p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · ${x.stars != null ? `<span class="stars">★</span> ${x.stars.toFixed(1)} from ${x.ratings} ${x.ratings === 1 ? "rating" : "ratings"}` : "no ratings yet"} · ${fmt(x.sends)} ${x.sends === 1 ? "send" : "sends"}${e && e.classic ? " · a Granite Hollow classic" : ""}</p>
@@ -1774,6 +1888,7 @@
     on("[data-dir]", askWay);
     on("[data-reveal]", hearLine);
     on("[data-pet]", petDog);
+    on("[data-chat]", sitChat);
     on("[data-beta]", takeBeta);
     on("[data-dismiss]", () => { G.day.encounter = null; save(); renderPanel(); });
     on("[data-rate]", n => { const t = G.ticks[G.day.last.tick]; t.stars = +n.dataset.rate; save(); renderPanel(); });

@@ -223,6 +223,7 @@
     const rings = world.append("g").attr("class", "rings");          // project rings, on the ground under the rocks
     const stand = world.append("g").attr("class", "standing tiled");
     const over = world.append("g").attr("class", "over");            // your pads at the boulder you're at
+    const people = world.append("g").attr("class", "people");        // the regulars, at their boulders today (Stage 6)
     const sky = world.append("g").attr("class", "sky-layer");
     const light = svg.append("g").attr("class", "light").attr("pointer-events", "none");
     const glow = svg.append("g").attr("class", "glow").attr("pointer-events", "none");
@@ -329,7 +330,10 @@
     const trailD = t => tl(t.pts.map(p => [f1(p[0]), f1(-p[1])]));
     // Trails go down first: where they cross the bald, the heath covers them and only a worn line and the blazes show.
     const trailUnder = ground.append("g").attr("class", "trails");
-    for (const t of S.trails) { trailUnder.append("path").attr("class", "trail-edge").attr("d", trailD(t)); trailUnder.append("path").attr("class", "trail-dirt").attr("d", trailD(t)); }
+    // Every edge first, then every trail's dirt over them, so where trails meet no
+    // edge is drawn across another trail's tread (the little outlines at junctions).
+    for (const t of S.trails) trailUnder.append("path").attr("class", "trail-edge").attr("d", trailD(t));
+    for (const t of S.trails) trailUnder.append("path").attr("class", "trail-dirt").attr("d", trailD(t));
     const baldG = ground.append("g").attr("class", "bald-g");
     baldG.append("path").attr("class", "bald-fringe").attr("d", ringD(S.bald.ring(1.04)));
     baldG.append("path").attr("class", "bald").attr("d", baldD);
@@ -793,10 +797,22 @@
       // Soot on The Hearthstone.
       if (/soot/i.test(desc)) g.append("path").attr("class", "r-soot").attr("d", ell(T[0] * .2, T[1] * .55, R * .5, R * .45)).attr("fill", "url(#soft-dark)").attr("clip-path", `url(#bclip-${bo.id})`);
     }
+    // Your crash pads, down in front of the boulder: thick foam blocks (about half
+    // the climber's leg height at walking zoom, PAD_T), each with its top, the
+    // front face toward you and whichever end faces you.
+    const PAD_T = .85;
     function drawPads(g, F) {
       const y0 = F.R * 1.0, R = F.R;
-      g.append("path").attr("class", "pad p0").attr("d", `M${f2(-R * .55)},${f2(y0)}L${f2(R * .05)},${f2(y0 - .15)}L${f2(R * .12)},${f2(y0 + 1.1)}L${f2(-R * .5)},${f2(y0 + 1.25)}Z`);
-      g.append("path").attr("class", "pad p1").attr("d", `M${f2(R * .1)},${f2(y0 - .1)}L${f2(R * .62)},${f2(y0 - .25)}L${f2(R * .72)},${f2(y0 + .85)}L${f2(R * .18)},${f2(y0 + 1.05)}Z`);
+      const block = (cls, q) => {          // q: back-left, back-right, front-right, front-left (on the ground)
+        const up = p => [p[0], p[1] - PAD_T], P = pts => "M" + pts.map(p => `${f2(p[0])},${f2(p[1])}`).join("L") + "Z";
+        const [bl, br, fr, fl] = q;
+        g.append("path").attr("class", `pad ${cls} pad-side`).attr("d", P(fr[0] > 0 ? [br, fr, up(fr), up(br)] : [bl, fl, up(fl), up(bl)]));
+        g.append("path").attr("class", `pad ${cls} pad-front`).attr("d", P([fl, fr, up(fr), up(fl)]));
+        g.append("path").attr("class", `pad ${cls}`).attr("d", P(q.map(up)));
+        g.append("path").attr("class", "pad-seam").attr("d", `M${f2((up(bl)[0] + up(br)[0]) / 2)},${f2((up(bl)[1] + up(br)[1]) / 2)}L${f2((up(fl)[0] + up(fr)[0]) / 2)},${f2((up(fl)[1] + up(fr)[1]) / 2)}`);
+      };
+      block("p0", [[-R * .55, y0], [R * .05, y0 - .15], [R * .12, y0 + 1.1], [-R * .5, y0 + 1.25]]);
+      block("p1", [[R * .1, y0 - .1], [R * .62, y0 - .25], [R * .72, y0 + .85], [R * .18, y0 + 1.05]]);
       g.append("path").attr("class", "bucket").attr("d", `M${f2(R * .85)},${f2(y0 + .2)}h.5l-.06,.55h-.38z`);
     }
     function drawBird(g, kind) {
@@ -830,7 +846,7 @@
       [[0, 0, .75, .3], [.05, -.42, .58, .25], [-.04, -.8, .42, .2], [.02, -1.12, .26, .16]].forEach(([x, y, rx, ry]) => g.append("path").attr("class", "cairn-stone").attr("d", ell(x, y, rx, ry)));
     }
     function drawCar(Lr, m) {
-      const g = Lr.append("g").attr("class", "car c" + m.c).attr("transform", `translate(${f2(m.x)},${f2(-m.y)})`);
+      const g = Lr.append("g").attr("class", "car c" + m.c).attr("transform", `translate(${f2(m.x)},${f2(-m.y)})${m.rot ? ` rotate(${m.rot})` : ""}`);
       g.append("path").attr("class", "car-shadow").attr("d", ell(.3, .4, 2.2, 1.1));
       // Nosed into its space: seen from behind and above.
       g.append("path").attr("class", "car-body").attr("d", "M-1.9,.6V-1.6Q-1.9,-2.4 -1.1,-2.5H1.1Q1.9,-2.4 1.9,-1.6V.6Q1.9,1 1.5,1H-1.5Q-1.9,1 -1.9,.6Z");
@@ -1218,11 +1234,30 @@
     labelItems.forEach(d => { d.w = measure(d.text, d.small ? "italic 600 13px Fraunces, Georgia, serif" : FONT[d.kind]) + (SPACING[d.kind] || 0) * d.text.length; });
 
     // ---- you: a small climber with a crash pad on their back, dressed for the
-    // weather (setOutfit), drawn in screen space above the canopy so the woods
-    // never hide them. Feet at 0,0, about 30 px tall at scale 1. Four facings:
+    // weather (setOutfit), drawn above the map so the woods never hide them.
+    // They live in their own small SVG layered over the map (not inside it):
+    // their legs move every frame, and inside the map that made the browser
+    // repaint the whole park each frame while walking (Stage 6: ~22 → ~50 fps
+    // headless). Now walking only slides the map, which costs nothing to draw. Feet at 0,0, about 30 px tall at scale 1. Four facings:
     // from the side (r, and mirrored for l), from the front (d, walking towards
     // you, the pad peeking out behind) and from the back (u, the pad on show).
-    const meG = marks.append("g").attr("class", "me");
+    const ME_BOX = [72, 84], ME_FOOT = [36, 62];      // the layer's size, and where the feet are in it (fits the figure at scale 1.6 and the pulse)
+    const meSvg = d3.select(wrap).insert("svg", () => svgEl.nextSibling).attr("class", "me-layer").attr("aria-hidden", "true")
+      .attr("width", ME_BOX[0]).attr("height", ME_BOX[1]).attr("viewBox", `${-ME_FOOT[0]} ${-ME_FOOT[1]} ${ME_BOX[0]} ${ME_BOX[1]}`);
+    const meG = meSvg.append("g").attr("class", "me").attr("id", "me-live");
+    // What stands in front of you (Stage 6): copies of the nearby boulders and
+    // trees between you and the viewer, drawn over you in this small layer, and a
+    // faint see-through outline of you on top so you never lose yourself.
+    // The copies live in a transparent layer the size of the map that slides with
+    // it (so walking never redraws them); the see-through outline in a small layer
+    // that follows you, like the climber's own.
+    const occSvg = d3.select(wrap).insert("svg", () => meSvg.node().nextSibling).attr("class", "occ-layer").attr("aria-hidden", "true").attr("display", "none");
+    const occInner = occSvg.append("g");
+    let occBox = null;          // what the copies cover, in the map's own units (x, and y down): [x0, y0, x1, y1]
+    const ghostSvg = d3.select(wrap).insert("svg", () => occSvg.node().nextSibling).attr("class", "me-layer me-ghost").attr("aria-hidden", "true").attr("display", "none")
+      .attr("width", ME_BOX[0]).attr("height", ME_BOX[1]).attr("viewBox", `${-ME_FOOT[0]} ${-ME_FOOT[1]} ${ME_BOX[0]} ${ME_BOX[1]}`);
+    ghostSvg.append("use").attr("href", "#me-live");
+    let occKey = "";
     let outfit = { shirt: "#c2553a", pants: "#3f4f63", shorts: false, jacket: false, hat: null, scarf: false, pad: "#2f6b8f", skin: "#e6bf98", hair: "#4a3426" };
     let mePose = { phase: 0, moving: false, facing: "d", padDown: false };
     let meParts = null;
@@ -1233,18 +1268,31 @@
     });
     const top = o => (o.jacket ? o.jacket : o.shirt), sleeve = o => o.jacket || (o.longSleeves ? o.shirt : o.skin);
     // A pad seen from behind or peeking out from behind (x0..x0+w).
-    function padFlat(g, o, x0, w, y0 = -25, h = 15.5) {
+    function padFlat(g, o, x0, w, y0 = -27, h = 18) {
       const p = g.append("g").attr("class", "me-pad");
       p.append("rect").attr("x", x0).attr("y", y0).attr("width", w).attr("height", h).attr("rx", 1.6).attr("fill", o.pad);
-      p.append("path").attr("d", `M${x0},${y0 + 4.5}h${w}M${x0},${y0 + 10}h${w}`).attr("class", "me-pad-seam");
+      p.append("path").attr("d", `M${x0},${y0 + h * .3}h${w}M${x0},${y0 + h * .64}h${w}`).attr("class", "me-pad-seam");
       return p;
     }
+    // A climber's extras: stripes on the shirt, a hood, a chalk bag, and hats.
+    const stripesOn = (g, o, x0 = -4.8, w = 9.6) => { if (o.stripes && !o.jacket) g.append("path").attr("class", "me-stripes").attr("stroke", o.stripes).attr("d", `M${x0},-18.4h${w}M${x0},-15.4h${w}M${x0},-12.4h${w}`); };
+    const chalkBag = (g, o, x, y = -11.6) => g.append("path").attr("class", "me-chalk").attr("fill", o.chalk || "#d0a23a").attr("d", `M${x - 1.5},${y}h3v2.6q0,1-1,1h-1q-1,0-1,-1z`);
+    function hatOn(g, o, view, cx) {          // view: side, front or back; cx: the head's centre
+      const c = o.hatC || "#b5462e";
+      if (o.hat === "headband") g.append("path").attr("class", "me-band").attr("stroke", c).attr("d", view === "side" ? `M${cx - 4.3},-28.2L${cx + 4.4},-27.6` : `M${cx - 4.4},-27.9h8.8`);
+      else if (o.hat === "bucket") g.append("path").attr("class", "me-hat").attr("fill", c).attr("d", `M${cx - 3.6},-27.4Q${cx - 3.4},-31.4 ${cx},-31.5Q${cx + 3.4},-31.4 ${cx + 3.6},-27.4Z` + (view === "side" ? `M${cx - 6},-27.2Q${cx},-28.6 ${cx + 6.4},-26.8L${cx + 6},-26.2Q${cx},-27.6 ${cx - 5.8},-26.5Z` : `M${cx - 6.4},-27.4Q${cx},-25.6 ${cx + 6.4},-27.4Q${cx},-28.6 ${cx - 6.4},-27.4Z`));
+    }
     function drawSide(g, o) {
+      // The far arm, behind everything, a shade darker.
+      const back = g.append("path").attr("class", "me-arm me-arm-far").attr("stroke", d3.color(o.jacket || (o.longSleeves || o.hoodie ? o.shirt : o.skin)).darker(.45).formatHex());
       const legs = legsOf(g, o);
       // The pad on the back (the back is to the left: mirrored to face left).
-      const padG = padFlat(g, o, -11, 7.2);
+      const padG = padFlat(g, o, -13.2, 8.8);
       g.append("path").attr("class", "me-strap").attr("d", "M-4.6,-21.5Q0,-17 2.6,-10.5");
+      if (o.hoodie && !o.jacket) g.append("path").attr("class", "me-hood").attr("fill", o.shirt).attr("d", "M-4.6,-20.4Q-6.2,-23.4 -3.2,-24.2Q-1.2,-23.6 -1.4,-20.8Z");
       g.append("rect").attr("class", "me-torso").attr("x", -4.8).attr("y", -21.5).attr("width", 9.6).attr("height", 12.5).attr("rx", 3.2).attr("fill", top(o));
+      stripesOn(g, o);
+      chalkBag(g, o, -3.6);
       if (o.jacket) g.append("path").attr("class", "me-zip").attr("d", "M1.2,-21V-9.5");
       if (o.scarf) g.append("path").attr("class", "me-scarf").attr("d", "M-3.6,-21.3h7.4v2.4h-7.4zM2.2,-19.2l1,4.2").attr("fill", o.scarf);
       const arm = g.append("path").attr("class", "me-arm").attr("stroke", sleeve(o));
@@ -1254,23 +1302,29 @@
         g.append("circle").attr("class", "me-hat").attr("cx", .6).attr("cy", -32.3).attr("r", 1.4).attr("fill", o.hatC || "#b5462e");
       } else if (o.hat === "cap") {
         g.append("path").attr("class", "me-hat").attr("d", "M-3.9,-27.4a4.6,4.4 0 0 1 9,0zM4.6,-27.6h3.6").attr("fill", o.hatC || "#2f6b4f");
-      } else g.append("path").attr("class", "me-hair").attr("d", "M-3.9,-26.8a4.6,4.6 0 0 1 8.4,-2.4q-3.2,.6-5,2.6z").attr("fill", o.hair);
-      return { g, legs, arms: [arm], padG, kind: "side" };
+      } else {
+        g.append("path").attr("class", "me-hair").attr("d", "M-3.9,-26.8a4.6,4.6 0 0 1 8.4,-2.4q-3.2,.6-5,2.6z").attr("fill", o.hair);
+        hatOn(g, o, "side", .6);
+      }
+      return { g, legs, arms: [arm, back], padG, kind: "side" };
     }
     // Head-on: towards you (front) or away (back).
     function drawFacing(g, o, front) {
       let padG = null;
-      if (front) padG = padFlat(g, o, -6.9, 13.8, -25.5);          // behind the shoulders
+      if (front) padG = padFlat(g, o, -8.2, 16.4, -27.5, 18);      // behind the shoulders
       const legs = legsOf(g, o);
       const arms = [-1, 1].map(() => g.append("path").attr("class", "me-arm").attr("stroke", sleeve(o)));
       g.append("rect").attr("class", "me-torso").attr("x", -4.8).attr("y", -21.5).attr("width", 9.6).attr("height", 12.5).attr("rx", 3.2).attr("fill", top(o));
+      stripesOn(g, o);
       if (front) {
+        if (o.hoodie && !o.jacket) g.append("path").attr("class", "me-hood").attr("fill", "none").attr("stroke", "rgba(0,0,0,.35)").attr("d", "M-2.6,-21.3Q0,-18.6 2.6,-21.3");
         if (o.jacket) g.append("path").attr("class", "me-zip").attr("d", "M0,-21V-9.5");
         if (o.scarf) g.append("path").attr("class", "me-scarf").attr("d", "M-3.7,-21.4h7.4v2.4h-7.4zM1.3,-19.1l.5,4.4h1.6l-.4,-4.4z").attr("fill", o.scarf);
         padG.append("path").attr("class", "me-strap").attr("d", "M-3.1,-21.2V-12.5M3.1,-21.2V-12.5");
       } else {
         if (o.scarf) g.append("path").attr("class", "me-scarf").attr("d", "M-3.7,-21.4h7.4v2.4h-7.4z").attr("fill", o.scarf);
-        padG = padFlat(g, o, -6.2, 12.4, -24.2, 15);                // on the back, over the shirt
+        padG = padFlat(g, o, -7.4, 14.8, -26.5, 17.5);              // on the back, over the shirt
+        chalkBag(g, o, 3.4, -10.6);
       }
       // The head: a face from the front, hair (or a hat) from behind.
       g.append("circle").attr("class", "me-head").attr("cx", 0).attr("cy", -26.3).attr("r", 4.5).attr("fill", front ? o.skin : o.hair);
@@ -1282,6 +1336,7 @@
       } else if (o.hat === "cap") {
         g.append("path").attr("class", "me-hat").attr("d", front ? "M-4.3,-27.6a4.3,4.2 0 0 1 8.6,0zM-4.9,-27.5q4.9,2.3 9.8,0" : "M-4.4,-26.4a4.4,4.6 0 0 1 8.8,0z").attr("fill", hatC);
       } else if (front) g.append("path").attr("class", "me-hair").attr("d", "M-4.4,-26.4a4.5,4.5 0 0 1 8.8,0q-1.6,-1.9-4.4,-1.6q-2.8,-.3-4.4,1.6z").attr("fill", o.hair);
+      if (o.hat === "headband" || o.hat === "bucket") hatOn(g, o, front ? "front" : "back", 0);
       return { g, legs, arms, padG, kind: front ? "front" : "back" };
     }
     function drawMe() {
@@ -1305,7 +1360,8 @@
       for (const v of [side, front, back]) v.g.attr("display", v === view ? null : "none");
       body.attr("transform", `translate(0,${f2(bob)})`);
       if (view === side) {
-        side.g.attr("transform", f === "l" || f === -1 ? "scale(-1,1)" : null);
+        // Leaning into the walk a little.
+        side.g.attr("transform", `${f === "l" || f === -1 ? "scale(-1,1) " : ""}${m ? "rotate(4)" : ""}`.trim() || null);
         [sw, -sw].forEach((d, i) => {
           const hx = i ? 1.9 : -1.9, fx = hx + d, kx = hx + d * .55;
           side.legs[i].up.attr("d", `M${f2(hx)},-10.5L${f2(kx)},-5.2`);
@@ -1313,6 +1369,7 @@
           side.legs[i].shoe.attr("d", `M${f2(fx - 1.2)},-.6h3`);
         });
         side.arms[0].attr("d", `M1.2,-19.5L${f2(2.6 - sw * .7)},-13.2`);
+        side.arms[1].attr("d", `M-.4,-19.6L${f2(-.8 + sw * .7)},-13.4`);
       } else {
         // Each foot lifts in turn; the arms swing a little the other way.
         [-1, 1].forEach((sd, i) => {
@@ -1320,7 +1377,7 @@
           view.legs[i].up.attr("d", `M${f2(hx)},-10.5L${f2(fx)},${f2(-5.6 - lift * .5)}`);
           view.legs[i].low.attr("d", `M${f2(hx)},-10.5L${f2(fx)},${f2(-5.6 - lift * .5)}L${f2(fx)},${f2(fy)}`);
           view.legs[i].shoe.attr("d", `M${f2(fx - 1.2)},${f2(fy + .6)}h2.4`);
-          view.arms[i].attr("d", `M${f2(sd * 4.6)},-19.6L${f2(sd * 5.7)},${f2(-13.4 + (i ? s : -s) * .9)}`);
+          view.arms[i].attr("d", `M${f2(sd * 4.6)},-19.6L${f2(sd * (5.7 + Math.abs(s) * .3))},${f2(-13.4 + (i ? s : -s) * 1.4)}`);
         });
       }
       view.padG.attr("display", mePose.padDown && !m ? "none" : null);
@@ -1360,6 +1417,8 @@
       tip.style.left = x + "px"; tip.style.top = y + "px";
     }).on("pointerleave.rock", () => { ui.hover = null; ui.hotSector = null; markBoulders(); labelSel.classed("zone-hot", false); placeLabels(); if (tip) tip.hidden = true; })
       .on("click.rock", e => {
+        const who = e.target.closest && e.target.closest("g.person");
+        if (who && opts.onPerson) { if (tip) tip.hidden = true; return opts.onPerson(who.dataset.who); }
         const id = rockAt(e);
         if (id == null) {
           const [gx, gy] = d3.pointer(e);
@@ -1443,7 +1502,7 @@
       if (pending.size) requestAnimationFrame(buildSome); else { building = false; updateTiles(); }
     }
     function draw() {
-      world.attr("transform", T); glow.attr("transform", T);
+      world.attr("transform", T); glow.attr("transform", T); occSlide();
       const k = T.k, next = k < LOD.park ? "park" : k < LOD.area ? "far" : k < LOD.close ? "area" : "close";
       if (next !== lod) {
         lod = next;
@@ -1457,7 +1516,71 @@
       if (opts.onZoom) opts.onZoom(T);
     }
     const meScale = () => clamp(.62 + T.k * .075, .95, 1.6);
-    const placeMe = () => meG.attr("transform", `translate(${f2(T.applyX(meWorld[0]))},${f2(T.applyY(-meWorld[1]))}) scale(${f2(meScale())})`);
+    // Where the climber is on screen: the map point, less the margin, plus the slide
+    // (the layer is a small box with the climber's feet at ME_FOOT).
+    let meK = null;
+    const placeMe = () => {
+      const tr = `translate3d(${f1(T.applyX(meWorld[0]) - pad + slide[0] - ME_FOOT[0])}px,${f1(T.applyY(-meWorld[1]) - pad + slide[1] - ME_FOOT[1])}px,0)`;
+      meSvg.node().style.transform = tr; if (occKey && occKey !== "|") ghostSvg.node().style.transform = tr;
+      const sc = meScale(); if (sc !== meK) { meK = sc; meG.attr("transform", `scale(${f2(sc)})`); }
+      placeOccluders();
+    };
+    // The copies' layer is only as big as what's in front of you, placed over the
+    // map where those things are, and slid along with it.
+    function syncOcc() { occSlide(); }
+    function occSlide() {
+      if (!occBox) return;
+      const [x0, y0, x1, y1] = occBox, el = occSvg.node().style;
+      el.left = f1(T.applyX(x0) - pad) + "px"; el.top = f1(T.applyY(y0) - pad) + "px";
+      el.width = f1((x1 - x0) * T.k) + "px"; el.height = f1((y1 - y0) * T.k) + "px";
+      el.transform = slide[0] || slide[1] ? `translate3d(${f1(slide[0])}px,${f1(slide[1])}px,0)` : "";
+    }
+    const inPoly = (pt, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c; } return c; };
+    function placeOccluders() { if (window.__noOcc) return;
+      const [mx, my] = meWorld, k = T.k, hW = 30 * meScale() / k, ids = [], trees = [];
+      if (k >= LOD.area) {
+        // Boulders you're behind: your feet north of its middle, and part of you inside its outline.
+        for (const bo of S.boulders) {
+          const dx = mx - bo.b.x, dy = my - bo.b.y;
+          if (dy <= 0 || dy > bo.form.H + bo.form.R || Math.abs(dx) > bo.form.R * 2.2) continue;
+          const half = hW * .22;          // the climber is about a fifth as wide as tall: test their sides too
+          if ([0, .45, .9].some(f => [-half, 0, half].some(sx => inPoly([dx + sx, -dy - f * hW], bo.form.hull)))) ids.push(bo.id);
+        }
+        // Foreground trees whose crown covers you.
+        S.tIndex.some([mx, my], 24, t => {
+          if (!t.fg || t.y >= my || trees.length >= 5) return false;
+          const cr = t.crownR * 1.05, ch = t.crownR * 1.7, dx = Math.abs(mx - t.x), up = my - t.y;
+          if (dx < cr && [0, .5, .9].some(f => Math.abs(up + f * hW - ch) < cr)) trees.push(t);
+          return false;
+        });
+      }
+      const key = ids.join(",") + "|" + trees.map(t => t.x + ":" + t.y).join(",");
+      if (key !== occKey) {
+        occKey = key; occInner.selectAll("*").remove();
+        // Back to front, as on the map.
+        const items = [...ids.map(id => ({ y: S.boulders[id].b.y, id })), ...trees.map(t => ({ y: t.y, t }))].sort((a, b) => b.y - a.y);
+        for (const it of items) {
+          if (it.t) { drawTree(occInner, it.t); continue; }
+          const src = svg.select(`g.boulder[data-id="${it.id}"]`).node();
+          if (!src) continue;
+          const c = src.cloneNode(true);
+          for (const a of ["tabindex", "role", "aria-label", "data-id"]) c.removeAttribute(a);
+          occInner.node().appendChild(c);
+        }
+        ghostSvg.attr("display", items.length ? null : "none");
+        occSvg.attr("display", items.length ? null : "none");
+        if (items.length) {
+          const xs = [], ys = [];
+          for (const it of items) {
+            if (it.t) { const cr = it.t.crownR * 1.7; xs.push(it.t.x - cr, it.t.x + cr); ys.push(-it.t.y - it.t.crownR * 3.6, -it.t.y + 1.5); }
+            else { const bo = S.boulders[it.id], F = bo.form; xs.push(bo.b.x - F.R * 2.4, bo.b.x + F.R * 2.4); ys.push(-bo.b.y - F.H - F.R * 1.2, -bo.b.y + F.R * 1.3); }
+          }
+          occBox = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+          occSvg.attr("viewBox", `${f2(occBox[0])} ${f2(occBox[1])} ${f2(occBox[2] - occBox[0])} ${f2(occBox[3] - occBox[1])}`);
+          occSlide(); placeMe();
+        } else occBox = null;
+      }
+    }
     function placeLabels() {
       const k = T.k, boxes = furniture.slice();
       const hit = b => boxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
@@ -1519,11 +1642,12 @@
       svg.attr("viewBox", `0 0 ${size.w} ${size.h}`); sizeLight();
       Object.assign(svgEl.style, pad ? { position: "absolute", left: -pad + "px", top: -pad + "px", width: size.w + "px", height: size.h + "px", willChange: "transform" }
         : { position: "", left: "", top: "", width: "", height: "", willChange: "" });
+      syncOcc();
     }
     // Drop the slide into the camera (the picture doesn't move; the SVG redraws once).
     function commitSlide() {
       if (!slide[0] && !slide[1]) return;
-      const [sx, sy] = slide; slide = [0, 0]; svgEl.style.transform = "";
+      const [sx, sy] = slide; slide = [0, 0]; svgEl.style.transform = ""; occSlide();
       svg.call(zoom.transform, d3.zoomIdentity.translate(T.x + sx, T.y + sy).scale(T.k));
     }
     // Turn the margin on (while walking) or off (when still): the picture stays where it is.
@@ -1638,12 +1762,12 @@
         clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (!mePose.moving) setPad(0); }, 900);
         let sx = size.w / 2 - T.applyX(p[0]), sy = size.h / 2 - T.applyY(-p[1]);
         if (Math.abs(sx) > pad * .8 || Math.abs(sy) > pad * .8) {
-          slide = [0, 0]; svgEl.style.transform = "";
+          slide = [0, 0]; svgEl.style.transform = ""; occSlide();
           svg.call(zoom.transform, centred(p, T.k));
           sx = clamp(size.w / 2 - T.applyX(p[0]), -pad * .95, pad * .95); sy = clamp(size.h / 2 - T.applyY(-p[1]), -pad * .95, pad * .95);
         }
         slide = [sx, sy];
-        svgEl.style.transform = `translate3d(${f1(sx)}px,${f1(sy)}px,0)`;
+        svgEl.style.transform = `translate3d(${f1(sx)}px,${f1(sy)}px,0)`; occSlide();
       } else if (!mePose.moving && pad) { clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (!mePose.moving) setPad(0); }, 900); }
       placeMe();
     }
@@ -1652,6 +1776,49 @@
       if (on) { commitSlide(); go(centred(meWorld, Math.max(T.k, opts.followMinK || 5)), ms); }
     }
     function setOutfit(o) { outfit = { ...outfit, ...o }; drawMe(); }
+    // The regulars where they are today: [{ who, name, b (a boulder id), side (±1), look }].
+    // Standing figures in the map itself (they don't move, so they cost nothing
+    // while you walk), beside their boulder, facing it, their pad down.
+    const PERSON_SCALE = .14;                // the figure is ~33 units tall: about 4.6 m, a little smaller than you
+    function poseStill(v) {
+      if (v.kind === "side") {
+        v.legs.forEach((l, i) => { const hx = i ? 1.9 : -1.9; l.up.attr("d", `M${hx},-10.5L${hx},-5.2`); l.low.attr("d", `M${hx},-10.5L${hx},-5.2L${hx},-1.2`); l.shoe.attr("d", `M${hx - 1.2},-.6h3`); });
+        v.arms[0].attr("d", "M1.2,-19.5L2.6,-13.2"); if (v.arms[1]) v.arms[1].attr("d", "M-.4,-19.6L-.8,-13.4");
+      } else v.legs.forEach((l, i) => { const sd = i ? 1 : -1; l.up.attr("d", `M${sd * 2},-10.5L${sd * 2.3},-5.6`); l.low.attr("d", `M${sd * 2},-10.5L${sd * 2.3},-5.6L${sd * 2.3},-1.2`); l.shoe.attr("d", `M${sd * 2.3 - 1.2},-.6h2.4`); v.arms[i].attr("d", `M${sd * 4.6},-19.6L${sd * 5.7},-13.4`); });
+      v.padG.attr("display", "none");
+    }
+    // Where each person stands: beside their boulder, somewhere no tree stands in
+    // front of them (people are drawn over the woods, so they mustn't stand behind any).
+    const personAt = new Map();
+    const treeInFront = (x, y, h = 4.8) => { let hit = false; S.tIndex.some([x, y], 24, t => {
+      if (!t.fg || t.y >= y) return false;
+      const cr = t.crownR * 1.05, ch = t.crownR * 1.7;
+      if (Math.abs(x - t.x) < cr + 1 && [0, .5, .9].some(f => Math.abs(y - t.y + f * h - ch) < cr + .5)) hit = true;
+      return hit; }); return hit; };
+    const standable = (x, y) => !S.inWater([x, y], 1) && !S.boulders.some(b2 => Math.hypot(x - b2.b.x, y - b2.b.y) < b2.form.R * 1.05 + 1.2);
+    function setPeople(list) {
+      people.selectAll("*").remove(); personAt.clear();
+      for (const p of list) {
+        const bo = S.boulders[p.b]; if (!bo) continue;
+        const R = bo.form.R, sd = p.side;
+        const tries = [[sd * R * 1.1, -R * 1.15], [-sd * R * 1.1, -R * 1.15], [sd * R * 1.5, -R * .3], [-sd * R * 1.5, -R * .3], [0, -R * 1.7], [sd * R * 1.9, -R * 1.5], [-sd * R * 1.9, -R * 1.5]];
+        let [ox, oy] = tries[0];
+        for (const [tx, ty] of tries) { const x0 = bo.b.x + tx, y0 = bo.b.y + ty; if (standable(x0, y0) && !treeInFront(x0, y0)) { [ox, oy] = [tx, ty]; break; } }
+        const x = bo.b.x + ox, y = bo.b.y + oy, facing = ox > 0 ? 1 : ox < 0 ? -1 : sd;
+        personAt.set(p.who, { x, y, side: facing });
+        const g = people.append("g").attr("class", "person").attr("data-who", p.who).attr("transform", `translate(${f2(x)},${f2(-y)})`);
+        g.append("title").text(p.name);
+        if (p.look.pad) {                     // their pad, down beside them
+          const P2 = (pts) => "M" + pts.map(q => `${f2(q[0])},${f2(q[1])}`).join("L") + "Z";
+          const px = -facing * 1.6;
+          g.append("path").attr("class", "person-pad-side").attr("fill", d3.color(p.look.pad).darker(.6).formatHex()).attr("d", P2([[px - 1.3, .2], [px + 1.3, .2], [px + 1.3, -.4], [px - 1.3, -.4]]));
+          g.append("path").attr("class", "person-pad").attr("fill", p.look.pad).attr("d", P2([[px - 1.2, -1.2], [px + 1.2, -1.2], [px + 1.3, -.4], [px - 1.3, -.4]]));
+        }
+        g.append("ellipse").attr("class", "me-shadow").attr("rx", 1.1).attr("ry", .35);
+        const fig = g.append("g").attr("transform", `scale(${PERSON_SCALE})`).append("g").attr("transform", facing > 0 ? "scale(-1,1)" : null);
+        poseStill(drawSide(fig, { skin: "#e6bf98", hair: "#4a3426", pants: "#3f4f63", pad: "#2f6b8f", ...p.look }));
+      }
+    }
     drawMe();
     // Put world point (x, y) in the middle of the view, at zoom k (the current one by default); instant unless ms.
     function centerOn(x, y, k = T.k, ms = 0) { go(d3.zoomIdentity.translate(size.w / 2 - k * x, size.h / 2 + k * y).scale(k), ms); }
@@ -1690,7 +1857,7 @@
     draw();
     return { setDate, setTime, flyTo, setMarks, setMe, setKnown, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
       zoomBy: f => { commitSlide(); svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f); },
-      setFollow, following: () => follow, setOutfit, toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],
+      setFollow, following: () => follow, setOutfit, setPeople, personAt: who => personAt.get(who) || null, toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],
       tilesPending: () => pending.size + (building ? 1 : 0) };
   }
 
