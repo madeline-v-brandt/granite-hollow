@@ -6,7 +6,7 @@
 // you or costs time.
 //
 //   const map = Paper.make(D, scene, hostEl);
-//   map.open({ areas, me, view, onPick, onClose });   map.close();   map.isOpen()
+//   map.open({ areas, me, view, onPick, onGo, onClose });   map.close();   map.isOpen()
 //     areas  the climbing areas to mark: [{ name, state: 1 known | 2 visited, sub }]
 //     me     where you are [x, y]; view: the world view's box [x0, y0, x1, y1]
 //     onPick({ x, y, sector })   called when an area or a spot is picked
@@ -217,12 +217,13 @@
           <span><svg width="26" height="14"><circle cx="13" cy="7" r="4.5" fill="#c0392b" stroke="#4a3f30"/></svg>You are here</span>
         </div>
         <h3>Climbing areas</h3>
-        <ul class="pp-list">${known.map(a => `<li><button type="button" data-pp-area="${esc(a.name)}" class="${s.here === a.name ? "here" : ""}"><b>${esc(a.name)}</b><span>${esc(a.sub || "")}</span></button></li>`).join("") || `<li class="pp-none">None yet.</li>`}</ul>
+        <ul class="pp-list">${known.map(a => `<li><button type="button" data-pp-area="${esc(a.name)}" class="${s.here === a.name ? "here" : ""}"><b>${esc(a.name)}</b><span>${esc(a.sub || "")}</span></button>${s.onGo && s.here !== a.name ? `<button type="button" class="pp-go" data-pp-go="${esc(a.name)}" aria-label="Walk to ${esc(a.name)}">Walk</button>` : ""}</li>`).join("") || `<li class="pp-none">None yet.</li>`}</ul>
         ${s.footnote ? `<p class="pp-foot">${esc(s.footnote)}</p>` : ""}
-        <p class="pp-hint">Pick an area, or anywhere on the map, to look at it. Looking doesn't move you or cost time.</p>
+        <p class="pp-hint">Pick an area, or anywhere on the map, to look at it. Looking doesn't move you or cost time.${s.onGo ? " <b>Walk</b> takes you there along the trails." : ""}</p>
         <button type="button" class="pp-x" data-pp-close aria-label="Fold up the trail map (M or Esc)" title="Fold it up (M)">×</button>`);
       side.selectAll("[data-pp-area]").on("click", function () { const sec = D.sectors.find(x => x.name === this.dataset.ppArea); pick({ x: sec.x, y: sec.y, sector: sec.name }); });
       side.selectAll("[data-pp-close]").on("click", close);
+      side.selectAll("[data-pp-go]").on("click", function () { const cb = state && state.onGo, name = this.dataset.ppGo; close(); if (cb) cb(name); });
     }
     function pick(where) { const cb = state && state.onPick; close(); if (cb) cb(where); }
     function onKey(e) { if (e.key === "Escape") { e.preventDefault(); close(); } }

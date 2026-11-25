@@ -27,7 +27,8 @@ const World = require(GAME_DIR + "world.js"), D = require(GAME_DIR + "game-data.
   console.log("new climber: v", g.v, "rules", g.rules, "dev", !!g.dev, "| tried", Object.keys(g.ps).length, "sent", g.ticks.length, "| invariants", World.check(D, g), "| valid", World.validate(D, g));
   // An old climber already saved in this browser: converted on load, with a copy kept.
   const fixture = fs.readFileSync(FIX + "v1-midday.json", "utf8");
-  await p.evaluate((k, s) => { localStorage.clear(); localStorage.setItem(k, s); }, SLOT, fixture);
+  // (Written from another page: the game saves itself as it unloads.)
+  await p.goto(url.replace("index.html", "game-data.json")); await p.evaluate((k, s) => { localStorage.clear(); localStorage.setItem(k, s); }, SLOT, fixture);
   await p.goto(url, { waitUntil: "load" }); await ready(p); await sleep(400);
   g = await saved();
   const copy = await p.evaluate(k => JSON.parse(localStorage.getItem(k) || "null"), COPY);

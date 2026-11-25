@@ -416,8 +416,23 @@ svg#map:active { cursor: grabbing; }
 .lab-note .lt { font: 500 15px var(--hand); fill: color-mix(in oklab, var(--map-ink-2), #6a4a2a 30%); }
 .lab-trail .lt { font: 600 15px var(--hand); fill: #6d4927; }
 .leader { fill: none; stroke: color-mix(in oklab, var(--map-ink-2), transparent 35%); stroke-width: 1.1; stroke-dasharray: 1.5 2.5; stroke-linecap: round; }
-.me-halo { fill: var(--raised); opacity: .9; } .me-dot { fill: var(--accent); stroke: var(--ink); stroke-width: 1.2; }
+/* you: a small climber with a crash pad, inked like the map, with a pale halo so the woods never swallow them */
+.me { pointer-events: none; }
+.me-shadow { fill: rgba(40, 30, 20, .32); }
+.me-halo { fill: #fbf4e2; fill-opacity: .34; }
+.me-leg { fill: none; stroke-width: 2.7; stroke-linecap: round; stroke-linejoin: round; }
+.me-shoe { fill: none; stroke: #2b2620; stroke-width: 2.1; stroke-linecap: round; }
+.me-pad rect { stroke: #2b2620; stroke-width: 1.1; }
+.me-pad-seam { fill: none; stroke: rgba(255, 255, 255, .5); stroke-width: .8; }
+.me-strap { fill: none; stroke: #2b2620; stroke-width: 1.1; stroke-linecap: round; }
+.me-torso { stroke: #2b2620; stroke-width: 1.2; }
+.me-zip { fill: none; stroke: rgba(0, 0, 0, .35); stroke-width: .8; }
+.me-scarf { stroke: #2b2620; stroke-width: .8; }
+.me-arm { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+.me-head { stroke: #2b2620; stroke-width: 1.1; }
+.me-hat, .me-hair { stroke: #2b2620; stroke-width: .9; stroke-linejoin: round; }
 .me-pulse { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .5; }
+.me.moving .me-pulse { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .me-pulse { animation: pulse 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
   @keyframes pulse { from { transform: scale(.6); opacity: .7; } to { transform: scale(1.9); opacity: 0; } }
@@ -786,6 +801,24 @@ tr.lb-me td { background: var(--gold-soft); }
   .dev-out { max-height: 220px; overflow: auto; font-size: 11px; background: var(--paper-2, rgba(0,0,0,.04)); padding: 8px; border-radius: 6px; white-space: pre-wrap; }
   .dev-out:empty { display: none; }
 
+  /* ---- Stage 4: walking. A quick fade for long trips, the prompt at an unfamiliar boulder, the first-day hint */
+  .map-fade { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: var(--edge, #e9dfc6); opacity: 0; transition: opacity .28s ease; }
+  .map-fade.on { opacity: 1; }
+  .map-prompt { position: absolute; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 3;
+    display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 14px; border-radius: 999px; background: var(--raised) var(--grain);
+    border: 1px solid var(--rule-ink); box-shadow: var(--shadow); font-family: var(--hand); font-size: 20px; color: var(--ink); }
+  .map-prompt[hidden], .map-hint[hidden] { display: none; }
+  .map-prompt kbd, .map-hint kbd { font: 700 11px var(--body); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 4px; opacity: .8; }
+  .map-hint { position: absolute; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 2; margin: 0; max-width: min(440px, calc(100% - 300px)); text-align: center;
+    padding: 6px 12px; border-radius: 10px; background: color-mix(in srgb, var(--raised) 88%, transparent); border: 1px solid var(--rule-ink); font-size: 13px; color: var(--ink-2); pointer-events: none; }
+  .map-hint kbd { margin: 0 1px; }
+  #map-me.lost { color: var(--accent); background: var(--accent-soft); }
+  .pp-list li { display: flex; align-items: stretch; gap: 4px; }
+  .pp-list li > [data-pp-area] { flex: 1; min-width: 0; }
+  .pp-list .pp-go { flex: none; width: auto; display: block; font: 800 11px "Nunito Sans", sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #a9442c; background: transparent;
+    border: 1px dashed rgba(169, 68, 44, .55); border-radius: 6px; padding: 0 8px; cursor: pointer; }
+  .pp-list .pp-go:hover { background: rgba(169, 68, 44, .08); }
+
   /* ---- Stage 3: finding boulders, spotting lines, first ascents */
   .result.discover { border: 1.5px solid color-mix(in srgb, var(--accent) 45%, var(--rule)); border-left: 4px solid var(--accent); background: var(--accent-soft); }
   .result.discover .rt::before { content: "Field note · "; font-family: var(--body); font-weight: 800; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--plus); vertical-align: 2px; }
@@ -882,7 +915,7 @@ tr.lb-me td { background: var(--gold-soft); }
           <div class="ct-title">Granite Hollow</div>
           <div class="ct-sub" id="map-caption">State Park</div>
           <div class="map-key" aria-hidden="true">
-            <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="var(--accent)" stroke="var(--ink)" stroke-width="1"></circle></svg>You</span>
+            <span><svg width="12" height="15" viewBox="-6 -15.5 12 16"><rect x="-5.5" y="-12" width="3.4" height="7.5" rx=".8" fill="#2f6b8f" stroke="var(--ink)" stroke-width=".7"/><rect x="-2.4" y="-10.6" width="4.8" height="6" rx="1.5" fill="#c2553a" stroke="var(--ink)" stroke-width=".7"/><path d="M-1,-4.6L-1.6,0M1,-4.6L1.6,0" stroke="#3f4f63" stroke-width="1.4" stroke-linecap="round"/><circle cx=".3" cy="-12.8" r="2.2" fill="#e6bf98" stroke="var(--ink)" stroke-width=".6"/></svg>You</span>
             <span><svg width="13" height="13" viewBox="-6.5 -6.5 13 13"><circle r="5.5" fill="#2e6c53" stroke="#fcf8ee" stroke-width="1.2"></circle><path d="M-2.4,.1L-.7,1.8L2.5,-1.6" fill="none" stroke="#fcf8ee" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>Sent here</span>
             <span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="var(--project)" stroke-width="1.6" stroke-dasharray="3 2"></circle></svg>Project</span>
             <span><svg width="13" height="13"><path d="M6.5 1 8 5h4l-3.2 2.4 1.2 4L6.5 9 3 11.4l1.2-4L1 5h4z" fill="var(--gold)"></path></svg>Tip from a local</span>
@@ -895,6 +928,9 @@ tr.lb-me td { background: var(--gold-soft); }
           <button type="button" id="map-paper" class="fit" aria-label="Open the trail map (M)" title="Trail map (M)">MAP</button>
         </div>
         <svg id="map" role="img" aria-label="Illustrated map of the park. Select an area or a boulder to walk there."></svg>
+        <div class="map-fade" id="map-fade" aria-hidden="true"></div>
+        <div class="map-prompt" id="map-prompt" hidden></div>
+        <p class="map-hint" id="map-hint" hidden></p>
         <div class="tooltip" id="tip" hidden></div>
         <div class="banner" id="banner" hidden></div>
         <div class="scalebar"><span id="scale-label">200 m</span><div class="ruler" id="scale-ruler"></div></div>
@@ -925,11 +961,12 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=17"></script>
-<script src="art.js?v=17"></script>
-<script src="world.js?v=17"></script>
-<script src="knowledge.js?v=17"></script>
-<script src="illustrate.js?v=17"></script>
-<script src="paint.js?v=17"></script>
-<script src="paper.js?v=17"></script>
-<script src="game.js?v=17"></script>
+<script src="mechanics.js?v=18"></script>
+<script src="art.js?v=18"></script>
+<script src="world.js?v=18"></script>
+<script src="knowledge.js?v=18"></script>
+<script src="illustrate.js?v=18"></script>
+<script src="paint.js?v=18"></script>
+<script src="paper.js?v=18"></script>
+<script src="travel.js?v=18"></script>
+<script src="game.js?v=18"></script>

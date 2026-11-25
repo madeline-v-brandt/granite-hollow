@@ -118,6 +118,7 @@
   }
   const placeXY = loc => loc.boulder != null ? [D.boulders[loc.boulder].x, D.boulders[loc.boulder].y] : nodeXY(loc.sector);
   function walkMinutes(to) {
+    if (M && M.minutesTo) return M.minutesTo(to);
     const from = G.loc;
     if (to.sector === from.sector) return to.boulder === from.boulder ? 0 : 1;
     return route(from.sector, to.sector).minutes + (to.boulder != null ? 1 : 0);
@@ -172,6 +173,7 @@
     Object.assign(G.player, s);
     G.dayNo++;
     G.loc = { sector: START_AREA, boulder: null };
+    { const st = D.sectorBy.get(START_AREA); G.pos = [st.x, st.y]; }     // at the trailhead junction
     if (!G.visited.includes(START_AREA)) G.visited.push(START_AREA);
     UI.recenter = true;                                   // the camera starts the day on you
     G.day = { no: G.dayNo, minute: 9 * 60 + Math.floor(Math.random() * 40), weather: w, startEnergy: s.energy,
@@ -337,20 +339,38 @@
 
   function afterAction() {
     checkAchievements();
-    const w = G.day.weather;
     if (!G.day.over) {
       if (G.player.energy <= 6) endDay("You're cooked. Time to head home.");
       else if (G.player.skin <= 2) endDay("Your skin is done for the day.");
-      else if (rainNow()) endDay(`It started ${w.precip === "Snow" ? "snowing" : "raining"} at ${clock(Mech.rainStart(w))}. Wet granite is slick and holds can snap, so you pack up and head home.`);
-      else if (G.day.minute >= w.dusk) endDay("The light's gone, and the park closes at dusk.");
-      else if (Mech.rainStart(w) != null && !G.day.rainWarned && G.day.minute >= Mech.rainStart(w) - 45) {
-        G.day.rainWarned = true; toast("Clouds rolling in", `${w.precip === "Snow" ? "Snow" : "Rain"} is on its way, due around ${clock(Mech.rainStart(w))}. Get your last burns in.`, "info");
-      } else if (w.pop && w.rainFrom && Mech.rainStart(w) == null && !G.day.rainWarned && G.day.minute >= w.rainFrom) {
-        G.day.rainWarned = true; toast("The rain held off", "Clear skies after all. Keep climbing until dusk.", "info");
-      }
-      else if (!G.day.warned && G.day.minute >= w.dusk - 45) { G.day.warned = true; toast("Light's fading", `The park closes at dusk, ${clock(w.dusk)}.`, "info"); }
+      else timeChecks();
     }
     save(); renderAll();
+  }
+  // The clock moved (climbing, resting or walking): rain, the light, and dusk.
+  // Dusk never strands you: you're warned in time to walk out, and when the light
+  // goes you walk back to the lot.
+  function timeChecks() {
+    const w = G.day.weather, d = G.day;
+    if (d.over) return;
+    if (rainNow()) { endDay(`It started ${w.precip === "Snow" ? "snowing" : "raining"} at ${clock(Mech.rainStart(w))}. Wet granite is slick and holds can snap, so you pack up and head home.`); return; }
+    if (d.minute >= w.dusk) { duskOut(); return; }
+    if (Mech.rainStart(w) != null && !d.rainWarned && d.minute >= Mech.rainStart(w) - 45) {
+      d.rainWarned = true; toast("Clouds rolling in", `${w.precip === "Snow" ? "Snow" : "Rain"} is on its way, due around ${clock(Mech.rainStart(w))}. Get your last burns in.`, "info");
+    } else if (w.pop && w.rainFrom && Mech.rainStart(w) == null && !d.rainWarned && d.minute >= w.rainFrom) {
+      d.rainWarned = true; toast("The rain held off", "Clear skies after all. Keep climbing until dusk.", "info");
+    }
+    const out = M && M.minutesToLot ? M.minutesToLot() : 0;
+    if (!d.warned && d.minute >= w.dusk - 45 - out) {
+      d.warned = true; toast("Light's fading", `The park closes at dusk, ${clock(w.dusk)}.${out > 1 ? ` It's a ${out} minute walk back to the lot from here.` : ""}`, "info");
+    } else if (!d.warnedOut && out >= 3 && d.minute >= w.dusk - out - 10) {
+      d.warnedOut = true; toast("Time to head out", `Dusk is at ${clock(w.dusk)}, and the lot is ${out} minutes away.`, "info");
+    }
+  }
+  // The light's gone: back to the lot, and the day is over.
+  function duskOut() {
+    const out = M && M.minutesToLot ? M.minutesToLot() : 0;
+    if (M && M.toLot) M.toLot();
+    endDay(out > 1 ? `The light's going, so you follow the trail back to the lot, ${out} minutes in the last of the daylight.` : "The light's gone, and the park closes at dusk.");
   }
 
   // What you know about rain today: a coming shower once the clouds roll in,
@@ -395,46 +415,33 @@
     afterAction();
   }
 
+  // Go somewhere you know (a panel, CragLog, the trail map): the walk is planned
+  // from where you actually are, along the trails, and costs the time it takes.
   function travel(to) {
     try { walkTo(to); } catch (e) { UI.busy = false; reportError("walking", e); safely("redraw", renderAll); }
   }
   function walkTo(to) {
-    if (UI.busy || G.day.over) return;
-    const from = { ...G.loc };
-    if (to.sector === from.sector && to.boulder === from.boulder) { UI.tab = "here"; renderAll(); return; }
-    const minutes = walkMinutes(to);
-    const knownRain = G.day.rainWarned ? Mech.rainStart(G.day.weather) : null;
-    if (G.day.minute + minutes >= Math.min(G.day.weather.dusk, knownRain ?? Infinity)) {
-      const raining = knownRain != null && knownRain < G.day.weather.dusk;
-      toast(raining ? "Rain's coming" : "Not enough daylight", raining ? "It'll be raining before you get there." : "It'll be dark before you get there. Head home instead.", "info"); return;
+    if (G.day.over) return;
+    if (to.sector === G.loc.sector && to.boulder === G.loc.boulder && !M.walking()) { UI.tab = "here"; renderAll(); return; }
+    M.goTo(to, { tab: true });
+  }
+  // You've arrived somewhere (by walking, or at the end of a trip): the area and
+  // boulder you're at, what that reveals, and who's around.
+  function arrive(prev, now, opts = {}) {
+    G.loc = now;
+    if (v2()) {
+      if (now.sector && K.visitArea(now.sector)) toast(`New area: ${now.sector}`, "You've found a climbing area that isn't on the kiosk map.", "find");
+      if (now.boulder != null && K.boulder(now.boulder) >= 1) K.visitBoulder(now.boulder);
     }
-    G.day.minute += minutes;
-    G.day.moved = true;
-    UI.fresh = null;
-    const pts = [M.meXY(from)];
-    if (to.sector !== from.sector) for (const n of route(from.sector, to.sector).nodes.slice(1)) pts.push(nodeXY(n));
-    if (to.boulder != null) pts.push(M.meXY(to));
-    UI.busy = true; UI.tab = "here";
-    renderAll();
-    M.walk(pts, reduceMotion ? 0 : Math.max(300, Math.min(1800, minutes * 70)), () => {
-      UI.busy = false;
-      G.loc = { sector: to.sector, boulder: to.boulder };
-      if (v2()) {
-        if (to.sector && K.visitArea(to.sector)) toast(`New area: ${to.sector}`, "You've found a climbing area that isn't on the kiosk map.", "info");
-        if (to.boulder != null && K.boulder(to.boulder) >= 1) K.visitBoulder(to.boulder);
-      }
-      const newSector = to.sector !== from.sector;
-      if (newSector && to.sector) {
-        if (!G.visited.includes(to.sector)) G.visited.push(to.sector);
-        G.day.encounter = null;
-        if (minutes > 1) G.day.last = { kind: "info", title: to.sector, text: `${minutes} minute walk. ${sectorBlurb(to.sector)}` };
-        maybeEncounter(to.sector);
-        M.focusSector(to.sector);
-      } else if (to.boulder != null) {
-        G.day.last = null;
-      }
-      afterAction();
-    });
+    if (now.sector && !G.visited.includes(now.sector)) G.visited.push(now.sector);
+    if (opts.quiet) return;
+    if (now.sector && now.sector !== prev.sector) {
+      G.day.encounter = null;
+      G.day.last = { kind: "info", title: now.sector, text: sectorBlurb(now.sector) };
+      maybeEncounter(now.sector);
+    } else if (now.boulder != null && now.boulder !== prev.boulder) G.day.last = null;
+    if (now.boulder !== prev.boulder) UI.fresh = null;
+    checkAchievements();
   }
   function sectorBlurb(name) {
     const s = D.sectorBy.get(name), a = K.areaStats(name);
@@ -550,16 +557,15 @@
   function buildMap() {
     const tip = $("#tip");
     const P = Paint.paint($("#map"), D, {
-      tooltip: tip, minZoom: WORLD_MIN_ZOOM,
+      tooltip: tip, minZoom: WORLD_MIN_ZOOM, followMinK: 6,
       furniture: ".cartouche, .map-tools, .compass, .scalebar",
       state: { here: G.loc.boulder != null ? D.boulders[G.loc.boulder].name : null },
-      onBoulder: id => { const b = D.boulders[id]; travel({ sector: b.sector, boulder: b.id }); },
-      onSector: name => {
-        if (!K.canGo({ sector: name })) { toast("No climbing you know of there", "Walk to a boulder you can see instead, or ask around.", "info"); return; }
-        travel({ sector: name, boulder: null });
-      },
+      // Clicking a boulder walks you to it; clicking open ground walks you to that spot.
+      onBoulder: id => { const b = D.boulders[id]; goTo({ sector: b.sector, boulder: b.id }, { tap: true }); },
+      onGround: (x, y) => goToPoint([x, y]),
+      onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
-        const mins0 = walkMinutes({ sector: b.sector, boulder: b.id });
+        const mins0 = minutesTo({ sector: b.sector, boulder: b.id });
         if (K.boulder(b.id) < 1) return `<strong>Unfamiliar boulder</strong><div class="sub">${b.height_ft} ft · ${esc(b.angle)}</div>It isn't in your guidebook. Walk over and have a look.${mins0 ? `<br>${mins0} min walk` : ""}`;
         if (!K.all()) {
           const a = K.boulderStats(b.id);
@@ -567,9 +573,9 @@
             ${b.desc ? `<div class="tip-desc">${esc(b.desc)}</div>` : ""}${a.n ? `${a.n} documented, V${a.lo}${a.hi > a.lo ? "–V" + a.hi : ""}` : "Nothing documented yet"}${a.open ? ` · ${a.open} unclimbed ${a.open === 1 ? "line" : "lines"}` : ""}<br>You've sent ${a.sent}${mins0 ? ` · ${mins0} min walk` : ""}`;
         }
         const ps = b.problems.map(i => G.ps[i]).filter(Boolean), sent = ps.filter(x => x.sent).length;
-        const g = d3.extent(b.problems, i => D.problems[i].grade), mins = walkMinutes({ sector: b.sector, boulder: b.id });
+        const g = d3.extent(b.problems, i => D.problems[i].grade);
         return `<strong>${esc(b.name)}</strong><div class="sub">${esc(b.sector)} · ${b.height_ft} ft · ${b.angle}</div>
-          ${b.desc ? `<div class="tip-desc">${esc(b.desc)}</div>` : ""}${b.problems.length} problems, V${g[0]}${g[1] > g[0] ? "–V" + g[1] : ""}<br>You've sent ${sent}${mins ? ` · ${mins} min walk` : " · you're here"}`;
+          ${b.desc ? `<div class="tip-desc">${esc(b.desc)}</div>` : ""}${b.problems.length} problems, V${g[0]}${g[1] > g[0] ? "–V" + g[1] : ""}<br>You've sent ${sent}${mins0 ? ` · ${mins0} min walk` : " · you're here"}`;
       },
       onZoom: T => {
         const k = T.k, metres = [10, 25, 50, 100, 200, 250, 500, 1000].find(m => m * k >= 90) || 1000;
@@ -577,76 +583,288 @@
         $("#scale-label").textContent = metres >= 1000 ? `${metres / 1000} km` : `${metres} m`;
       },
     });
+    const S = P.scene;
     $("#zoom-in").onclick = () => P.zoomBy(1.6);
     $("#zoom-out").onclick = () => P.zoomBy(1 / 1.6);
     $("#map-me").onclick = () => lookAtMe(600);
     $("#map-paper").onclick = () => togglePaper();
-    P.flyTo(G.loc.sector || START_AREA, 9, 0);              // a saved day picks up where you are
-    UI.recenter = false;
 
-    // Where your dot stands: in front of the boulder you're at (not on top of it), or at the area's trail junction.
-    const meXY = loc => {
-      if (loc.boulder == null) return nodeXY(loc.sector);
-      const bo = P.scene.boulders[loc.boulder];
-      return [bo.b.x - bo.form.R * .55, bo.b.y - bo.form.R * 1.45];
-    };
-    // A walk between two trail junctions follows the trail between them (either way along it).
-    const near = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1;
-    const alongTrails = points => {
-      const out = [points[0]];
-      for (let i = 1; i < points.length; i++) {
-        const a = points[i - 1], b = points[i], j = D.trails.findIndex(t => (near(t.start, a) && near(t.end, b)) || (near(t.start, b) && near(t.end, a)));
-        if (j >= 0) { const pts = P.scene.trails[j].pts; out.push(...(near(D.trails[j].start, a) ? pts : [...pts].reverse())); }
-        else out.push(b);
-      }
-      return out;
-    };
-    function walk(points, ms, done) {
-      points = alongTrails(points);
-      const segs = [], lens = [];
-      for (let i = 1; i < points.length; i++) { segs.push([points[i - 1], points[i]]); lens.push(Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1])); }
-      const total = d3.sum(lens) || 1;
-      if (!ms) { P.setMe(points[points.length - 1]); done(); return; }
-      const timer = d3.timer(el => {
-        let d = Math.min(1, el / ms) * total, i = 0;
-        while (i < lens.length - 1 && d > lens[i]) { d -= lens[i]; i++; }
-        const f = lens[i] ? Math.min(1, d / lens[i]) : 1, [a, b] = segs[i] || [points[0], points[0]];
-        P.setMe([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
-        if (el >= ms) { timer.stop(); P.setMe(points[points.length - 1]); done(); }
-      });
+    // ---- the ground: where you can stand, and how fast you walk there
+    const LOT = [0, 0];                                  // the trailhead, by the kiosk
+    const Wk = Travel.make({ trails: S.trails.map(t => t.pts), blocked: p => S.inWater(p, 0) });
+    const SPEED = { trail: 14, off: 9 };                 // metres a second on screen (the same 3 : 2 as the clock's rates)
+    const [bx0, bx1, by0, by1] = S.bounds, edge = 60;
+    const inPark = p => p[0] > bx0 + edge && p[0] < bx1 - edge && p[1] > by0 + edge * .6 && p[1] < by1 - edge;
+    const boulderAt = p => S.boulders.find(bo => Math.hypot(p[0] - bo.b.x, p[1] - bo.b.y) < bo.form.R * .9 + .5);
+    const solid = p => !inPark(p) || S.inWater(p, -.4) || !!boulderAt(p);
+    const onTrail = p => S.trailDist(p, 4) < 2.6;
+    // Where you stand to climb a boulder: in front of it (south-west), on open ground.
+    function approach(id) {
+      const bo = S.boulders[id], R = bo.form.R;
+      for (const [ax, ay] of [[-.55, -1.45], [.55, -1.45], [-1.5, -.4], [1.5, -.4], [0, 1.6]]) { const p = [bo.b.x + ax * R, bo.b.y + ay * R]; if (!solid(p)) return p; }
+      return [bo.b.x - R * .55, bo.b.y - R * 1.45];
     }
-    // The paper park map (paper.js): built the first time it opens.
+    const pointOf = to => (to.boulder != null ? approach(to.boulder) : to.sector ? [D.sectorBy.get(to.sector).x, D.sectorBy.get(to.sector).y] : LOT);
+    const zoneR = s => (s.name === "Hawkwatch" ? S.baldR : s.radius);
+    // Where a point is, in the game's terms: at a boulder (close enough to climb), in
+    // an area, or between them. A little stickiness keeps the edges from flickering.
+    function locAt(p, prev) {
+      let best = null, bd = Infinity;
+      for (const bo of S.boulders) {
+        const d = Math.hypot(p[0] - bo.b.x, p[1] - bo.b.y), reach = bo.form.R * 1.55 + (prev.boulder === bo.id ? 7 : 3.5);
+        if (d < reach && d - bo.form.R < bd) { bd = d - bo.form.R; best = bo.id; }
+      }
+      if (best != null) return { sector: D.boulders[best].sector, boulder: best };
+      let sec = null, sd = Infinity;
+      for (const s of D.sectors) {
+        const d = Math.hypot(p[0] - s.x, p[1] - s.y), r = zoneR(s) + (prev.sector === s.name ? 25 : 6);
+        if (d < r && d / r < sd) { sd = d / r; sec = s.name; }
+      }
+      return { sector: sec, boulder: null };
+    }
+    const sameLoc = (a, b) => a.sector === b.sector && a.boulder === b.boulder;
+    if (!validPos(G.pos)) G.pos = pointOf(G.loc);
+
+    // ---- walking costs daylight, a little at a time
+    function spend(minutes) {
+      const d = G.day;
+      d.walkFrac = (d.walkFrac || 0) + minutes;
+      const whole = Math.floor(d.walkFrac);
+      if (!whole) return;
+      d.walkFrac -= whole; d.minute += whole; d.moved = true;
+      safely("status bar", renderHud);
+      timeChecks();
+      if (d.over) stop();
+    }
+    const plan = to => { if (!validPos(G.pos)) G.pos = pointOf(G.loc); return Wk.plan(G.pos, Array.isArray(to) ? to : pointOf(to)); };
+    const minutesCache = new Map();
+    // Minutes to walk from where you are to a place ({ sector, boulder }): 0 if you're there, at least 1 otherwise.
+    function minutesTo(to) {
+      if (sameLoc(G.loc, to)) return 0;
+      if (!validPos(G.pos)) G.pos = pointOf(G.loc);
+      const key = G.pos.map(v => Math.round(v)).join(",") + "|" + to.sector + "|" + to.boulder;
+      if (!minutesCache.has(key)) { if (minutesCache.size > 400) minutesCache.clear(); const p = plan(to); minutesCache.set(key, p ? Math.round(p.minutes) : 99); }
+      return Math.max(1, minutesCache.get(key));
+    }
+    const minutesToLot = () => { const p = plan(LOT); return p ? Math.round(p.minutes) : 0; };
+
+    // ---- moving: the keys (WASD and the arrows), a tap, or a trip
+    const keys = new Set();
+    let walk = null, raf = null, last = null, phase = 0, facing = 1, stillTimer = null;
+    const fade = $("#map-fade");
+    const pose = moving => ({ phase, moving, facing, padDown: G.loc.boulder != null });
+    function frame(now) {
+      raf = null;
+      const dt = last == null ? 0 : Math.min(.05, (now - last) / 1000);
+      last = now;
+      if (G.day.over || modalOpen()) { keys.clear(); if (walk) stop(); }
+      if (walk) stepWalk(now, dt);
+      else if (keys.size) stepKeys(dt);
+      const moving = !!walk || keys.size > 0;
+      P.setMe(G.pos, pose(moving));
+      if (moving) raf = requestAnimationFrame(frame);
+      else { last = null; clearTimeout(stillTimer); stillTimer = setTimeout(() => { save(); }, 400); }
+    }
+    const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
+    function stepKeys(dt) {
+      let dx = 0, dy = 0;
+      if (keys.has("left")) dx--; if (keys.has("right")) dx++; if (keys.has("up")) dy++; if (keys.has("down")) dy--;
+      const n = Math.hypot(dx, dy); if (!n) return;
+      const trail = onTrail(G.pos), v = (trail ? SPEED.trail : SPEED.off) * dt, mx = dx / n * v, my = dy / n * v;
+      const from = G.pos;
+      let to = [from[0] + mx, from[1] + my];
+      // Something in the way: veer around it (a boulder's curve, a shoreline), the smallest turn first.
+      if (solid(to)) {
+        to = from;
+        for (const deg of [25, -25, 50, -50, 75, -75]) {
+          const a = deg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a), q = [from[0] + mx * c - my * sn, from[1] + mx * sn + my * c];
+          if (!solid(q)) { to = q; break; }
+        }
+      }
+      const moved = Math.hypot(to[0] - from[0], to[1] - from[1]);
+      if (!moved) return;
+      if (Math.abs(to[0] - from[0]) > .01) facing = to[0] > from[0] ? 1 : -1;
+      G.pos = to; phase += moved;
+      if (!G.walked) { G.walked = true; showHint(); }
+      spend(moved / (trail ? Wk.rate.trail : Wk.rate.off));
+      if (!G.day.over) moved_();
+    }
+    // Where you are changed: arriving at a boulder or an area (walking past things on a trip is quiet).
+    function moved_(quiet = false) {
+      const now = locAt(G.pos, G.loc);
+      if (sameLoc(now, G.loc)) return;
+      const prev = { ...G.loc };
+      arrive(prev, now, { quiet });
+      if (!quiet) { renderAll(); showPrompt(); }
+    }
+
+    // A trip: walked at a stroll when it's short, hurried along when it's longer, and
+    // with a quick fade for long ones (you walk off, and arrive walking in). It
+    // costs the full walk's time either way, charged as you go.
+    function goTo(to, opts = {}) {
+      if (G.day.over) return;
+      const dest = Array.isArray(to) ? to : pointOf(to), path = Wk.plan(G.pos, dest);
+      if (!path) { toast("No way through", "There's water in the way.", "info"); return; }
+      const w = G.day.weather, knownRain = G.day.rainWarned ? Mech.rainStart(w) : null;
+      if (path.minutes >= 1 && G.day.minute + path.minutes >= Math.min(w.dusk, knownRain ?? Infinity)) {
+        const raining = knownRain != null && knownRain < w.dusk;
+        toast(raining ? "Rain's coming" : "Not enough daylight", raining ? "It'll be raining before you get there." : "It'll be dark before you get there. Head home instead.", "info"); return;
+      }
+      stop();
+      const M_ = path.metres, real = d3.sum(path.pts.slice(1), (q, i) => Math.hypot(q[0] - path.pts[i][0], q[1] - path.pts[i][1]) / (path.rates[i] === Wk.rate.trail ? SPEED.trail : SPEED.off));
+      const lead = Math.min(45, M_ * .2), phases = [];
+      if (reduceMotion) phases.push({ d0: 0, d1: M_, ms: 0 });
+      else if (real <= 3) phases.push({ d0: 0, d1: M_, ms: real * 1000 });
+      else if (M_ <= 260) phases.push({ d0: 0, d1: M_, ms: 3000 });
+      else phases.push({ d0: 0, d1: lead, ms: 1100 }, { fade: true, d0: lead, d1: M_ - 45 }, { d0: M_ - 45, d1: M_, ms: 1100 });
+      walk = { path, to: Array.isArray(to) ? null : to, from: { ...G.loc }, phases, i: 0, t0: null, d: 0, paid: 0, tab: !!opts.tab };
+      UI.busy = true; UI.fresh = null; if (walk.tab) UI.tab = "here";
+      if (!G.walked && opts.tap) { G.walked = true; showHint(); }
+      P.setFollow(true);
+      renderAll(); showPrompt();
+      kick();
+    }
+    function goToPoint(p) {
+      if (G.day.over || UI.busy && !walk) return;
+      if (S.inWater(p, 0)) { toast("That's water", "Pick somewhere on dry ground.", "info"); return; }
+      if (!inPark(p)) return;
+      goTo(p, { tap: true });
+    }
+    function stepWalk(now, dt) {
+      const w = walk, ph = w.phases[w.i];
+      if (ph.fade) {
+        // Fade out, jump ahead (paying for the walk you skipped), fade back in.
+        if (!w.fading) { w.fading = true; fade.classList.add("on"); setTimeout(() => { if (walk !== w) return; goAlong(w, ph.d1); if (walk !== w) return; w.i++; w.t0 = null; P.setMe(G.pos, pose(true)); setTimeout(() => fade.classList.remove("on"), 60); }, 300); }
+        return;
+      }
+      if (w.t0 == null) w.t0 = now;
+      const u = ph.ms ? Math.min(1, (now - w.t0) / ph.ms) : 1;
+      goAlong(w, ph.d0 + (ph.d1 - ph.d0) * u);
+      if (walk !== w) return;                              // stopped on the way (dusk, rain)
+      if (u >= 1) { w.i++; w.t0 = null; w.fading = false; if (w.i >= w.phases.length) finish(); }
+    }
+    function goAlong(w, d) {
+      const a = Travel.along(w.path, d), before = G.pos;
+      G.pos = a.p; phase += Math.hypot(a.p[0] - before[0], a.p[1] - before[1]);
+      if (Math.abs(a.dir[0]) > .05) facing = a.dir[0] > 0 ? 1 : -1;
+      const cost = a.minutes - w.paid; w.paid = a.minutes; w.d = d;
+      spend(cost);
+      if (walk === w) moved_(true);
+    }
+    function finish() {
+      const w = walk; walk = null; UI.busy = false;
+      fade.classList.remove("on");
+      // Arriving counts from where the trip began (passing through on the way was quiet).
+      G.pos = w.path.pts[w.path.pts.length - 1];
+      const now = w.to ? { sector: w.to.sector, boulder: w.to.boulder } : locAt(G.pos, G.loc);
+      arrive(w.from, now, { quiet: sameLoc(w.from, now) });
+      save(); renderAll(); showPrompt();
+    }
+    // Stop a trip where it is (keys take over, the day ends, a new trip starts).
+    function stop() {
+      if (!walk) return;
+      const w = walk; walk = null; UI.busy = false; fade.classList.remove("on");
+      const now = locAt(G.pos, G.loc); arrive(w.from, now, { quiet: sameLoc(w.from, now) });
+      safely("redraw", renderAll);
+    }
+    // The light's gone: walk back to the lot (no need to watch it).
+    function toLot() { stop(); keys.clear(); G.pos = LOT.slice(); G.loc = { sector: null, boulder: null }; P.setMe(G.pos, pose(false)); P.setFollow(true, 0); }
+
+    // The keyboard. WASD and the arrows walk (not while typing, or with a dialog or the trail map open); E inspects.
+    const KEY = { w: "up", arrowup: "up", s: "down", arrowdown: "down", a: "left", arrowleft: "left", d: "right", arrowright: "right" };
+    const typing = t => t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    const blockedKeys = () => $("#game").hidden || modalOpen() || (paper && paper.isOpen()) || G.day.over;
+    document.addEventListener("keydown", e => {
+      if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return;
+      const k = e.key.toLowerCase(), dir = KEY[k];
+      if (dir) {
+        if (k.startsWith("arrow") && e.target && e.target.closest && e.target.closest(".side")) return;   // arrows still scroll the side panel
+        if (blockedKeys()) return;
+        e.preventDefault();
+        if (walk) stop();
+        if (!keys.has(dir)) { keys.add(dir); if (!P.following()) P.setFollow(true); kick(); }
+      } else if (k === "e" && !blockedKeys() && G.loc.boulder != null && K.boulder(G.loc.boulder) < 1 && !UI.busy) { e.preventDefault(); inspectBoulder(G.loc.boulder); }
+    });
+    document.addEventListener("keyup", e => { const dir = KEY[e.key.toLowerCase()]; if (dir) keys.delete(dir); });
+    window.addEventListener("blur", () => keys.clear());
+    document.addEventListener("visibilitychange", () => { if (document.hidden && G) save(); });
+
+    // ---- the prompt over the map at an unfamiliar boulder, and a first-day hint
+    const prompt = $("#map-prompt");
+    function showPrompt() {
+      const b = G.loc.boulder, show = !G.day.over && b != null && !K.all() && K.boulder(b) < 1;
+      prompt.hidden = !show;
+      if (show) {
+        prompt.innerHTML = `<span>Unfamiliar boulder</span><button type="button" class="btn small primary" data-map-inspect ${UI.busy ? "disabled" : ""}>Inspect <kbd>E</kbd></button>`;
+        prompt.querySelector("[data-map-inspect]").onclick = () => inspectBoulder(b);
+      }
+    }
+    const touchOnly = matchMedia("(hover: none) and (pointer: coarse)").matches;
+    function showHint() {
+      const h = $("#map-hint"); if (!h) return;
+      h.hidden = !!G.walked || G.day.over || !prompt.hidden;
+      h.innerHTML = touchOnly ? "Tap where you want to go. Tap a boulder to walk over to it."
+        : `Walk with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrow keys, or click where you want to go.`;
+    }
+
+    // ---- the paper park map (paper.js): built the first time it opens
     let paper = null;
     function togglePaper() {
       if (paper && paper.isOpen()) { paper.close(); return; }
       if (!paper) paper = Paper.make(D, P.scene, $("#paper-root"));
       const areas = D.sectors.filter(s => K.area(s.name) >= 1).map(s => {
-        const a = K.areaStats(s.name), mins = walkMinutes({ sector: s.name, boulder: null });
+        const a = K.areaStats(s.name), mins = minutesTo({ sector: s.name, boulder: null });
         const range = K.all() ? `V${s.lo}–V${s.hi}` : a.n ? `V${a.lo}–V${a.hi}` : a.boulders ? `${a.boulders} ${a.boulders === 1 ? "boulder" : "boulders"} found` : "not explored yet";
         return { name: s.name, state: K.area(s.name), minutes: mins, sub: `${range} · ${G.loc.sector === s.name ? "you're here" : mins + " min walk"}` };
       });
       const hidden = D.sectors.some(s => K.area(s.name) < 1);
-      paper.open({ areas, here: G.loc.sector, me: meXY(G.loc), view: P.viewBox(),
+      paper.open({ areas, here: G.loc.sector, me: G.pos, view: P.viewBox(),
         footnote: hidden ? "Locals say there's more climbing deeper in the woods than the kiosk map shows." : "",
-        onPick: w => (w.sector ? P.flyTo(w.sector, 9, 800) : P.centerOn(w.x, w.y, P.view().k, 700)) });
+        onPick: w => { P.setFollow(false); $("#map-me").classList.add("lost"); (w.sector ? P.flyTo(w.sector, 9, 800) : P.centerOn(w.x, w.y, P.view().k, 700)); },
+        onGo: G.day.over ? null : name => { if (K.canGo({ sector: name })) travel({ sector: name, boulder: null }); } });
     }
-    const lookAtMe = (ms = 0) => { const [x, y] = meXY(G.loc); P.centerOn(x, y, Math.max(P.view().k, 6), ms); };
-    let knownKey = "all";
+    const lookAtMe = (ms = 0) => { P.setFollow(true, ms); $("#map-me").classList.remove("lost"); };
+    let knownKey = "all", outfitKey = "";
     function update() {
-      if (UI.recenter) { UI.recenter = false; P.flyTo(G.loc.sector || START_AREA, 9, 0); }
+      if (!validPos(G.pos)) G.pos = pointOf(G.loc);       // a save from before Stage 4, or a loaded file
+      if (UI.recenter) { UI.recenter = false; P.setMe(G.pos, pose(false)); P.setFollow(true, 0); }
       // Label only what the player knows (only when that has changed).
       const view = K.mapView(), key = view ? JSON.stringify(view) : "all";
       if (key !== knownKey) { knownKey = key; P.setKnown(view); }
-      P.setMe(meXY(G.loc));
+      const ok = G.day.no + "|" + G.day.weather.temp;
+      if (ok !== outfitKey) { outfitKey = ok; P.setOutfit(outfitFor()); }
+      if (!walk && !keys.size) P.setMe(G.pos, pose(false));
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
       P.setMarks({
         here: G.loc.boulder ?? null, sector: G.loc.sector ?? null, tip: tipBoulders,
         ticked: new Set(D.boulders.filter(b => b.problems.some(i => G.ps[i]?.sent)).map(b => b.id)),
         project: new Set(D.boulders.filter(b => b.problems.some(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 2)).map(b => b.id)),
       });
+      showPrompt(); showHint();
       applyAtmosphere();
     }
-    return { walk, update, meXY, focusSector: name => P.focus(name), paint: P, togglePaper, lookAtMe };
+    P.setMe(G.pos, pose(false));
+    P.setFollow(true, 0);
+    UI.recenter = false;
+    return { update, paint: P, togglePaper, lookAtMe, goTo, minutesTo, minutesToLot, toLot, walking: () => !!walk, locAt: p => locAt(p, G.loc), approach,
+      teleport: to => { stop(); G.pos = pointOf(to); G.loc = { sector: to.sector, boulder: to.boulder }; P.setMe(G.pos, pose(false)); P.setFollow(true, 0); } };
+  }
+  const validPos = p => Array.isArray(p) && p.length === 2 && p.every(v => typeof v === "number" && isFinite(v) && Math.abs(v) < 5000);
+  // Dressed for the weather: shorts on hot days, layers and a beanie in the cold.
+  // The colours are the climber's own (from their id), so they're the same every day.
+  function outfitFor() {
+    const w = G.day.weather, t = w.temp;
+    let h = 0; for (const c of String(G.id || "climber")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    // Each shirt has pads that stand out against it.
+    const SHIRT = [["#c2553a", ["#2f6b8f", "#3c7a3b", "#2e4f6e"]], ["#2f6b4f", ["#c9772b", "#a43b2f", "#55306b"]], ["#6d5aa8", ["#d0a23a", "#3c7a3b", "#c9772b"]],
+      ["#d08a2c", ["#2f6b8f", "#55306b", "#2e4f6e"]], ["#3f7fa6", ["#c9772b", "#a43b2f", "#d0a23a"]], ["#b0436e", ["#2f6b8f", "#3c7a3b", "#d0a23a"]]];
+    const JACKET = ["#8a3f2b", "#2e4f6e", "#5f6b2d", "#6b3b5e"], HAT = ["#b5462e", "#d0a23a", "#2f6b8f", "#6d5aa8"];
+    const [shirt, pads] = SHIRT[h % 6];
+    return { shirt, pad: pads[(h >>> 4) % 3], hatC: HAT[(h >>> 8) % 4],
+      shorts: t >= 72, pants: t >= 72 ? "#6b6457" : "#3f4f63", longSleeves: t < 62,
+      jacket: t < 50 ? JACKET[(h >>> 12) % 4] : false,
+      hat: t < 45 ? "beanie" : t >= 78 && /sun|bluebird|hot/i.test(w.sky) ? "cap" : null,
+      scarf: t < 36 ? "#d9b24c" : false };
   }
 
   // ============================================================ atmosphere
@@ -878,16 +1096,23 @@
     const d = G.day;
     if (d.over) return `${resultHtml()}<h2>Day over</h2><p class="lede">${esc(d.reason || "")}</p><button type="button" class="btn primary" data-summary>See today's summary</button>`;
     if (G.loc.sector == null) {
-      const rows = [...D.sectors].filter(s => K.area(s.name) >= 1).sort((a, b) => a.walk_min - b.walk_min).map(s => {
+      const mins = s => walkMinutes({ sector: s.name, boulder: null });
+      const rows = [...D.sectors].filter(s => K.area(s.name) >= 1).sort((a, b) => mins(a) - mins(b)).map(s => {
         const a = K.areaStats(s.name);
         const sub = K.all() ? `${s.boulderIds.length} boulders · V${s.lo}–V${s.hi} · you've sent ${a.sent} of ${D.sectorProblems.get(s.name).length}`
           : a.boulders ? `${a.boulders} ${a.boulders === 1 ? "boulder" : "boulders"} found · ${a.n} documented${a.open ? ` · ${a.open} unclimbed` : ""} · you've sent ${a.sent}`
           : "You know where it is, but you haven't found its boulders yet.";
         return `<li><button type="button" class="rowbtn" data-go-sector="${esc(s.name)}"><span><span class="t">${esc(s.name)}</span>
           <span class="s">${sub}</span></span>
-          <span class="v">${route(null, s.name).minutes} min walk</span></button></li>`;
+          <span class="v">${mins(s)} min walk</span></button></li>`;
       }).join("");
-      return `${resultHtml()}<h2>The parking lot</h2><p class="meta">${K.all() ? "Pick a sector to walk to." : "The kiosk map marks the areas below. Pick one to walk to, or head for any boulder you can see on the map."} Walking takes time, and the park closes at dusk.</p><ul class="rowlist">${rows}</ul>`;
+      // Between areas: by the lot, on a trail, or off in the woods.
+      const p = G.pos || [0, 0], atLot = Math.hypot(p[0], p[1] + 10) < 45;
+      const onTrail = M && M.paint && M.paint.scene.trailDist(p, 5) < 3;
+      const title = atLot ? "The parking lot" : onTrail ? "On the trail" : "In the woods";
+      const lede = atLot ? (K.all() ? "Pick a sector to walk to." : "The kiosk map marks the areas below. Pick one to walk to, or head for any boulder you can see on the map.")
+        : onTrail ? "Between climbing areas. Keep walking, or pick an area to head for." : "No trail here, just trees and the odd glacial erratic. Anything you can see on the map, you can walk to.";
+      return `${resultHtml()}${npcHtml()}<h2>${title}</h2><p class="meta">${lede} Walking takes time, and the park closes at dusk.</p><h3>Areas you know</h3><ul class="rowlist">${rows}</ul>`;
     }
     const s = D.sectorBy.get(G.loc.sector);
     if (G.loc.boulder == null) {
@@ -1622,6 +1847,9 @@
     if (!ok) throw new Error("This save file is damaged or incomplete.");
     for (const [k, v] of [["tips", []], ["todo", []], ["ach", {}], ["visited", []], ["feed", []]]) if (g[k] == null) g[k] = v;
     if (!num(g.bestGrade)) g.bestGrade = -1;
+    if (g.pos != null && !(Array.isArray(g.pos) && g.pos.length === 2 && g.pos.every(v => num(v) && Math.abs(v) < 5000))) g.pos = null;   // the map puts you back where loc says
+    if (g.walked != null && typeof g.walked !== "boolean") delete g.walked;
+    if (g.day.walkFrac != null && !(num(g.day.walkFrac) && g.day.walkFrac >= 0 && g.day.walkFrac < 1)) g.day.walkFrac = 0;
     migrateSave(g);
     if (g.v === 2 && World.validate(D, g)) throw new Error("This save file is damaged or incomplete.");
     if (g.v === 1 && rulesLive()) upgrade(g);
@@ -1659,7 +1887,7 @@
   }
   function applySave(g) {
     G = g;
-    Object.assign(UI, { tab: "here", busy: false, confirmReset: false, levelPending: false, summaryPending: false, kiosk: false, fresh: null });
+    Object.assign(UI, { tab: "here", busy: false, confirmReset: false, levelPending: false, summaryPending: false, kiosk: false, fresh: null, recenter: true });
     UI.expanded.clear(); UI.cl.problem = null;
     modalQueue.length = 0; $("#modal-root").innerHTML = "";
     save();
@@ -1899,7 +2127,8 @@
     $("#creator").hidden = true; $("#loading").hidden = true; $("#game").hidden = false;
     if (!M) {
       try { M = buildMap(); }
-      catch (e) { reportError("map", e); M = { walk: (pts, ms, done) => done(), update() { safely("light", applyAtmosphere); }, focusSector() {}, meXY: placeXY, togglePaper() {}, lookAtMe() {} }; }
+      catch (e) { reportError("map", e); M = { update() { safely("light", applyAtmosphere); }, togglePaper() {}, lookAtMe() {}, minutesToLot: () => 0, toLot() {}, walking: () => false,
+        goTo(to) { if (!Array.isArray(to)) { arrive({ ...G.loc }, { sector: to.sector, boulder: to.boulder }); save(); renderAll(); } }, teleport(to) { G.loc = { sector: to.sector, boulder: to.boulder }; } }; }
     }
     if (DEV) devButton();
     renderAll();
@@ -1966,10 +2195,10 @@
         },
         teleport: () => {
           const b = +root.querySelector("#dv-b").value, bo = D.boulders[b];
-          G.loc = { sector: bo.sector, boulder: b };
+          M.teleport({ sector: bo.sector, boulder: b });
           if (v2()) { K.visitArea(bo.sector); if (K.boulder(b) >= 1) K.visitBoulder(b); }
           if (!G.visited.includes(bo.sector)) G.visited.push(bo.sector);
-          G.day.last = null; done(false); M.focusSector(bo.sector);
+          G.day.last = null; done(false);
         },
         inspect: () => {
           const i = pid(), p = D.problems[i];
@@ -2026,6 +2255,7 @@
     if (!window.Art) await loadScript("art.js");
     if (!window.World) await loadScript("world.js");
     if (!window.Know) await loadScript("knowledge.js");
+    if (!window.Travel) await loadScript("travel.js");
     D = await fetch("game-data.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
     prepData();
     K = Know.make(D, () => G);

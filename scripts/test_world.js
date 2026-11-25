@@ -11,6 +11,7 @@ const World = require(path.join(G_DIR, "world.js"));
 global.World = World;
 const Know = require(path.join(G_DIR, "knowledge.js"));
 const D = require(path.join(G_DIR, "game-data.json"));
+const Travel = require(path.join(G_DIR, "travel.js"));
 
 let passed = 0;
 const test = (name, fn) => { try { fn(); passed++; console.log("  ok  " + name); } catch (e) { console.log("  FAIL " + name + "\n       " + (e.stack || e).split("\n").slice(0, 3).join("\n       ")); process.exitCode = 1; } };
@@ -279,6 +280,46 @@ test("Open projects: lines you know of; stronger eyes find more on boulders you'
   assert(K.lookAgain().includes(b), "a V8 climber sees more on it");
   const r = K.inspect(b, g.date);
   assert(r.lines.length > 0 && !r.found && !K.lookAgain().includes(b));
+});
+
+console.log("getting around (Stage 4)");
+// A small network: a trail from the lot (0,0) north to a junction (0,300), branching
+// east to (300,300) and west to (-300,300). A pond sits between the lot and the east branch.
+const net = () => Travel.make({ trails: [[[0, 0], [0, 150], [0, 300]], [[0, 300], [150, 300], [300, 300]], [[0, 300], [-150, 300], [-300, 300]]],
+  blocked: p => Math.hypot(p[0] - 150, p[1] - 150) < 80 });
+const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol;
+test("walking times match the game's trail pacing (45 m a minute on trails)", () => {
+  const W = net(), p = W.plan([0, 0], [300, 300]);
+  assert(near(p.metres, 600, 1e-6), p.metres);
+  assert(near(p.minutes, 600 / 45, 1e-6), p.minutes);
+  assert(p.rates.every(r => r === 45));
+});
+test("off the trail is slower, and you take the trail when it's quicker", () => {
+  const W = net();
+  // 40 m off a trail: straight through the woods.
+  const a = W.plan([0, 100], [-40, 100]);
+  assert(near(a.minutes, 40 / 30, 1e-6) && a.pts.length === 2);
+  // From the west end to the east end: along the trails (600 m at 45/min), not 600 m straight at 30/min.
+  const b = W.plan([-300, 300], [300, 300]);
+  assert(near(b.minutes, 600 / 45, 1e-6), b.minutes);
+  // A spot 20 m off the far trail: out along the trail, then into the woods.
+  const c = W.plan([0, 0], [-200, 320]);
+  assert(near(c.minutes, 500 / 45 + 20 / 30, 1e-3), c.minutes);
+  assert.strictEqual(c.rates[c.rates.length - 1], 30);
+});
+test("water is in the way: no walking across the pond", () => {
+  const W = net(), p = W.plan([50, 50], [250, 250]);   // straight across the pond
+  assert(p && p.pts.length > 2, "goes round, by the trails");
+  for (let i = 1; i < p.pts.length; i++) assert(W.clear(p.pts[i - 1], p.pts[i]), "no leg crosses water");
+  assert(p.minutes > Math.hypot(200, 200) / 30);
+});
+test("a walk can stop part way, and what it costs so far is known", () => {
+  const W = net(), p = W.plan([0, 0], [300, 300]);
+  const half = Travel.along(p, 300);
+  assert(near(half.p[0], 0) && near(half.p[1], 300) && near(half.minutes, 300 / 45, 1e-9));
+  const end = Travel.along(p, 1e6);
+  assert(end.end && near(end.minutes, p.minutes, 1e-9));
+  assert.strictEqual(W.plan([5, 5], [5, 5]).minutes, 0);
 });
 
 if (process.argv.includes("--curve")) {

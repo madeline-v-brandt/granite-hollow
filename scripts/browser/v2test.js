@@ -2,8 +2,8 @@
 // anywhere: panels, CragLog, map labels, accessible names, hover cards),
 // finding a boulder, a first ascent, reloading, a week's rest, and migrating an
 // old climber.   node scripts/browser/v2test.js
-// The leak check can flag a hidden line whose name is part of a visible one
-// ("Kiosk" in "Kiosk Sit"): sit starts and eliminates are named after their line.
+// Visible problems' names are taken out before looking for hidden ones, since
+// sit starts and eliminates are named after their line ("Kiosk Sit", "Kiosk").
 const { open, ready, click, settle, sleep, GAME_DIR: GD, FIX } = require("./lib");
 const fs = require("fs");
 global.Mech = require(GD + "mechanics.js"); global.World = require(GD + "world.js");
@@ -38,6 +38,9 @@ async function harvest(p) {
 }
 function leaks(g, all) {
   const K = Know.make(D, () => g), hits = [];
+  // Take out the names you can see first, so a sit start ("Kiosk Sit") doesn't look like its hidden parent ("Kiosk").
+  const shown = D.problems.map((p, i) => K.visible(i) ? K.name(i) : null).filter(Boolean).sort((a, b) => b.length - a.length);
+  for (const n of shown) all = all.split(n).join(" ");
   const word = n => new RegExp("(^|[^\\p{L}])" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "($|[^\\p{L}])", "u");
   D.problems.forEach((p, i) => { if (K.line(i) === "hidden" && p.name.length > 3 && !Object.values(World.NAMED).some(n => n.name === p.name) && word(p.name).test(all)) hits.push("problem: " + p.name); });
   D.boulders.forEach((b, i) => { if (K.boulder(i) < 1 && word(b.name).test(all)) hits.push("boulder: " + b.name); });
@@ -143,8 +146,9 @@ function leaks(g, all) {
   all = await harvest(p);
   console.log("LEAKS a week later:", leaks(g3, all));
   // Migration: an old climber in the dev slot is converted when it loads.
-  await p.evaluate((k, s) => { localStorage.setItem(k, s); }, SLOT, fs.readFileSync(FIX + "v1-midday.json", "utf8"));
-  await p.reload({ waitUntil: "load" }); await ready(p); await sleep(400);
+  // (Written from another page: the game saves itself as it unloads.)
+  await p.goto(url.replace(/index\.html.*$/, "game-data.json")); await p.evaluate((k, s) => { localStorage.setItem(k, s); }, SLOT, fs.readFileSync(FIX + "v1-midday.json", "utf8"));
+  await p.goto(url, { waitUntil: "load" }); await ready(p); await sleep(400);
   const gm = JSON.parse(await p.evaluate(k => localStorage.getItem(k), SLOT));
   const welcome = await modalText(p);
   console.log("welcome back:\n  " + welcome.split("\n").filter(Boolean).slice(0, 10).join("\n  "));

@@ -1217,9 +1217,60 @@
     const SPACING = { sector: 17 * .14, road: 11 * .2, water: 16 * .02 };
     labelItems.forEach(d => { d.w = measure(d.text, d.small ? "italic 600 13px Fraunces, Georgia, serif" : FONT[d.kind]) + (SPACING[d.kind] || 0) * d.text.length; });
 
-    // ---- you
+    // ---- you: a small climber with a crash pad on their back, dressed for the
+    // weather (setOutfit), drawn in screen space above the canopy so the woods
+    // never hide them. Feet at 0,0, about 30 px tall at scale 1.
     const meG = marks.append("g").attr("class", "me");
-    meG.append("circle").attr("class", "me-pulse").attr("r", 11); meG.append("circle").attr("class", "me-halo").attr("r", 9); meG.append("circle").attr("class", "me-dot").attr("r", 6.5);
+    let outfit = { shirt: "#c2553a", pants: "#3f4f63", shorts: false, jacket: false, hat: null, scarf: false, pad: "#2f6b8f", skin: "#e6bf98", hair: "#4a3426" };
+    let mePose = { phase: 0, moving: false, facing: 1, padDown: false };
+    let meParts = null;
+    function drawMe() {
+      meG.selectAll("*").remove();
+      const o = outfit;
+      meG.append("circle").attr("class", "me-pulse").attr("r", 11).attr("cy", -1);
+      const fig = meG.append("g").attr("class", "me-fig");
+      fig.append("ellipse").attr("class", "me-shadow").attr("cx", 0).attr("cy", 0).attr("rx", 7.5).attr("ry", 2.3);
+      fig.append("ellipse").attr("class", "me-halo").attr("cx", -.5).attr("cy", -14.5).attr("rx", 9.5).attr("ry", 16);
+      const body = fig.append("g").attr("class", "me-body");
+      const legs = [0, 1].map(() => {
+        const g = body.append("g");
+        return { low: g.append("path").attr("class", "me-leg").attr("stroke", o.shorts ? o.skin : o.pants),
+          up: g.append("path").attr("class", "me-leg").attr("stroke", o.pants), shoe: g.append("path").attr("class", "me-shoe") };
+      });
+      // The pad on the back (the back is to the left: the body is mirrored to face the way you walk).
+      const padG = body.append("g").attr("class", "me-pad");
+      padG.append("rect").attr("x", -11).attr("y", -25).attr("width", 7.2).attr("height", 15.5).attr("rx", 1.6).attr("fill", o.pad);
+      padG.append("path").attr("d", "M-11,-20.5h7.2M-11,-15h7.2").attr("class", "me-pad-seam");
+      body.append("path").attr("class", "me-strap").attr("d", "M-4.6,-21.5Q0,-17 2.6,-10.5");
+      body.append("rect").attr("class", "me-torso").attr("x", -4.8).attr("y", -21.5).attr("width", 9.6).attr("height", 12.5).attr("rx", 3.2).attr("fill", o.jacket ? o.jacket : o.shirt);
+      if (o.jacket) body.append("path").attr("class", "me-zip").attr("d", "M1.2,-21V-9.5");
+      if (o.scarf) body.append("path").attr("class", "me-scarf").attr("d", "M-3.6,-21.3h7.4v2.4h-7.4zM2.2,-19.2l1,4.2").attr("fill", o.scarf);
+      const arm = body.append("path").attr("class", "me-arm").attr("stroke", o.jacket || (o.longSleeves ? o.shirt : o.skin));
+      body.append("circle").attr("class", "me-head").attr("cx", .6).attr("cy", -26.3).attr("r", 4.5).attr("fill", o.skin);
+      if (o.hat === "beanie") {
+        body.append("path").attr("class", "me-hat").attr("d", "M-4.1,-27.2a4.8,4.6 0 0 1 9.4,0z").attr("fill", o.hatC || "#b5462e");
+        body.append("circle").attr("class", "me-hat").attr("cx", .6).attr("cy", -32.3).attr("r", 1.4).attr("fill", o.hatC || "#b5462e");
+      } else if (o.hat === "cap") {
+        body.append("path").attr("class", "me-hat").attr("d", "M-3.9,-27.4a4.6,4.4 0 0 1 9,0zM4.6,-27.6h3.6").attr("fill", o.hatC || "#2f6b4f");
+      } else body.append("path").attr("class", "me-hair").attr("d", "M-3.9,-26.8a4.6,4.6 0 0 1 8.4,-2.4q-3.2,.6-5,2.6z").attr("fill", o.hair);
+      meParts = { fig, body, legs, arm, padG };
+      poseMe();
+    }
+    // Legs swing with the distance walked; the body bobs; the pad comes off at a boulder.
+    function poseMe() {
+      if (!meParts) return;
+      const { body, legs, arm, padG } = meParts, m = mePose.moving, sw = m ? Math.sin(mePose.phase * 1.35) * 3 : 0, bob = m ? -Math.abs(Math.cos(mePose.phase * 1.35)) * .9 : 0;
+      body.attr("transform", `translate(0,${f2(bob)})${mePose.facing < 0 ? " scale(-1,1)" : ""}`);
+      [sw, -sw].forEach((d, i) => {
+        const hx = i ? 1.9 : -1.9, fx = hx + d, kx = hx + d * .55;
+        legs[i].up.attr("d", `M${f2(hx)},-10.5L${f2(kx)},-5.2`);
+        legs[i].low.attr("d", `M${f2(hx)},-10.5L${f2(kx)},-5.2L${f2(fx)},-1.2`);
+        legs[i].shoe.attr("d", `M${f2(fx - 1.2)},-.6h3`);
+      });
+      arm.attr("d", `M1.2,-19.5L${f2(2.6 - sw * .7)},-13.2`);
+      padG.attr("display", mePose.padDown && !m ? "none" : null);
+      meG.classed("moving", m);
+    }
     const hereB = S.boulders.find(bo => bo.b.name === state.here);
     let meWorld = hereB ? [hereB.b.x - hereB.form.R * .55, hereB.b.y - hereB.form.R * 1.45] : [0, 0];
 
@@ -1256,6 +1307,8 @@
       .on("click.rock", e => {
         const id = rockAt(e);
         if (id == null) {
+          const [gx, gy] = d3.pointer(e);
+          if (opts.onGround) { if (tip) tip.hidden = true; opts.onGround(T.invertX(gx), -T.invertY(gy)); return; }
           // An area's open ground: in the game, a click walks you there.
           if (!opts.onSector) return;
           const [mx, my] = d3.pointer(e), wx = T.invertX(mx), wy = -T.invertY(my);
@@ -1276,18 +1329,34 @@
       });
 
     // ---- zoom, levels of detail, and which tiles are on screen
-    let size = { w: wrap.clientWidth || 900, h: wrap.clientHeight || 700 }, T = d3.zoomIdentity, furniture = [];
+    // view: the map's frame on the page. While the camera follows a walking climber,
+    // the SVG is drawn `pad` larger on every side and slid under the frame with a
+    // GPU transform, and only redrawn when the slide runs out of margin (see
+    // follow below, and docs/phase2/stage1-walking.md). size is the SVG's own size.
+    let view = { w: wrap.clientWidth || 900, h: wrap.clientHeight || 700 }, pad = 0, slide = [0, 0];
+    let size = { w: view.w, h: view.h }, T = d3.zoomIdentity, furniture = [];
+    const PAD = opts.slidePad ?? 220;
     const measureFurniture = () => {
       const wr = wrap.getBoundingClientRect();
-      furniture = [...wrap.querySelectorAll(opts.furniture || ".cartouche, .tools, .compass")].map(el => { const r = el.getBoundingClientRect(); return { x0: r.left - wr.left - 6, x1: r.right - wr.left + 6, y0: r.top - wr.top - 6, y1: r.bottom - wr.top + 6 }; });
+      furniture = [...wrap.querySelectorAll(opts.furniture || ".cartouche, .tools, .compass")].map(el => { const r = el.getBoundingClientRect(); return { x0: r.left - wr.left - 6 + pad, x1: r.right - wr.left + 6 + pad, y0: r.top - wr.top - 6 + pad, y1: r.bottom - wr.top + 6 + pad }; });
     };
     // The park itself (boulders, water and the lot), without the forest margins beyond it.
     const pk = (() => { const xs = [...D.boulders.map(b => b.x), ...D.features.flatMap(f => [f.x - f.r, f.x + f.r])], ys = [...D.boulders.map(b => b.y), ...D.features.flatMap(f => [f.y - f.r, f.y + f.r]), -40];
       return [Math.min(...xs) - 50, Math.max(...xs) + 50, Math.min(...ys) - 10, Math.max(...ys) + 50]; })();
-    const fitK = () => Math.min(size.w / (pk[1] - pk[0]), size.h / (pk[3] - pk[2]));
+    const fitK = () => Math.min(view.w / (pk[1] - pk[0]), view.h / (pk[3] - pk[2]));
     // opts.minZoom: the game keeps the world close enough to look its best (its paper map shows the whole park).
     const minK = () => (opts.minZoom ? Math.max(opts.minZoom, 0) : fitK() * .8);
-    const zoom = d3.zoom().scaleExtent([minK(), 16]).translateExtent([[bx0 - 60, -by1 - 60], [bx1 + 60, -by0 + 60]]).on("zoom", e => { T = e.transform; draw(); });
+    // follow: the camera keeps the climber in the middle as they walk. Dragging the
+    // map lets go (opts.onFollow(false)); the wheel and the zoom buttons zoom about them.
+    let follow = false, idleTimer = null;
+    const centred = (p, k) => d3.zoomIdentity.translate(size.w / 2 - k * p[0], size.h / 2 + k * p[1]).scale(k);
+    const zoom = d3.zoom().scaleExtent([minK(), 16]).translateExtent([[bx0 - 60, -by1 - 60], [bx1 + 60, -by0 + 60]]).on("zoom", e => {
+      T = e.transform;
+      const se = e.sourceEvent;
+      if (follow && se && /move/.test(se.type)) { follow = false; if (opts.onFollow) opts.onFollow(false); }
+      else if (follow && se && se.type === "wheel") { T = centred(meWorld, T.k); svg.property("__zoom", T); }
+      draw();
+    });
     svg.call(zoom).on("dblclick.zoom", null);
     let lod = "";
     const pending = new Set();
@@ -1332,7 +1401,8 @@
       placeBadges();
       if (opts.onZoom) opts.onZoom(T);
     }
-    const placeMe = () => meG.attr("transform", `translate(${f2(T.applyX(meWorld[0]))},${f2(T.applyY(-meWorld[1]))})`);
+    const meScale = () => clamp(.62 + T.k * .075, .95, 1.6);
+    const placeMe = () => meG.attr("transform", `translate(${f2(T.applyX(meWorld[0]))},${f2(T.applyY(-meWorld[1]))}) scale(${f2(meScale())})`);
     function placeLabels() {
       const k = T.k, boxes = furniture.slice();
       const hit = b => boxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
@@ -1360,7 +1430,7 @@
         for (const [x, y, anchor] of cands) {
           const x0 = anchor === "start" ? x : anchor === "end" ? x - d.w : x - d.w / 2;
           const box = { x0: x0 - 3, x1: x0 + d.w + 3, y0: y - h + 4, y1: y + 6 };
-          if (box.x0 < 4 || box.x1 > size.w - 4 || box.y0 < 4 || box.y1 > size.h - 4) continue;
+          if (box.x0 < pad + 4 || box.x1 > pad + view.w - 4 || box.y0 < pad + 4 || box.y1 > pad + view.h - 4) continue;
           if (hit(box) && !wanted) continue;
           boxes.push(box); d.show = true; d.x = x; d.y = y; d.anchor = anchor; d.ax = ax; d.ay = ay; break;
         }
@@ -1378,16 +1448,38 @@
       });
     }
     function sizeLight() { for (const r of [tint, veil, dim]) r.attr("width", size.w).attr("height", size.h); }
-    const fitTo = (cx, cy, rad) => { const k = Math.min(size.w, size.h) / (2 * rad); return d3.zoomIdentity.translate(size.w / 2 - k * cx, size.h / 2 - k * -cy).scale(k); };
+    const fitTo = (cx, cy, rad) => { const k = Math.min(view.w, view.h) / (2 * rad); return d3.zoomIdentity.translate(size.w / 2 - k * cx, size.h / 2 - k * -cy).scale(k); };
     const home = () => { const k = fitK(); return d3.zoomIdentity.translate(size.w / 2 - k * (pk[0] + pk[1]) / 2, size.h / 2 + k * (pk[2] + pk[3]) / 2).scale(k); };
     svg.attr("viewBox", `0 0 ${size.w} ${size.h}`); sizeLight(); measureFurniture();
     zoom.scaleExtent([minK(), 16]);
     svg.call(zoom.transform, opts.view ? fitTo(...opts.view) : home());
     new ResizeObserver(() => {
       const w = wrap.clientWidth, h = wrap.clientHeight;
-      if (!w || !h || (w === size.w && h === size.h)) return;
-      size = { w, h }; svg.attr("viewBox", `0 0 ${w} ${h}`); sizeLight(); measureFurniture(); zoom.scaleExtent([minK(), 16]); draw();
+      if (!w || !h || (w === view.w && h === view.h)) return;
+      view = { w, h }; layout(); measureFurniture(); zoom.scaleExtent([minK(), 16]); draw();
     }).observe(wrap);
+    // The SVG's size and place under the frame: the view, plus pad all round.
+    function layout() {
+      size = { w: view.w + 2 * pad, h: view.h + 2 * pad };
+      svg.attr("viewBox", `0 0 ${size.w} ${size.h}`); sizeLight();
+      Object.assign(svgEl.style, pad ? { position: "absolute", left: -pad + "px", top: -pad + "px", width: size.w + "px", height: size.h + "px", willChange: "transform" }
+        : { position: "", left: "", top: "", width: "", height: "", willChange: "" });
+    }
+    // Drop the slide into the camera (the picture doesn't move; the SVG redraws once).
+    function commitSlide() {
+      if (!slide[0] && !slide[1]) return;
+      const [sx, sy] = slide; slide = [0, 0]; svgEl.style.transform = "";
+      svg.call(zoom.transform, d3.zoomIdentity.translate(T.x + sx, T.y + sy).scale(T.k));
+    }
+    // Turn the margin on (while walking) or off (when still): the picture stays where it is.
+    function setPad(p) {
+      if (p === pad) return;
+      commitSlide();
+      const d = p - pad; pad = p; layout(); measureFurniture();
+      svg.call(zoom.transform, d3.zoomIdentity.translate(T.x + d, T.y + d).scale(T.k));
+    }
+    // Interacting with the map: settle the slide first, so pointers land where they look.
+    for (const ev of ["pointerdown", "wheel"]) wrap.addEventListener(ev, () => commitSlide(), { capture: true, passive: true });
     const go = (t, ms = 900) => {
       const lo = minK();
       if (t.k < lo) { const cx = (size.w / 2 - t.x) / t.k, cy = (size.h / 2 - t.y) / t.k; t = d3.zoomIdentity.translate(size.w / 2 - lo * cx, size.h / 2 - lo * cy).scale(lo); }
@@ -1480,11 +1572,36 @@
       const k = T.k;
       badgeSel.attr("transform", bo => `translate(${f2(T.applyX(bo.b.x + bo.form.R * .75) + 4)},${f2(T.applyY(-bo.b.y - bo.form.H * .85) - Math.min(10, k * 1.2))})`);
     }
-    function setMe(p) { meWorld = p; placeMe(); }
+    // Where you are, and how you're moving: { phase, moving, facing, padDown }.
+    // While following a walking climber, the map slides under them (and redraws
+    // only when the slide runs out of margin); a still climber lets the margin go.
+    function setMe(p, pose) {
+      meWorld = p;
+      if (pose) { mePose = { ...mePose, ...pose }; poseMe(); }
+      if (follow && mePose.moving) {
+        if (!pad) setPad(PAD);
+        clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (!mePose.moving) setPad(0); }, 900);
+        let sx = size.w / 2 - T.applyX(p[0]), sy = size.h / 2 - T.applyY(-p[1]);
+        if (Math.abs(sx) > pad * .8 || Math.abs(sy) > pad * .8) {
+          slide = [0, 0]; svgEl.style.transform = "";
+          svg.call(zoom.transform, centred(p, T.k));
+          sx = clamp(size.w / 2 - T.applyX(p[0]), -pad * .95, pad * .95); sy = clamp(size.h / 2 - T.applyY(-p[1]), -pad * .95, pad * .95);
+        }
+        slide = [sx, sy];
+        svgEl.style.transform = `translate3d(${f1(sx)}px,${f1(sy)}px,0)`;
+      } else if (!mePose.moving && pad) { clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (!mePose.moving) setPad(0); }, 900); }
+      placeMe();
+    }
+    function setFollow(on, ms = 0) {
+      follow = !!on;
+      if (on) { commitSlide(); go(centred(meWorld, Math.max(T.k, opts.followMinK || 5)), ms); }
+    }
+    function setOutfit(o) { outfit = { ...outfit, ...o }; drawMe(); }
+    drawMe();
     // Put world point (x, y) in the middle of the view, at zoom k (the current one by default); instant unless ms.
     function centerOn(x, y, k = T.k, ms = 0) { go(d3.zoomIdentity.translate(size.w / 2 - k * x, size.h / 2 + k * y).scale(k), ms); }
     // The world box on screen: [x0, y0, x1, y1] in metres.
-    const viewBox = () => [T.invertX(0), -T.invertY(size.h), T.invertX(size.w), -T.invertY(0)];
+    const viewBox = () => { const x0 = pad - slide[0], y0 = pad - slide[1]; return [T.invertX(x0), -T.invertY(y0 + view.h), T.invertX(x0 + view.w), -T.invertY(y0)]; };
     // Label only what the player knows: { sectors: { name: { show, sub } }, boulders: { id: name | null } }.
     let freshTimer = null;
     function setKnown(view) {
@@ -1512,11 +1629,13 @@
     function focus(name) {
       const s = D.sectors.find(x => x.name === name); if (!s) return;
       const rad = (name === "Hawkwatch" ? S.baldR : s.radius) + 40, t = fitTo(s.x, s.y + 4, rad);
-      const x = T.applyX(s.x), y = T.applyY(-s.y), inView = x > 40 && x < size.w - 40 && y > 60 && y < size.h - 40;
+      const x = T.applyX(s.x) - pad + slide[0], y = T.applyY(-s.y) - pad + slide[1], inView = x > 40 && x < view.w - 40 && y > 60 && y < view.h - 40;
       if (t.k > T.k * 1.15 || !inView) go(t, 700);
     }
     draw();
-    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, centerOn, view: () => T, viewBox, focus, home: () => go(home()), zoomBy: f => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f), scene: S,
+    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
+      zoomBy: f => { commitSlide(); svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f); },
+      setFollow, following: () => follow, setOutfit, toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],
       tilesPending: () => pending.size + (building ? 1 : 0) };
   }
 
