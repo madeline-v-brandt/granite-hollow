@@ -19,6 +19,11 @@ async function harvest(p) {
   const ids = await p.evaluate(() => [...document.querySelectorAll("[data-cl]")].map(b => +b.dataset.cl));
   for (const i of [...new Set(ids)].slice(0, 12)) { await p.evaluate(i => { const b = document.querySelector(`[data-cl="${i}"]`); if (b) b.click(); }, i); await sleep(80); out.push(await text(p)); await click(p, "[data-cl-back]"); await sleep(60); }
   await click(p, '#tabs [data-tab="here"]');
+  // The trail map: everything printed on it, and its accessible names.
+  await p.keyboard.press("Escape"); await p.evaluate(() => document.body.focus());
+  await p.keyboard.press("m"); await sleep(400);
+  out.push(await p.evaluate(() => { const b = document.querySelector(".paper-back"); return b && !b.hidden ? b.innerText + " " + [...b.querySelectorAll("svg text")].map(t => t.textContent).join(" | ") + " " + [...b.querySelectorAll("[aria-label]")].map(e => e.getAttribute("aria-label")).join(" | ") : "(trail map didn't open)"; }));
+  await p.keyboard.press("Escape"); await sleep(150);
   out.push(await p.evaluate(() => [...document.querySelectorAll("#map g.lab")].filter(g => g.getAttribute("display") !== "none").map(g => g.textContent).join(" | ")));
   out.push(await p.evaluate(() => [...document.querySelectorAll("#map [aria-label]")].map(g => g.getAttribute("aria-label")).join(" | ")));
   out.push(...await p.evaluate(() => [...document.querySelectorAll("#map g.boulder, #map g.far-rock")].filter(g => !g.closest("[display=none]")).slice(0, 40).map(g => {

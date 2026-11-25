@@ -11,6 +11,8 @@
   // development mode until Stage 3, when discovery and first ascents are playable.
   const RULES2_LIVE = false;
   const START_DATE = "2025-09-06";
+  const START_AREA = "The Tailgate";      // every climbing day starts at the trailhead, by the lot
+  const WORLD_MIN_ZOOM = 3.2;              // the world view never zooms out past an area; the paper map shows the park
   const fmt = d3.format(",");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = s => document.querySelector(s);
@@ -163,14 +165,16 @@
     const s = Mech.startOfDay(G.player, rest);
     Object.assign(G.player, s);
     G.dayNo++;
-    G.loc = { sector: null, boulder: null };
+    G.loc = { sector: START_AREA, boulder: null };
+    if (!G.visited.includes(START_AREA)) G.visited.push(START_AREA);
+    UI.recenter = true;                                   // the camera starts the day on you
     G.day = { no: G.dayNo, minute: 9 * 60 + Math.floor(Math.random() * 40), weather: w, startEnergy: s.energy,
       attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null,
       over: false, warned: false, levelBefore: Mech.levelInfo(G.player.xp).level };
     const intro = first && v2()
-      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk map marks three climbing areas: The Tailgate, right by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot.`
+      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk's trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot.`
       : first
-      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. Pick a sector on the map to walk in. The Schoolhouse is 6 minutes up the trail, and the boulders at the Tailgate are right beside the car.`
+      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The boulders at The Tailgate are right beside the car. The trail map (press M) shows the rest of the park: The Schoolhouse is 5 minutes up the trail.`
       : `${w.sky}, ${w.temp}°F. ${w.note}`;
     G.day.last = { kind: "info", title: first ? "Welcome to Granite Hollow" : `Day ${G.dayNo}`, text: intro };
     if (Mech.rainStart(w) === 0) {
@@ -178,6 +182,7 @@
       G.day.reason = `${w.pop != null ? `The ${Mech.rainChance(w)} came through, and the rock is soaked.` : `${w.precip === "Snow" ? "Snow" : "Rain"} all day.`} Wet granite is slick and holds can snap, so there's no climbing. It counts as a rest day.`;
       note(`Day ${G.dayNo}: rained out.`);
     } else note(`Day ${G.dayNo}: ${w.sky}, ${w.temp}°F, ${w.label.toLowerCase()} conditions.`);
+    if (v2()) K.visitArea(START_AREA);
     // The community climbs too: every day since the last one is simulated, once.
     if (v2()) safely("the crag's history", () => World.step(D, G, G.date, { today: { date: G.date, wet: !!G.day.rainedOut } }));
   }
@@ -368,6 +373,7 @@
       toast(raining ? "Rain's coming" : "Not enough daylight", raining ? "It'll be raining before you get there." : "It'll be dark before you get there. Head home instead.", "info"); return;
     }
     G.day.minute += minutes;
+    G.day.moved = true;
     const pts = [M.meXY(from)];
     if (to.sector !== from.sector) for (const n of route(from.sector, to.sector).nodes.slice(1)) pts.push(nodeXY(n));
     if (to.boulder != null) pts.push(M.meXY(to));
@@ -506,7 +512,7 @@
   function buildMap() {
     const tip = $("#tip");
     const P = Paint.paint($("#map"), D, {
-      tooltip: tip,
+      tooltip: tip, minZoom: WORLD_MIN_ZOOM,
       furniture: ".cartouche, .map-tools, .compass, .scalebar",
       state: { here: G.loc.boulder != null ? D.boulders[G.loc.boulder].name : null },
       onBoulder: id => { const b = D.boulders[id]; travel({ sector: b.sector, boulder: b.id }); },
@@ -535,8 +541,10 @@
     });
     $("#zoom-in").onclick = () => P.zoomBy(1.6);
     $("#zoom-out").onclick = () => P.zoomBy(1 / 1.6);
-    $("#zoom-fit").onclick = () => P.home();
-    if (G.loc.sector) P.flyTo(G.loc.sector, 9, 0);      // a saved day picks up where you are
+    $("#map-me").onclick = () => lookAtMe(600);
+    $("#map-paper").onclick = () => togglePaper();
+    P.flyTo(G.loc.sector || START_AREA, 9, 0);              // a saved day picks up where you are
+    UI.recenter = false;
 
     // Where your dot stands: in front of the boulder you're at (not on top of it), or at the area's trail junction.
     const meXY = loc => {
@@ -569,8 +577,25 @@
         if (el >= ms) { timer.stop(); P.setMe(points[points.length - 1]); done(); }
       });
     }
+    // The paper park map (paper.js): built the first time it opens.
+    let paper = null;
+    function togglePaper() {
+      if (paper && paper.isOpen()) { paper.close(); return; }
+      if (!paper) paper = Paper.make(D, P.scene, $("#paper-root"));
+      const areas = D.sectors.filter(s => K.area(s.name) >= 1).map(s => {
+        const a = K.areaStats(s.name), mins = walkMinutes({ sector: s.name, boulder: null });
+        const range = K.all() ? `V${s.lo}–V${s.hi}` : a.n ? `V${a.lo}–V${a.hi}` : a.boulders ? `${a.boulders} ${a.boulders === 1 ? "boulder" : "boulders"} found` : "not explored yet";
+        return { name: s.name, state: K.area(s.name), minutes: mins, sub: `${range} · ${G.loc.sector === s.name ? "you're here" : mins + " min walk"}` };
+      });
+      const hidden = D.sectors.some(s => K.area(s.name) < 1);
+      paper.open({ areas, here: G.loc.sector, me: meXY(G.loc), view: P.viewBox(),
+        footnote: hidden ? "Locals say there's more climbing deeper in the woods than the kiosk map shows." : "",
+        onPick: w => (w.sector ? P.flyTo(w.sector, 9, 800) : P.centerOn(w.x, w.y, P.view().k, 700)) });
+    }
+    const lookAtMe = (ms = 0) => { const [x, y] = meXY(G.loc); P.centerOn(x, y, Math.max(P.view().k, 6), ms); };
     let knownKey = "all";
     function update() {
+      if (UI.recenter) { UI.recenter = false; P.flyTo(G.loc.sector || START_AREA, 9, 0); }
       // Label only what the player knows (only when that has changed).
       const view = K.mapView(), key = view ? JSON.stringify(view) : "all";
       if (key !== knownKey) { knownKey = key; P.setKnown(view); }
@@ -583,7 +608,7 @@
       });
       applyAtmosphere();
     }
-    return { walk, update, meXY, focusSector: name => P.focus(name), paint: P };
+    return { walk, update, meXY, focusSector: name => P.focus(name), paint: P, togglePaper, lookAtMe };
   }
 
   // ============================================================ atmosphere
@@ -723,7 +748,7 @@
       </div>
       <div class="actions">
         <button type="button" class="btn" id="act-rest" ${disabled}>Rest 20 min</button>
-        ${d.attempts === 0 && G.loc.sector == null && !d.over
+        ${d.attempts === 0 && !d.moved && (G.loc.sector == null || (G.loc.sector === START_AREA && G.loc.boulder == null)) && !d.over
           ? `<button type="button" class="btn" id="act-skip" ${disabled}>Rest day</button>` : ""}
         <button type="button" class="btn primary" id="act-home" ${disabled}>Head home</button>
       </div>`;
@@ -838,7 +863,10 @@
           <span class="v">${a.sent}/${a.lines} sent</span></button></li>`;
       }).join("");
       const none = `<p class="lede">You haven't found any boulders here yet. Have a look around: walk to any boulder you can see on the map.</p>`;
-      return `${resultHtml()}${npcHtml()}<h2>${esc(s.name)}</h2><p class="meta">${s.walk_min} min from the lot.${ids.length ? " Pick a boulder." : ""}</p>${ids.length ? `<ul class="rowlist">${rows}</ul>` : none}`;
+      const away = D.sectors.filter(x => x.name !== s.name && K.area(x.name) >= 1).map(x => [x, walkMinutes({ sector: x.name, boulder: null })]).sort((a, b) => a[1] - b[1]);
+      const elsewhere = away.length ? `<h3>Other areas</h3><ul class="rowlist">${away.map(([x, m]) => `<li><button type="button" class="rowbtn" data-go-sector="${esc(x.name)}"><span><span class="t">${esc(x.name)}</span></span><span class="v">${m} min walk</span></button></li>`).join("")}</ul>
+        <p class="meta">The trail map (M) shows where they are.</p>` : "";
+      return `${resultHtml()}${npcHtml()}<h2>${esc(s.name)}</h2><p class="meta">${s.name === START_AREA ? "Right by the lot." : `${s.walk_min} min from the lot.`}${ids.length ? " Pick a boulder." : ""}</p>${ids.length ? `<ul class="rowlist">${rows}</ul>` : none}${elsewhere}`;
     }
     const b = D.boulders[G.loc.boulder];
     const disabled = UI.busy || d.over ? "disabled" : "";
@@ -1647,11 +1675,17 @@
     draw();
   }
 
+  document.addEventListener("keydown", e => {
+    if (e.key !== "m" && e.key !== "M") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || !M || !M.togglePaper || $("#game").hidden || $("#modal-root").children.length) return;
+    const t = e.target; if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    e.preventDefault(); safely("trail map", M.togglePaper);
+  });
   function showGame() {
     $("#creator").hidden = true; $("#loading").hidden = true; $("#game").hidden = false;
     if (!M) {
       try { M = buildMap(); }
-      catch (e) { reportError("map", e); M = { walk: (pts, ms, done) => done(), update() { safely("light", applyAtmosphere); }, focusSector() {}, meXY: placeXY }; }
+      catch (e) { reportError("map", e); M = { walk: (pts, ms, done) => done(), update() { safely("light", applyAtmosphere); }, focusSector() {}, meXY: placeXY, togglePaper() {}, lookAtMe() {} }; }
     }
     if (DEV) devButton();
     renderAll();

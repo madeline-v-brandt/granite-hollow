@@ -1285,7 +1285,9 @@
     const pk = (() => { const xs = [...D.boulders.map(b => b.x), ...D.features.flatMap(f => [f.x - f.r, f.x + f.r])], ys = [...D.boulders.map(b => b.y), ...D.features.flatMap(f => [f.y - f.r, f.y + f.r]), -40];
       return [Math.min(...xs) - 50, Math.max(...xs) + 50, Math.min(...ys) - 10, Math.max(...ys) + 50]; })();
     const fitK = () => Math.min(size.w / (pk[1] - pk[0]), size.h / (pk[3] - pk[2]));
-    const zoom = d3.zoom().scaleExtent([fitK() * .8, 16]).translateExtent([[bx0 - 60, -by1 - 60], [bx1 + 60, -by0 + 60]]).on("zoom", e => { T = e.transform; draw(); });
+    // opts.minZoom: the game keeps the world close enough to look its best (its paper map shows the whole park).
+    const minK = () => (opts.minZoom ? Math.max(opts.minZoom, 0) : fitK() * .8);
+    const zoom = d3.zoom().scaleExtent([minK(), 16]).translateExtent([[bx0 - 60, -by1 - 60], [bx1 + 60, -by0 + 60]]).on("zoom", e => { T = e.transform; draw(); });
     svg.call(zoom).on("dblclick.zoom", null);
     let lod = "";
     const pending = new Set();
@@ -1379,14 +1381,18 @@
     const fitTo = (cx, cy, rad) => { const k = Math.min(size.w, size.h) / (2 * rad); return d3.zoomIdentity.translate(size.w / 2 - k * cx, size.h / 2 - k * -cy).scale(k); };
     const home = () => { const k = fitK(); return d3.zoomIdentity.translate(size.w / 2 - k * (pk[0] + pk[1]) / 2, size.h / 2 + k * (pk[2] + pk[3]) / 2).scale(k); };
     svg.attr("viewBox", `0 0 ${size.w} ${size.h}`); sizeLight(); measureFurniture();
-    zoom.scaleExtent([fitK() * .8, 16]);
+    zoom.scaleExtent([minK(), 16]);
     svg.call(zoom.transform, opts.view ? fitTo(...opts.view) : home());
     new ResizeObserver(() => {
       const w = wrap.clientWidth, h = wrap.clientHeight;
       if (!w || !h || (w === size.w && h === size.h)) return;
-      size = { w, h }; svg.attr("viewBox", `0 0 ${w} ${h}`); sizeLight(); measureFurniture(); zoom.scaleExtent([fitK() * .8, 16]); draw();
+      size = { w, h }; svg.attr("viewBox", `0 0 ${w} ${h}`); sizeLight(); measureFurniture(); zoom.scaleExtent([minK(), 16]); draw();
     }).observe(wrap);
-    const go = (t, ms = 900) => (ms && !reduceMotion ? svg.transition().duration(ms).call(zoom.transform, t) : svg.call(zoom.transform, t));
+    const go = (t, ms = 900) => {
+      const lo = minK();
+      if (t.k < lo) { const cx = (size.w / 2 - t.x) / t.k, cy = (size.h / 2 - t.y) / t.k; t = d3.zoomIdentity.translate(size.w / 2 - lo * cx, size.h / 2 - lo * cy).scale(lo); }
+      return ms && !reduceMotion ? svg.transition().duration(ms).call(zoom.transform, t) : svg.call(zoom.transform, t);
+    };
 
     // ---- season and light, as variables only
     const rootStyle = wrap.style;
@@ -1475,8 +1481,10 @@
       badgeSel.attr("transform", bo => `translate(${f2(T.applyX(bo.b.x + bo.form.R * .75) + 4)},${f2(T.applyY(-bo.b.y - bo.form.H * .85) - Math.min(10, k * 1.2))})`);
     }
     function setMe(p) { meWorld = p; placeMe(); }
-    // Put world point (x, y) in the middle of the view, at zoom k (the current one by default). Instant.
-    function centerOn(x, y, k = T.k) { svg.call(zoom.transform, d3.zoomIdentity.translate(size.w / 2 - k * x, size.h / 2 + k * y).scale(k)); }
+    // Put world point (x, y) in the middle of the view, at zoom k (the current one by default); instant unless ms.
+    function centerOn(x, y, k = T.k, ms = 0) { go(d3.zoomIdentity.translate(size.w / 2 - k * x, size.h / 2 + k * y).scale(k), ms); }
+    // The world box on screen: [x0, y0, x1, y1] in metres.
+    const viewBox = () => [T.invertX(0), -T.invertY(size.h), T.invertX(size.w), -T.invertY(0)];
     // Label only what the player knows: { sectors: { name: { show, sub } }, boulders: { id: name | null } }.
     function setKnown(view) {
       known = view || null;
@@ -1499,7 +1507,7 @@
       if (t.k > T.k * 1.15 || !inView) go(t, 700);
     }
     draw();
-    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, centerOn, view: () => T, focus, home: () => go(home()), zoomBy: f => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f), scene: S,
+    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, centerOn, view: () => T, viewBox, focus, home: () => go(home()), zoomBy: f => svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f), scene: S,
       tilesPending: () => pending.size + (building ? 1 : 0) };
   }
 
