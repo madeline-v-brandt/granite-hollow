@@ -120,14 +120,29 @@
     function inspect(b, date) {
       if (all()) return { found: false, lines: [] };
       const found = knowBoulder(b, 2);
+      (k().looked = k().looked || {})[b] = date;
       const lines = D.boulders[b].problems.filter(p => line(p) === "hidden" && canSpot(p) && identify(p, "spot", date));
       return { found, lines };
     }
     // Lines on a known boulder you can see now but couldn't before (you got stronger).
     const spottable = b => D.boulders[b].problems.filter(p => line(p) === "hidden" && canSpot(p));
+    // Have you looked this boulder over yourself (as opposed to hearing of it)?
+    const inspected = b => !all() && (!!(k().looked && k().looked[b]) || D.boulders[b].problems.some(p => { const l = k().lines[p]; return l && l.how === "spot"; }));
+    // Boulders you've looked over that now hold lines you couldn't see then.
+    const lookAgain = () => (all() ? [] : Object.keys(k().boulders).map(Number).filter(b => inspected(b) && spottable(b).length));
+    // Lines you've identified (spotted, been told about, or tried), by problem id.
+    const identified = () => (all() ? [] : Object.keys(k().lines).map(Number));
+    // Another problem you can see that already goes by this name: its area, or null.
+    function sameName(p, nm) {
+      const want = String(nm || "").trim().toLowerCase();
+      if (!want) return null;
+      const hit = guidebook().find(i => i !== p && String(name(i)).toLowerCase() === want);
+      return hit == null ? null : D.boulders[D.problems[hit].b].sector;
+    }
 
     return { all, v2, est, area, boulder, line, visible, name, grade, boulderName, stats, knownBoulders, linesOn, guidebook,
       boulderStats, areaStats, canGo, canSpot, mapView, visitArea, visitBoulder, identify, tell, inspect, spottable,
+      inspected, lookAgain, identified, sameName,
       legend: p => (World && visible(p) ? World.legendOf(D, p) : null), faText: p => (World ? World.faText(D, est(p)) : "") };
   }
   const Know = { make };

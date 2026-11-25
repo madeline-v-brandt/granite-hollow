@@ -122,6 +122,7 @@ interface Knowledge {
   areas:    { [sector: string]: 1 | 2 }   // 1 known, 2 visited; absent means unknown
   boulders: { [bid: string]: 1 | 2 }
   lines:    { [pid: string]: Line }        // lines the player has identified
+  looked?:  { [bid: string]: Day }          // boulders you've inspected, and when (added in Stage 3)
   newsSeen: Day                            // for "new since you last looked" in CragLog
 }
 interface Line { how: "spot" | "told" | "tried" | "migrated", date: Day, from?: Who }

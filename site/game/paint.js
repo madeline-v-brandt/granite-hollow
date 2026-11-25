@@ -1486,15 +1486,24 @@
     // The world box on screen: [x0, y0, x1, y1] in metres.
     const viewBox = () => [T.invertX(0), -T.invertY(size.h), T.invertX(size.w), -T.invertY(0)];
     // Label only what the player knows: { sectors: { name: { show, sub } }, boulders: { id: name | null } }.
+    let freshTimer = null;
     function setKnown(view) {
       known = view || null;
+      let fresh = false;
       for (const d of labelItems) {
+        const was = d.off;
         if (d.kind === "sector") {
           const v = known && known.sectors[d.name];
           d.off = !!known && !(v && v.show);
           d.subNow = known ? (v && v.sub) || "" : d.sub;
         } else if (d.kind === "boulder") d.off = !!known && !known.boulders[d.id];
+        // A place you've just found: its label is inked in, briefly highlighted.
+        d.fresh = was === true && !d.off;
+        fresh = fresh || d.fresh;
       }
+      labelSel.classed("lab-new", d => !!d.fresh);
+      clearTimeout(freshTimer);
+      if (fresh) freshTimer = setTimeout(() => { for (const d of labelItems) d.fresh = false; labelSel.classed("lab-new", false); }, 2600);
       labelSel.filter(d => d.kind === "sector").select("text.lsub").text(d => d.subNow ?? d.sub);
       svg.selectAll("g.boulder").attr("aria-label", function () { return ariaOf(S.boulders[+this.dataset.id]); });
       placeLabels();

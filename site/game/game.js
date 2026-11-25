@@ -7,9 +7,14 @@
   // slot, the Phase 2 rules for new climbers, the dev tools, and never the leaderboard.
   const DEV = (() => { try { const q = new URLSearchParams(location.search); if (q.has("dev")) sessionStorage.setItem("gh-dev", q.get("dev") === "0" ? "0" : "1"); return sessionStorage.getItem("gh-dev") === "1"; } catch (e) { return false; } })();
   const SLOT = DEV ? "granite-hollow-save-dev" : SAVE_KEY;
-  // The Phase 2 rules (v2 saves: a crag that develops as you play) stay in
-  // development mode until Stage 3, when discovery and first ascents are playable.
-  const RULES2_LIVE = false;
+  // The Phase 2 rules (v2 saves: a crag that develops as you play). New climbers
+  // start under them, and old (v1) climbers are converted when they load, keeping
+  // a copy of the old save in this browser. In development mode the dev panel can
+  // still start climbers under the old rules, for testing.
+  const RULES2_LIVE = true;
+  const OLD_RULES_COPY = "granite-hollow-save-before-reopening";
+  const rulesLive = () => RULES2_LIVE && !(DEV && devRules() === 1);
+  const justMigrated = new WeakSet();      // saves converted this session: they get a welcome back
   const START_DATE = "2025-09-06";
   const START_AREA = "The Tailgate";      // every climbing day starts at the trailhead, by the lot
   const WORLD_MIN_ZOOM = 3.2;              // the world view never zooms out past an area; the paper map shows the park
@@ -71,7 +76,7 @@
   const nameGrade = i => (vg(i) ? `${vg(i)} ${pname(i)}` : pname(i));         // "V3 Name"
   const pref = i => (K.line(i) === "open" ? "the " + pname(i).charAt(0).toLowerCase() + pname(i).slice(1) : pname(i));   // in a sentence
   const gradeSpan = (i, style = "") => { const g = K.grade(i); return `<span class="grade"${style}${g == null ? ' title="Not climbed yet, so no grade"' : ""}>${g == null ? "?" : "V" + g}</span>`; };
-  const UI = { tab: "here", expanded: new Set(), cl: { q: "", sector: "", lo: 0, hi: 13, sort: "logs", problem: null, view: "problems", done: "" }, pj: { view: "open", sort: "recent" }, rk: { window: "12m", height: "", open: null, n: 25 }, busy: false, confirmReset: false };
+  const UI = { tab: "here", expanded: new Set(), cl: { q: "", sector: "", lo: 0, hi: 13, sort: "logs", problem: null, view: "problems", done: "" }, pj: { view: null, sort: "recent" }, rk: { window: "12m", height: "", open: null, n: 25 }, busy: false, confirmReset: false };
 
   // ====================================================================== data
   function prepData() {
@@ -139,9 +144,10 @@
       ps: {}, ticks: [], tips: [], todo: [], ach: {}, visited: [], feed: [], bestGrade: -1, board: { joined: false },
       day: null,
     };
-    if (DEV && devRules() === 2) Object.assign(G, { v: 2, rules: 2, world: World.create(D, World.newSeed()), know: World.initialKnow(D, START_DATE) });
+    if (rulesLive()) Object.assign(G, { v: 2, rules: 2, world: World.create(D, World.newSeed()), know: World.initialKnow(D, START_DATE) });
     if (DEV) G.dev = true;
     startDay(0, 0, true);
+    if (v2()) UI.kiosk = true;                            // the trailhead kiosk greets a new climber
   }
   // The next few days' weather is rolled once and saved with the game, so the
   // forecast you plan your rest days around is the weather you get.
@@ -172,7 +178,7 @@
       attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null,
       over: false, warned: false, levelBefore: Mech.levelInfo(G.player.xp).level };
     const intro = first && v2()
-      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk's trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot.`
+      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk's trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot. Everything else is waiting for a first ascent.`
       : first
       ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The boulders at The Tailgate are right beside the car. The trail map (press M) shows the rest of the park: The Schoolhouse is 5 minutes up the trail.`
       : `${w.sky}, ${w.temp}°F. ${w.note}`;
@@ -220,6 +226,11 @@
     ["winter", "Winter Warrior", "Climb in December, January or February.", () => G.day && G.day.attempts > 0 && [11, 0, 1].includes(monthOf(G.date))],
     ["flapper", "Flapper", "Tear a flapper. Ouch.", () => G.flapper === true],
     ["century", "Century", "Send 100 different problems.", () => firstSends().length >= 100],
+    // First ascents (the new rules only; the fifth field hides them under the old).
+    ["first-fa", "First Ascent", "Be the first to climb a line, and name it.", () => v2() && World.faCount(G) >= 1, true],
+    ["fa-10", "Developer", "Make 10 first ascents.", () => v2() && World.faCount(G) >= 10, true],
+    ["fa-hard", "Test Piece", "Make the first ascent of a V6 or harder.", () => v2() && Object.values(G.world.est).some(e => e.by === "you" && e.grade >= 6), true],
+    ["fa-boulder", "Your Boulder", "Make the first ascent of every line on a boulder.", () => v2() && D.boulders.some(b => b.problems.length >= 2 && b.problems.every(i => World.isMine(G, i))), true],
   ];
   function pyramidDone() {
     const m = G.bestGrade; if (m < 3) return false;
@@ -259,6 +270,7 @@
 
     if (r.sent) {
       const first = !st.sent, flash = first && st.att === 1, newMax = first && p.grade > G.bestGrade;
+      const openLabel = K.line(i) === "open" ? pname(i) : null;      // "Unclimbed crimpy slab", before it gets a name
       // Nobody had documented it: it's your first ascent, for good.
       const fa = first && v2() && World.recordSend(D, G, i, G.date, flash).fa;
       const tip = G.tips.find(t => t.p === i && !t.done);
@@ -278,15 +290,23 @@
       else if (!first) text = "Fun to climb it again, but you won't learn much from a repeat.";
       else if (st.att >= 10) text = `After ${st.att} tries it finally goes. That's what projecting feels like.`;
       else if (st.att >= 4) text = `Your ${ordinal(st.att)} try. Working out the beta paid off.`;
-      else text = `You top out ${pname(i)}.`;
+      else text = `You top out ${fa && openLabel ? "the " + openLabel.charAt(0).toLowerCase() + openLabel.slice(1) : pname(i)}.`;
       if (newMax) text += ` Your hardest send yet.`;
-      if (fa) text += " Nobody has documented an ascent before yours: it goes in CragLog as your first ascent.";
+      if (fa) text += " Nobody had documented an ascent of it. It's your first ascent, and it's yours to name.";
+      else if (first && v2() && G.world.est[i] && G.world.est[i].by !== "you") text += " " + ascentLine(i);
       if (tip && first) text += ` Good beta from ${D.climbers[tip.from][0]}.`;
-      G.day.last = { kind: "send", title: `${style === "Repeat" ? "Repeat" : fa ? "First ascent" : "Sent"}: ${titleOf(i)}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
+      G.day.last = { kind: "send", title: fa ? `First ascent on ${p.boulder.name}, V${p.grade}` : `${style === "Repeat" ? "Repeat" : "Sent"}: ${titleOf(i)}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
       note(`${fa ? "First ascent:" : style} ${pname(i)}${vg(i) ? ` (${vg(i)})` : ""}, +${fmt(xp)} XP.`);
-      showBanner(fa ? "FA" : style, i, xp);
-      const after = levelNow().level;
-      if (after > before) { UI.levelPending = true; setTimeout(() => showLevelUp(after), reduceMotion ? 0 : 900); }
+      if (fa) UI.faNote = G.feed[0];                        // renamed along with the problem
+      showBanner(fa ? "FA" : style, i, xp, fa ? `${p.boulder.name} · V${p.grade}` : null);
+      // After the banner: name your first ascent, then the level-up, then (if the day's over) the summary.
+      const after = levelNow().level, next = [];
+      if (fa) next.push(() => nameDialog(i, { first: true, was: openLabel }));
+      if (after > before) next.push(() => showLevelUp(after));
+      if (next.length) {
+        UI.levelPending = true;
+        setTimeout(() => { UI.levelPending = false; next.forEach(openModal); nextModal(); }, reduceMotion ? 0 : fa ? 1300 : 900);
+      }
     } else {
       const k = Math.max(1, Math.min(p.moves - 1, Math.round(r.progress * p.moves)));
       const frac = k / p.moves, newHigh = st.att > 1 && frac > st.best + 1e-6;
@@ -306,6 +326,12 @@
       note("Tore a flapper.");
     }
     afterAction();
+  }
+  // Your first send of someone else's problem: whose it was, and how many have climbed it.
+  function ascentLine(i) {
+    const e = G.world.est[i], who = World.whoName(D, e.by);
+    if (e.old) return e.by === "n:anon" ? "The notebook says somebody climbed it in the 70s." : `The notebook says ${who} climbed it in ${e.old}.`;
+    return `${who.charAt(0).toUpperCase() + who.slice(1)} made the first ascent on ${shortDate(e.date)}. Yours is the ${ordinal(e.reps + 1)} documented ascent.`;
   }
   function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
@@ -341,14 +367,24 @@
     const w = G.day.weather, ra = Mech.rainStart(w);
     return ra != null && ra <= w.dusk && G.day.minute >= ra;
   }
-  // Look a boulder over: you find it, and see the lines on it you could climb.
+  // Look a boulder over: you find it (its name, its story, a label on the map),
+  // and see the lines on it you could climb. Lines beyond you stay hidden until
+  // you're stronger, and the card says when there's more on the rock than that.
   function inspectBoulder(b) {
     if (UI.busy || G.day.over || G.loc.boulder !== b || K.all()) return;
     const r = K.inspect(b, G.date), name = D.boulders[b].name, n = r.lines.length;
+    const more = D.boulders[b].problems.some(p => K.line(p) === "hidden");
     G.day.minute += 5;
-    const lines = n ? `You see ${n} ${n === 1 ? "line" : "lines"} you could try.` : "Nothing on it looks climbable to you yet. Stronger climbers might see more.";
-    G.day.last = { kind: "info", title: r.found ? `New boulder: ${name}` : `Another look at ${name}`, text: r.found ? `You look it over. ${lines}` : n ? `You look again. ${lines}` : "You look again, but don't see anything new." };
-    if (r.found) { note(`Found a boulder: ${name}.`); toast(`Found: ${name}`, n ? `${n} ${n === 1 ? "line" : "lines"} to try.` : "Nothing you can climb yet.", "info"); }
+    UI.fresh = new Set(r.lines); UI.freshAnim = true;
+    const seen = n ? `You spot ${n === 1 ? "an unclimbed line" : n + " unclimbed lines"} you could try.` : "";
+    const done = K.linesOn(b).filter(p => K.line(p) === "est").length;      // someone got here first
+    const already = done ? `${done === 1 ? "One problem here is" : done + " problems here are"} already documented. ` : "";
+    const text = r.found
+      ? `You walk around it, chalk up a hold or two, and work out where the lines might go. ${already}${seen || (done ? "You don't see anything else you could climb yet." : "Nothing on it looks climbable to you yet.")}${more ? (n ? " There's more on this rock than you can read yet." : " Stronger climbers might see something.") : ""}`
+      : n ? `You look again with stronger eyes. ${seen}${more ? " There's still more you can't read yet." : ""}` : "You look again, but don't see anything new yet.";
+    G.day.last = { kind: "discover", title: r.found ? `New boulder: ${name}` : `Another look at ${name}`, text };
+    if (r.found) { note(`Found a boulder: ${name}${n ? `, with ${n} ${n === 1 ? "line" : "lines"} to try` : ""}.`); toast(`Found: ${name}`, n ? `${n} unclimbed ${n === 1 ? "line" : "lines"} to try.` : done ? `${done} documented ${done === 1 ? "problem" : "problems"}.` : "Nothing you can climb yet.", "find"); }
+    else if (n) note(`Spotted ${n} new ${n === 1 ? "line" : "lines"} on ${name}.`);
     afterAction();
   }
   function rest() {
@@ -374,6 +410,7 @@
     }
     G.day.minute += minutes;
     G.day.moved = true;
+    UI.fresh = null;
     const pts = [M.meXY(from)];
     if (to.sector !== from.sector) for (const n of route(from.sector, to.sector).nodes.slice(1)) pts.push(nodeXY(n));
     if (to.boulder != null) pts.push(M.meXY(to));
@@ -410,7 +447,8 @@
     G.day.over = true; G.day.reason = reason;
     note(`Headed home: ${G.day.sends.filter(s => s.style !== "Repeat").length} new sends, +${fmt(G.day.xp)} XP.`);
     save(); renderAll();
-    if (!UI.levelPending) showSummary();  // otherwise it opens when the level-up closes
+    if (UI.levelPending || modalOpen()) UI.summaryPending = true;   // it opens once the naming and level-up have closed
+    else showSummary();
   }
 
   // ============================================================== encounters
@@ -782,7 +820,7 @@
       const t = G.ticks[r.tick];
       rate = `<div class="rate">Rate it on CragLog: ${[1, 2, 3, 4].map(n => `<button type="button" data-rate="${n}" class="${t.stars >= n ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div>`;
     }
-    return `<div class="result ${r.kind}"><div class="rt">${esc(r.title)}</div><p>${esc(r.text)}</p>
+    return `<div class="result ${esc(r.kind)}"><div class="rt">${esc(r.title)}</div><p>${esc(r.text)}</p>
       ${r.xp ? `<p><b style="color:var(--gold)">+${fmt(r.xp)} XP</b></p>` : ""}
       ${gains ? `<div class="chips gains">${gains}</div>` : ""}${rate}</div>`;
   }
@@ -819,15 +857,16 @@
     return `<div class="why">About ${c >= 0.1 ? Math.round(c * 100) + "%" : c >= 0.01 ? "1 in " + Math.round(1 / c) : "under 1%"} per try right now.${graded ? "" : " Nobody has climbed it, so nobody knows its grade."}
       <div class="chips">${chips}</div></div>`;
   }
-  function problemRowHtml(i) {
-    const p = D.problems[i], st = G.ps[i], open = UI.expanded.has(i);
+  function problemRowHtml(i, k = 0, anim = false) {
+    const p = D.problems[i], st = G.ps[i], open = UI.expanded.has(i), fresh = !!(UI.fresh && UI.fresh.has(i));
     let status = "";
     if (st?.sent) status = `<span class="status sent">${st.flash ? "Flashed" : "Sent"}${st.att > 1 ? ` in ${st.att}` : ""}</span>`;
     else if (st?.att) status = `<span class="status">${st.att} ${st.att === 1 ? "try" : "tries"}</span>`;
-    const tip = G.tips.some(t => t.p === i && !t.done) ? `<span class="chip" style="background:var(--gold-soft);color:var(--gold)">★ tip</span>` : "";
+    const tip = (G.tips.some(t => t.p === i && !t.done) ? `<span class="chip" style="background:var(--gold-soft);color:var(--gold)">★ tip</span>` : "")
+      + (fresh ? `<span class="chip new">just spotted</span>` : "");
     const hp = st && !st.sent && st.att ? `<div class="hp"><div class="meter"><i style="width:${(st.best * 100).toFixed(0)}%"></i></div>Highpoint move ${Math.round(st.best * p.moves)} of ${p.moves}</div>` : "";
     const disabled = UI.busy || G.day.over ? "disabled" : "";
-    return `<div class="prob"><div class="prob-main">
+    return `<div class="prob${fresh && anim ? " fresh" : ""}"${fresh && anim ? ` style="animation-delay:${k * 140}ms"` : ""}><div class="prob-main">
         ${gradeSpan(i)}
         <div><button type="button" class="linklike pname" data-expand="${i}" aria-expanded="${open}">${esc(pname(i))}</button>${status}
           <div class="chips">${tip}${p.tagList.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>${hp}</div>
@@ -858,33 +897,48 @@
         const proj = b.problems.some(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 2);
         const range = a.n ? ` · V${a.lo}${a.hi > a.lo ? "–V" + a.hi : ""}` : "";
         const what = K.all() || !a.open ? `${a.n} problems${range}` : `${a.n} documented · ${a.open} unclimbed${range}`;
+        const again = !K.all() && K.inspected(bi) && K.spottable(bi).length ? " · worth another look" : "";
         return `<li><button type="button" class="rowbtn" data-go-boulder="${bi}"><span><span class="t">${esc(b.name)}</span>
-          <span class="s">${what} · ${b.height_ft} ft · ${b.angle}${proj ? " · project here" : ""}</span></span>
+          <span class="s">${what} · ${b.height_ft} ft · ${b.angle}${proj ? " · project here" : ""}${again}</span></span>
           <span class="v">${a.sent}/${a.lines} sent</span></button></li>`;
       }).join("");
       const none = `<p class="lede">You haven't found any boulders here yet. Have a look around: walk to any boulder you can see on the map.</p>`;
       const away = D.sectors.filter(x => x.name !== s.name && K.area(x.name) >= 1).map(x => [x, walkMinutes({ sector: x.name, boulder: null })]).sort((a, b) => a[1] - b[1]);
       const elsewhere = away.length ? `<h3>Other areas</h3><ul class="rowlist">${away.map(([x, m]) => `<li><button type="button" class="rowbtn" data-go-sector="${esc(x.name)}"><span><span class="t">${esc(x.name)}</span></span><span class="v">${m} min walk</span></button></li>`).join("")}</ul>
         <p class="meta">The trail map (M) shows where they are.</p>` : "";
-      return `${resultHtml()}${npcHtml()}<h2>${esc(s.name)}</h2><p class="meta">${s.name === START_AREA ? "Right by the lot." : `${s.walk_min} min from the lot.`}${ids.length ? " Pick a boulder." : ""}</p>${ids.length ? `<ul class="rowlist">${rows}</ul>` : none}${elsewhere}`;
+      const kiosk = s.name === START_AREA && v2() ? ` <button type="button" class="linklike" data-kiosk>Read the kiosk</button>` : "";
+      return `${resultHtml()}${npcHtml()}<h2>${esc(s.name)}</h2><p class="meta">${s.name === START_AREA ? "Right by the lot." : `${s.walk_min} min from the lot.`}${ids.length ? " Pick a boulder." : ""}${kiosk}</p>${ids.length ? `<ul class="rowlist">${rows}</ul>` : none}${ids.length ? areaHint(s.name) : ""}${elsewhere}`;
     }
     const b = D.boulders[G.loc.boulder];
     const disabled = UI.busy || d.over ? "disabled" : "";
     if (K.boulder(b.id) < 1) {
       return `${resultHtml()}${npcHtml()}<h2>Unfamiliar boulder</h2>
         <p class="meta">${esc(s.name)} · ${b.height_ft} ft · mostly ${b.angle}.</p>
-        <p class="lede">It isn't in your guidebook. Look it over to see whether anything on it might go.</p>
+        <p class="lede">It isn't in any guidebook. Look it over to see whether anything on it might go. It takes a few minutes.</p>
         <button type="button" class="btn primary" data-inspect="${b.id}" ${disabled}>Inspect</button>`;
     }
+    const anim = UI.freshAnim; UI.freshAnim = false;        // just-spotted lines arrive once, not on every redraw
     const lines = K.linesOn(b.id), more = K.all() ? [] : K.spottable(b.id);
     const others = (K.all() ? s.boulderIds : K.knownBoulders(s.name)).filter(x => x !== b.id).map(x => `<button type="button" class="linklike" data-go-boulder="${x}">${esc(D.boulders[x].name)}</button>`).join(", ");
     const lookAgain = more.length ? `<p class="meta" style="margin-top:10px"><button type="button" class="btn small" data-inspect="${b.id}" ${disabled}>Look it over</button>
-      ${K.boulder(b.id) < 2 || !b.problems.some(i => G.know.lines[i] && G.know.lines[i].how === "spot") ? "You haven't looked this boulder over properly yet." : "You're stronger than when you last looked. You might see more now."}</p>` : "";
+      ${!K.inspected(b.id) ? "You haven't looked this boulder over properly yet." : "You're stronger than when you last looked. You might see more now."}</p>` : "";
     return `${resultHtml()}${npcHtml()}<h2>${esc(b.name)}</h2>${b.desc ? `<p class="boulder-desc">${esc(b.desc)}</p>` : ""}
       <p class="meta">${esc(s.name)} · ${b.height_ft} ft · mostly ${b.angle}. Select a problem's name to see what makes it hard for you.</p>
-      ${lines.length ? lines.map(problemRowHtml).join("") : `<p class="lede">Nothing here that you can see how to climb yet. Stronger climbers might see more.</p>`}${lookAgain}
+      ${lines.length ? lines.map(i => problemRowHtml(i, UI.fresh ? [...UI.fresh].indexOf(i) : 0, anim)).join("") : `<p class="lede">Nothing here that you can see how to climb yet. Stronger climbers might see more.</p>`}${lookAgain}
       <h3>Nearby</h3><p class="meta">${others || "No other boulders in this sector."} · <button type="button" class="linklike" data-go-sector="${esc(s.name)}">Sector overview</button></p>`;
   }
+
+  // A gentle next step for a new climber, then a standing reminder of how finding things works.
+  function areaHint(sector) {
+    if (K.all()) return "";
+    let t;
+    if (sector === START_AREA && !G.ticks.length && !Object.keys(G.ps).length) t = "The notebook page's four problems are on The Billboard and Gus's Rock, right by the car. Start there.";
+    else if (!Object.values(G.know.lines).some(l => l.how === "spot")) t = "Other boulders here aren't in any guidebook. They're on the map without a name: click one to walk over and look it over.";
+    else t = "Boulders you haven't looked at yet are on the map without a name.";
+    return `<p class="meta hint">${esc(t)}</p>`;
+  }
+
+  const hasOldCopy = () => { try { const c = JSON.parse(localStorage.getItem(OLD_RULES_COPY) || "null"); return !!(c && c.id === G.id); } catch (e) { return false; } };
 
   // ---- Climber ----
   function climberHtml() {
@@ -897,7 +951,7 @@
       <div class="kv"><div><b style="color:var(--gold)">V${L.level}</b><span>level, ${(L.frac * 100).toFixed(0)}% to V${L.level + 1}</span></div>
         <div><b>${G.bestGrade >= 0 ? "V" + G.bestGrade : "–"}</b><span>hardest send</span></div><div><b>${sends.length}</b><span>problems sent</span></div>
         <div><b>${G.ticks.filter(t => t.style === "Flash").length}</b><span>flashes</span></div><div><b>${G.dayNo}</b><span>days at the crag</span></div>
-        <div><b>${Object.keys(G.ach).length}</b><span>achievements</span></div></div>
+        ${v2() ? `<div><b>${World.faCount(G)}</b><span>first ascents</span></div>` : ""}<div><b>${Object.keys(G.ach).length}</b><span>achievements</span></div></div>
       <h3>How leveling works</h3>
       <p class="lede">Sends near your level are worth the most XP. Each grade harder doubles it; each grade easier halves it. Flashes, tips from locals and new hardest sends earn bonuses. Moving up gets slower as you get stronger, like it does outside.</p>
       <h3>Style skills</h3>
@@ -912,6 +966,7 @@
       <h3>Backup</h3>
       <p class="lede">The game saves itself in this browser, but clearing browser data erases it. Download a save file to keep a copy, or to move your climber to another browser or computer.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-export>Download save file</button><button type="button" class="btn" data-import>Load save file</button></div>
+      ${hasOldCopy() ? `<p class="meta" style="margin-top:6px">This browser also keeps your climber from before the reopening, when the whole crag was documented. <button type="button" class="linklike" data-old>Download it</button></p>` : ""}
       <p class="meta" style="margin-top:6px">${G.backup ? `Last downloaded ${new Date(G.backup.at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}, on game day ${G.backup.dayNo}.` : "You haven't downloaded a save file yet."}</p>
       <h3>Start over</h3>
       ${UI.confirmReset
@@ -1017,13 +1072,19 @@
       const p = D.problems[t.p];
       return `<tr><td>${shortDate(t.date)}</td><td class="grade" style="font-size:15px">${vg(t.p) || "?"}</td><td><button type="button" class="linklike" data-cl="${t.p}">${esc(pname(t.p))}</button><div class="meta" style="margin:0">${esc(p.sector)}</div></td><td>${t.style}${v2() && World.isMine(G, t.p) && G.world.est[t.p].date === t.date && t.style !== "Repeat" ? " · FA" : ""}</td><td class="num stars">${t.stars ? "★".repeat(t.stars) : ""}</td></tr>`;
     }).join("");
-    return `<h2>Logbook</h2><p class="meta">${sends.length} problems sent, ${G.ticks.filter(t => t.style === "Flash").length} flashed, over ${G.dayNo} days.</p>
+    const fas = v2() ? Object.entries(G.world.est).filter(([, e]) => e.by === "you").map(([i, e]) => [+i, e]).sort((a, b) => (a[1].date < b[1].date ? 1 : a[1].date > b[1].date ? -1 : b[0] - a[0])) : [];
+    const faHtml = !v2() ? "" : `<h3>Your first ascents</h3>${fas.length ? `<p class="meta">${fas.length} ${fas.length === 1 ? "problem" : "problems"} in Granite Hollow's guidebook ${fas.length === 1 ? "carries" : "carry"} your name.</p>
+      <ul class="rowlist">${fas.slice(0, 40).map(([i, e]) => `<li><button type="button" class="rowbtn" data-cl="${i}"><span><span class="t">${esc(nameGrade(i))}</span>
+        <span class="s">${esc(D.problems[i].boulder.name)} · ${esc(D.problems[i].sector)} · ${shortDate(e.date)}${e.flash ? " · flashed" : ""}</span></span>
+        <span class="v">${e.reps ? `${e.reps} ${e.reps === 1 ? "repeat" : "repeats"}` : "no repeats yet"}${e.classic ? `<span class="s">a classic</span>` : ""}</span></button></li>`).join("")}</ul>${fas.length > 40 ? `<p class="meta">Showing the latest 40.</p>` : ""}`
+      : `<p class="meta">Be the first up a line nobody has climbed, and it goes in the guidebook under your name.</p>`}`;
+    return `<h2>Logbook</h2><p class="meta">${sends.length} ${sends.length === 1 ? "problem" : "problems"} sent, ${G.ticks.filter(t => t.style === "Flash").length} flashed${v2() ? `, ${fas.length} first ${fas.length === 1 ? "ascent" : "ascents"}` : ""}, over ${G.dayNo} ${G.dayNo === 1 ? "day" : "days"}.</p>
       <h3>Grade pyramid</h3>
       <div class="pyr">${counts.map(([g, c]) => `<span class="g">V${g}</span><div class="bar"><i style="width:${(c / maxC * 82).toFixed(1)}%"></i>${c}</div>`).join("")}</div>
-      ${projects.length ? `<h3>Open projects</h3><ul class="rowlist">${projects.slice(0, 12).map(([i, s]) => {
+      ${projects.length ? `<h3>Projects in progress</h3><ul class="rowlist">${projects.slice(0, 12).map(([i, s]) => {
         const p = D.problems[i];
         return `<li><button type="button" class="rowbtn" data-go-problem="${i}"><span><span class="t">${esc(nameGrade(i))}</span><span class="s">${esc(p.boulder.name)} · ${esc(p.sector)} · ${s.att} tries</span></span><span class="v">high ${Math.round(s.best * p.moves)}/${p.moves}</span></button></li>`;
-      }).join("")}</ul>` : ""}
+      }).join("")}</ul>` : ""}${faHtml}
       <h3>Ticks</h3><table><thead><tr><th>Date</th><th>Grade</th><th>Problem</th><th>Style</th><th class="num">Stars</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
@@ -1144,9 +1205,9 @@
     const head = state === "est"
       ? `<h2 style="margin-top:8px">${esc(pname(i))} <span class="grade" style="font-size:24px">${vg(i)}</span></h2>
         <p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · ${x.stars != null ? `<span class="stars">★</span> ${x.stars.toFixed(1)} from ${x.ratings} ${x.ratings === 1 ? "rating" : "ratings"}` : "no ratings yet"} · ${fmt(x.sends)} ${x.sends === 1 ? "send" : "sends"}${e && e.classic ? " · a Granite Hollow classic" : ""}</p>
-        <p class="meta">First ascent: ${esc(K.faText(i))}${e && !e.old ? `, ${shortDate(e.date)}` : ""}${e && e.flash ? " (flashed)" : ""}</p>`
+        <p class="meta">First ascent: ${World.isMine(G, i) ? (G.player.name.toLowerCase() === "you" ? "you" : `${esc(G.player.name)} (you)`) : esc(K.faText(i))}${e && !e.old ? `, ${shortDate(e.date)}` : ""}${e && e.flash ? " (flashed)" : ""}${World.isMine(G, i) ? ` · <button type="button" class="linklike" data-rename="${i}">${e.name ? "Rename" : "Name it"}</button>` : ""}</p>`
       : `<h2 style="margin-top:8px">${esc(pname(i))}</h2>
-        <p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · nobody has documented an ascent, so it has no name or grade yet</p>`;
+        <p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · nobody has documented an ascent, so it has no name or grade yet. Climb it first and you get to name it.</p>`;
     return `${back}${head}
       ${legend ? `<p class="legend">Local legend: ${esc(legend)}</p>` : ""}
       ${p.boulder.desc ? `<p class="boulder-desc" style="font-size:14px">${esc(p.boulder.name)}: ${esc(p.boulder.desc)}</p>` : ""}
@@ -1162,15 +1223,21 @@
 
   // ---- Journal ----
   // ---- Journal: projects log
+  // Three views: lines you've tried and not sent (with your highpoints), lines
+  // you know of but haven't tried yet (spotted, told about, or from the notebook;
+  // new rules only), and projects you've sent.
   function projectsHtml() {
-    const v = UI.pj.view;
     const all = Object.entries(G.ps).map(([i, st]) => [+i, st]).filter(([, st]) => st.att > 0);
-    let list = v === "sent" ? all.filter(([, st]) => st.sent && st.att >= 2) : all.filter(([, st]) => !st.sent);
+    const known = K.identified().filter(i => !G.ps[i] || (!G.ps[i].sent && !(G.ps[i].att > 0))).map(i => [i, null]);
+    const tried = all.filter(([, st]) => !st.sent), sentP = all.filter(([, st]) => st.sent && st.att >= 2);
+    const v = UI.pj.view || (tried.length || !known.length ? "tried" : "known");
+    if (v === "known") return knownHtml(known, tried.length, sentP.length);
+    let list = v === "sent" ? sentP : tried;
     const lastDate = st => (st.log && st.log.length ? String(st.log[st.log.length - 1][0]) : st.sentOn || "");
     const sorts = {
       recent: (a, b) => (lastDate(b[1]) > lastDate(a[1]) ? 1 : lastDate(b[1]) < lastDate(a[1]) ? -1 : 0) || b[1].att - a[1].att,
       close: (a, b) => (v === "sent" ? b[1].att - a[1].att : chanceFor(b[0]) - chanceFor(a[0])),
-      grade: (a, b) => D.problems[b[0]].grade - D.problems[a[0]].grade || b[1].best - a[1].best,
+      grade: (a, b) => (K.grade(b[0]) ?? -1) - (K.grade(a[0]) ?? -1) || b[1].best - a[1].best,
       tries: (a, b) => b[1].att - a[1].att,
     };
     list.sort(sorts[UI.pj.sort] || sorts.recent);
@@ -1196,15 +1263,43 @@
     };
     const opts = [["recent", "Recently tried"], ["close", v === "sent" ? "Most tries" : "Closest to sending"], ["grade", "Hardest"], ["tries", "Most tries"]].filter((o, k) => !(v === "sent" && k === 3));
     return `<h3>Projects</h3>
-      <div class="cl-filters" style="margin-bottom:6px">
-        <div class="cl-views" role="group" aria-label="Projects" style="margin:0">
-          <button type="button" data-pj-view="open" aria-pressed="${v === "open"}">Open (${all.filter(([, st]) => !st.sent).length})</button>
-          <button type="button" data-pj-view="sent" aria-pressed="${v === "sent"}">Sent (${all.filter(([, st]) => st.sent && st.att >= 2).length})</button></div>
+      <div class="cl-filters" style="margin-bottom:6px">${pjViews(v, tried.length, known.length, sentP.length)}
         <select id="pj-sort" aria-label="Sort projects">${opts.map(([k, l]) => `<option value="${k}" ${UI.pj.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select>
       </div>
       ${shown.length ? `<ul class="pj-list">${shown.map(card).join("")}</ul>${list.length > 30 ? `<p class="meta">Showing 30 of ${list.length}.</p>` : ""}`
-        : `<p class="meta">${v === "open" ? "Anything you try and don't send shows up here, with your highpoint and how each session went." : "Projects you send after more than one try show up here."}</p>`}
+        : `<p class="meta">${v === "tried" ? "Anything you try and don't send shows up here, with your highpoint and how each session went." : "Projects you send after more than one try show up here."}</p>`}
       <p class="meta">Bars show your highpoint each session; green means you sent it that day.</p>`;
+  }
+  function pjViews(v, nTried, nKnown, nSent) {
+    return `<div class="cl-views pj-views" role="group" aria-label="Projects">
+      <button type="button" data-pj-view="tried" aria-pressed="${v === "tried"}">Attempted (${nTried})</button>
+      ${K.all() ? "" : `<button type="button" data-pj-view="known" aria-pressed="${v === "known"}">Open (${nKnown})</button>`}
+      <button type="button" data-pj-view="sent" aria-pressed="${v === "sent"}">Sent (${nSent})</button></div>`;
+  }
+  // Lines you know of and haven't tried: unclimbed ones are first ascents waiting.
+  function knownHtml(known, nTried, nSent) {
+    const how = l => ({ spot: `you spotted it ${shortDate(l.date)}`, told: l.from ? `${World.whoName(D, l.from)} told you about it` : "someone told you about it",
+      kiosk: "on the old notebook page", migrated: "from before the reopening", tried: "you've tried it", dev: "development mode" }[l.how] || "");
+    const sorts = {
+      recent: (a, b) => (G.know.lines[b].date > G.know.lines[a].date ? 1 : G.know.lines[b].date < G.know.lines[a].date ? -1 : 0) || b - a,
+      close: (a, b) => chanceFor(b) - chanceFor(a),
+      fa: (a, b) => (K.line(a) === "open" ? 0 : 1) - (K.line(b) === "open" ? 0 : 1) || chanceFor(b) - chanceFor(a),
+    };
+    const ids = known.map(([i]) => i).sort(sorts[UI.pj.sort] || sorts.recent), shown = ids.slice(0, 30);
+    const card = i => {
+      const p = D.problems[i], l = G.know.lines[i] || {}, fl = Mech.feel(chanceFor(i)), h = how(l);
+      const fa = K.line(i) === "open" ? "Unclimbed: the first ascent is up for grabs" : `First ascent: ${K.faText(i)}`;
+      return `<li class="pj"><div class="pj-top"><button type="button" class="linklike pj-name" data-cl="${i}">${gradeSpan(i)} ${esc(pname(i))}</button>
+          <button type="button" class="btn small" data-go-problem="${i}">Go</button></div>
+        <div class="meta" style="margin:0">${esc(p.boulder.name)} · ${esc(p.sector)}${h ? ` · ${esc(h.charAt(0).toUpperCase() + h.slice(1))}` : ""}</div>
+        <div class="pj-row"><span class="pj-lbl">${esc(fa)}</span><span class="pj-lbl">Today: <b>${fl.label}</b></span></div></li>`;
+    };
+    const opts = [["recent", "Recently found"], ["close", "Closest to sending"], ["fa", "Unclimbed first"]];
+    return `<h3>Projects</h3>
+      <div class="cl-filters" style="margin-bottom:6px">${pjViews("known", nTried, known.length, nSent)}
+        <select id="pj-sort" aria-label="Sort projects">${opts.map(([k, l]) => `<option value="${k}" ${UI.pj.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      ${shown.length ? `<ul class="pj-list">${shown.map(card).join("")}</ul>${ids.length > 30 ? `<p class="meta">Showing 30 of ${ids.length}.</p>` : ""}`
+        : `<p class="meta">Lines you spot on boulders, or hear about from other climbers, wait here until you try them.</p>`}`;
   }
   function journalHtml() {
     const tips = [...G.tips].reverse();
@@ -1221,7 +1316,7 @@
         return `<li><button type="button" class="rowbtn" data-go-problem="${i}"><span><span class="t">${esc(nameGrade(i))}</span><span class="s">${esc(p.boulder.name)} · ${esc(p.sector)}</span></span><span class="v">Go</span></button></li>`; }).join("")}</ul>`
         : `<p class="meta">Add problems from CragLog.</p>`}
       <h3>Achievements</h3>
-      <div class="ach">${ACH.map(([id, name, desc]) => `<div class="${G.ach[id] ? "" : "locked"}"><b>${esc(name)}</b><span>${esc(desc)}${G.ach[id] ? ` · ${shortDate(G.ach[id])}` : ""}</span></div>`).join("")}</div>
+      <div class="ach">${ACH.filter(a => !a[4] || v2()).map(([id, name, desc]) => `<div class="${G.ach[id] ? "" : "locked"}"><b>${esc(name)}</b><span>${esc(desc)}${G.ach[id] ? ` · ${shortDate(G.ach[id])}` : ""}</span></div>`).join("")}</div>
       <h3>Recent</h3>
       <ul class="feed">${G.feed.slice(0, 30).map(f => `<li><time>${shortDate(f.date)}</time>${esc(f.text)}</li>`).join("")}</ul>`;
   }
@@ -1238,6 +1333,9 @@
       UI.expanded.add(p.id); travel({ sector: p.sector, boulder: p.b });
     });
     on("[data-inspect]", n => inspectBoulder(+n.dataset.inspect));
+    on("[data-kiosk]", () => openModal(showKiosk));
+    on("[data-rename]", n => openModal(() => nameDialog(+n.dataset.rename)));
+    on("[data-old]", exportOldCopy);
     on("[data-lb-bucket]", n => { UI.lbBucket = +n.dataset.lbBucket; UI.lbGrade = null; renderPanel(); });
     on("[data-cl]", n => { UI.cl.problem = +n.dataset.cl; UI.tab = "craglog"; renderTabs(); renderPanel(); $("#tabbody").scrollTop = 0; });
     on("[data-cl-back]", () => { UI.cl.problem = null; renderPanel(); });
@@ -1273,37 +1371,51 @@
   }
 
   // ============================================================ modals/toasts
+  // One modal at a time. openModal() waits its turn behind one that's open; when
+  // the last closes, a day summary that was held back opens.
+  const modalQueue = [];
+  const modalOpen = () => !!$("#modal-root").children.length;
+  const openModal = fn => (modalOpen() ? modalQueue.push(fn) : fn());
+  function nextModal() {
+    if (modalOpen()) return;
+    const fn = modalQueue.shift();
+    if (fn) { safely("a dialog", fn); return; }
+    if (UI.summaryPending && !UI.levelPending && G && G.day && G.day.over) { UI.summaryPending = false; showSummary(); }
+  }
   function modal(html, bind) {
     const root = $("#modal-root");
     root.innerHTML = `<div class="modal-back"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
-    const close = () => { root.innerHTML = ""; };
+    const close = () => { root.innerHTML = ""; nextModal(); };
     bind(root, close);
-    const first = root.querySelector("button"); if (first) first.focus();
+    const first = root.querySelector(".acts .btn.primary") || root.querySelector("button"); if (first) first.focus();
   }
   function toast(title, text, kind) {
     const el = document.createElement("div");
-    el.className = "toast"; if (kind === "info") el.style.borderLeftColor = "var(--energy)";
+    el.className = "toast" + (kind === "find" ? " find" : ""); if (kind === "info") el.style.borderLeftColor = "var(--energy)";
     el.innerHTML = `<b>${esc(title)}</b>${esc(text)}`;
     $("#toasts").appendChild(el);
     setTimeout(() => el.remove(), 4200);
   }
   let bannerTimer = null;
-  function showBanner(style, i, xp) {
+  function showBanner(style, i, xp, what = null) {
     const b = $("#banner");
     b.innerHTML = `<div class="big ${style === "Flash" || style === "FA" ? "flash" : ""}">${style === "Flash" ? "FLASH!" : style === "Repeat" ? "AGAIN" : style === "FA" ? "FIRST ASCENT!" : "SENT!"}</div>
-      <div class="what">${esc(pname(i))}${vg(i) ? ` · ${vg(i)}` : ""}</div><div class="xp">+${fmt(xp)} XP</div>`;
+      <div class="what">${esc(what || `${pname(i)}${vg(i) ? ` · ${vg(i)}` : ""}`)}</div><div class="xp">+${fmt(xp)} XP</div>`;
     b.hidden = false; b.classList.remove("show"); void b.offsetWidth; b.classList.add("show");
     clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.hidden = true; }, 2200);
   }
   function showLevelUp(level) {
+    // Stronger eyes: boulders you've looked over may hold lines you couldn't read then.
+    const again = K.lookAgain();
+    const eyes = again.length ? `<p class="lede">You might see new lines on ${again.length === 1 ? esc(K.boulderName(again[0])) : `${again.length} boulders you've already looked over`}. Go and have another look.</p>` : "";
     modal(`<span class="label-sm">Level up</span><div class="big-level">V${level}</div>
       <h2>${esc(LEVEL_LINES[level] || "Stronger every season.")}</h2>
-      <p class="lede">V${level} problems will now feel like projects instead of impossibilities. Keep sending near your limit to reach V${level + 1}.</p>
+      <p class="lede">V${level} problems will now feel like projects instead of impossibilities. Keep sending near your limit to reach V${level + 1}.</p>${eyes}
       <div class="acts"><button type="button" class="btn primary" data-close>Keep climbing</button></div>`,
-      (root, close) => { root.querySelector("[data-close]").onclick = () => { close(); UI.levelPending = false; if (G.day.over) showSummary(); }; });
+      (root, close) => { root.querySelector("[data-close]").onclick = () => { UI.levelPending = false; close(); }; });
   }
   function showSummary() {
-    const d = G.day, newSends = d.sends.filter(s => s.style !== "Repeat");
+    const d = G.day, newSends = d.sends.filter(s => s.style !== "Repeat"), faToday = newSends.filter(s => s.fa).length;
     const levelUps = levelNow().level - d.levelBefore;
     const rested = d.attempts === 0 ? 1 : 0;           // a day without climbing (rained out) counts as rest
     const preview = n => Mech.startOfDay(G.player, n + rested);
@@ -1321,7 +1433,7 @@
         <span class="sky">${esc(f.sky)}, ${f.temp}°F</span>${rainLine}
         <span class="body">${b.energy}% energy<br>${b.skin.toFixed(0)}% skin</span></button>`;
     }).join("");
-    modal(`<span class="label-sm">Day ${d.no} · ${prettyDate(G.date)}</span><h2>${d.rainedOut ? "Rained out" : newSends.length ? `${newSends.length} new ${newSends.length === 1 ? "send" : "sends"}` : d.attempts ? "No sends today" : "A quiet day"}</h2>
+    modal(`<span class="label-sm">Day ${d.no} · ${prettyDate(G.date)}</span><h2>${d.rainedOut ? "Rained out" : newSends.length ? `${newSends.length} new ${newSends.length === 1 ? "send" : "sends"}${faToday ? `, ${faToday} first ${faToday === 1 ? "ascent" : "ascents"}` : ""}` : d.attempts ? "No sends today" : "A quiet day"}</h2>
       <p class="lede">${esc(d.reason || "")} ${d.attempts} attempts, ${d.highpoints} new highpoints, +${fmt(d.xp)} XP${levelUps > 0 ? `, and you leveled up to V${levelNow().level}` : ""}.</p>
       ${newSends.length ? `<ul class="rowlist">${newSends.map(s => `<li><div class="rowbtn" style="cursor:default"><span><span class="t">${esc(nameGrade(s.p))}</span><span class="s">${s.fa ? `First ascent${s.style === "Flash" ? ", flashed" : ""}` : s.style}</span></span><span class="v" style="color:var(--gold)">+${fmt(s.xp)} XP</span></div></li>`).join("")}</ul>` : ""}
       ${gains.length ? `<h3 style="font-family:var(--display);letter-spacing:.1em;text-transform:uppercase;font-size:13px;color:var(--ink-2)">Getting better at</h3><div class="chips">${gains.map(([t, g]) => `<span class="chip good">${STYLE[t][0]} +${g.toFixed(2)}</span>`).join("")}</div>` : ""}
@@ -1336,6 +1448,96 @@
         root.querySelectorAll("[data-next]").forEach(b => {
           b.onclick = () => { const n = +b.dataset.next; close(); startDay(1 + n, n + rested); UI.expanded.clear(); save(); renderAll(); M.update(); if (G.day.over) showSummary(); };
         });
+      });
+  }
+
+  // ======================================================= first ascents
+  // Name your first ascent. The curated name fits the boulder's theme, so it's
+  // the suggestion; closing without choosing keeps it, and you can rename your
+  // own problems later from their CragLog page.
+  function nameDialog(i, opts = {}) {
+    if (!World.isMine(G, i)) return;
+    const p = D.problems[i], e = G.world.est[i], curated = p.name, now = pname(i);
+    const what = opts.was ? `the ${opts.was.charAt(0).toLowerCase() + opts.was.slice(1)}` : "this line";
+    modal(`<span class="label-sm">${opts.first ? `First ascent · ${esc(shortDate(e.date))}` : "Your first ascent"}</span>
+      <h2>${opts.first ? "Name your problem" : "Rename your problem"}</h2>
+      ${opts.first ? `<p class="lede">Nobody had documented an ascent of ${esc(what)} on ${esc(p.boulder.name)}. Now it's in the guidebook: <b>V${e.grade}</b>, first ascent by ${esc(G.player.name)}${e.flash ? ", flashed" : ""}.</p>
+      <p class="meta">Whoever climbs a line first gets to name it. Here's a name that suits the boulder, or write your own.</p>`
+        : `<p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · V${e.grade}. Only your own first ascents can be renamed.</p>`}
+      <div class="field fa-field"><label for="fa-name">Name</label><input type="text" id="fa-name" maxlength="40" autocomplete="off" spellcheck="false" value="${esc(now)}"></div>
+      <p class="meta fa-note" id="fa-note" aria-live="polite"></p>
+      <div class="acts"><button type="button" class="btn primary" data-name>${opts.first ? "Name it" : "Save the name"}</button>
+        ${opts.first ? `<button type="button" class="btn" data-keep>Keep “${esc(curated)}”</button>` : `<button type="button" class="btn" data-keep>Cancel</button>`}
+        ${!opts.first && e.name ? `<button type="button" class="btn" data-curated>Use “${esc(curated)}”</button>` : ""}</div>`,
+      (root, close) => {
+        const inp = root.querySelector("#fa-name"), noteEl = root.querySelector("#fa-note"), ok = root.querySelector("[data-name]");
+        const check = () => {
+          const t = World.cleanName(inp.value), dup = t && K.sameName(i, t);
+          ok.disabled = !t;
+          noteEl.textContent = !t ? "A name needs at least one letter or number."
+            : /[<>]/.test(inp.value) ? "< and > aren't allowed, so they'll be left out."
+            : dup ? `There's already a ${t} at ${dup}. That's allowed: real crags have plenty of duplicates.` : "";
+        };
+        const finish = name => {
+          const before = pname(i), shown = World.nameFa(D, G, i, name);
+          if (shown != null && shown !== before) {
+            if (!opts.first) note(`Renamed ${before} to ${shown}.`);
+            if (UI.faNote && G.feed.includes(UI.faNote) && opts.first) UI.faNote.text = `First ascent: ${shown} (V${e.grade}).`;
+          }
+          if (opts.first && G.day.last && G.day.last.p === i && G.day.last.kind === "send") G.day.last.title = `First ascent: ${titleOf(i)}`;
+          UI.faNote = null;
+          save(); renderAll(); close();
+        };
+        inp.oninput = check;
+        inp.onkeydown = ev => { if (ev.key === "Enter" && !ok.disabled) { ev.preventDefault(); finish(inp.value); } else if (ev.key === "Escape") { ev.preventDefault(); finish(opts.first ? curated : now); } };
+        ok.onclick = () => finish(inp.value);
+        root.querySelector("[data-keep]").onclick = () => finish(opts.first ? curated : now);
+        const cu = root.querySelector("[data-curated]"); if (cu) cu.onclick = () => finish(curated);
+        check();
+        setTimeout(() => { inp.focus(); inp.select(); }, 0);
+      });
+  }
+
+  // The trailhead kiosk: the trail map, and the one surviving page of the old
+  // climbers' notebook. It greets a new climber, and is there to reread at The Tailgate.
+  function showKiosk() {
+    const page = World.notebook(D).map(n => {
+      const p = D.problems[n.p], who = n.by === "n:anon" ? "?" : World.whoName(D, n.by).replace(/^the /, "");
+      return `<li><span class="nb-name">${esc(p.name)}</span><span class="nb-what">${esc(p.boulder.name.replace(/^The /, ""))} · V${p.grade} · ${esc(who)}${n.by === "n:anon" ? "" : ` '${String(n.year).slice(2)}`}</span></li>`;
+    }).join("");
+    modal(`<span class="label-sm">The trailhead kiosk</span><h2>Welcome to Granite Hollow</h2>
+      <p class="lede">Climbing reopened here on September 1, after nearly forty years. The kiosk has the park's trail map, the new climbing rules, and, pinned under glass, the only page of the old climbers' notebook anyone has found.</p>
+      <figure class="notebook" aria-label="A page from the old kiosk notebook"><ol>${page}</ol>
+        <figcaption class="nb-margin">“with a stick!” — D.</figcaption></figure>
+      <p class="lede">Those four are the whole guidebook so far. Everything else in the park is waiting for someone to climb it first. Find boulders, look them over for lines, and if you're first up something, you get to name it.</p>
+      <p class="meta">The trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch.</p>
+      <div class="acts"><button type="button" class="btn primary" data-close>Go climbing</button><button type="button" class="btn" data-paper>Open the trail map</button></div>`,
+      (root, close) => {
+        root.querySelector("[data-close]").onclick = close;
+        root.querySelector("[data-paper]").onclick = () => { close(); safely("trail map", M.togglePaper); };
+      });
+  }
+
+  // A climber from before the reopening, converted on load: what changed.
+  function showWelcomeBack() {
+    const est = Object.values(G.world.est), fa = World.faCount(G), sent = new Set(firstSends().map(t => t.p)).size;
+    const others = est.filter(e => e.by !== "you" && !e.old).length;
+    const lines = Object.values(G.know.lines).filter(l => l.how !== "kiosk").length;
+    let copy = false; try { copy = !!localStorage.getItem(OLD_RULES_COPY); } catch (e) { }
+    modal(`<span class="label-sm">Granite Hollow has changed</span><h2>The park has reopened</h2>
+      <p class="lede">Granite Hollow was closed to climbing from 1987 until September 2025, so when you arrived almost nothing was documented. Problems now get their names and grades from whoever climbs them first, and the crag develops as you play.</p>
+      <ul class="welcome">
+        <li><b>${fa === sent ? `Your ${fa} ${fa === 1 ? "send is a first ascent" : "sends are first ascents"}` : `${fa} of your ${sent} sends ${fa === 1 ? "is a first ascent" : "are first ascents"}`}.</b> ${fa === 1 ? "It's" : "They're"} in CragLog under your name, and you can rename ${fa === 1 ? "it" : "them"} there.${fa < sent ? " The others are on the old notebook page, climbed back in the 70s." : ""}</li>
+        <li><b>The ${lines} ${lines === 1 ? "line" : "lines"} you'd tried or heard about</b> are in your journal.</li>
+        <li><b>Other climbers have been busy too:</b> ${others} ${others === 1 ? "problem" : "problems"} documented since the reopening.</li>
+        <li>Boulders you hadn't been to are unfamiliar again. Click one on the map to walk over and look it over.</li>
+        <li>Your level, skills, ticks and projects are exactly as they were.</li>
+      </ul>
+      <p class="meta">You stay on the leaderboard's <i>Before the reopening</i> board.${copy ? ` A copy of your climber from before the change is kept in this browser: <button type="button" class="linklike" data-old>download it</button>.` : ""}</p>
+      <div class="acts"><button type="button" class="btn primary" data-close>Back to climbing</button></div>`,
+      (root, close) => {
+        root.querySelector("[data-close]").onclick = close;
+        const o = root.querySelector("[data-old]"); if (o) o.onclick = exportOldCopy;
       });
   }
 
@@ -1359,25 +1561,35 @@
   }
   const describeSave = s => `${s.name}: level V${s.level}, hardest send ${s.best >= 0 ? "V" + s.best : "none yet"}, ${s.sends} problems sent, ${prettyDate(s.date)} (day ${s.days})`;
 
+  const saveFileBody = g => JSON.stringify({ format: SAVE_FORMAT, version: 1, exported: new Date().toISOString(), summary: saveSummary(g), game: g }, null, 1);
+  async function download(filename, body) {
+    if (downloads) await downloads.save({ filename, data: body });   // first await: stays inside the click
+    else {
+      const url = URL.createObjectURL(new Blob([body], { type: "application/json" }));
+      const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+  }
+  const downloadFailed = e => {
+    if (e && e.code === "declined") return;
+    toast("Couldn't download the save file", e && e.code === "rate_limited" ? "A download prompt is already open. Try again in a moment." : "Downloads aren't available here. Try opening the game in a desktop browser.", "info");
+  };
   async function exportSave() {
     const filename = `granite-hollow-${slug(G.player.name)}-${G.date}.json`;
-    const body = JSON.stringify({ format: SAVE_FORMAT, version: 1, exported: new Date().toISOString(),
-      summary: saveSummary(G), game: G }, null, 1);
     try {
-      if (downloads) await downloads.save({ filename, data: body });   // first await: stays inside the click
-      else {
-        const url = URL.createObjectURL(new Blob([body], { type: "application/json" }));
-        const a = Object.assign(document.createElement("a"), { href: url, download: filename });
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-      }
+      await download(filename, saveFileBody(G));
       G.backup = { at: new Date().toISOString(), dayNo: G.dayNo }; save();
       toast("Save file downloaded", filename, "info");
       renderPanel();
-    } catch (e) {
-      if (e && e.code === "declined") return;
-      toast("Couldn't download the save file", e && e.code === "rate_limited" ? "A download prompt is already open. Try again in a moment." : "Downloads aren't available here. Try opening the game in a desktop browser.", "info");
-    }
+    } catch (e) { downloadFailed(e); }
+  }
+  // The copy of a climber kept when they were converted to the new rules.
+  async function exportOldCopy() {
+    let g = null; try { g = JSON.parse(localStorage.getItem(OLD_RULES_COPY)); } catch (e) { }
+    if (!g || !g.player) { toast("No copy here", "There's no climber from before the reopening saved in this browser.", "info"); return; }
+    const filename = `granite-hollow-${slug(g.player.name)}-before-the-reopening.json`;
+    try { await download(filename, saveFileBody(g)); toast("Save file downloaded", filename, "info"); } catch (e) { downloadFailed(e); }
   }
 
   // Check a loaded file thoroughly: every problem and climber it points at must
@@ -1386,7 +1598,8 @@
     const g = obj && obj.format === SAVE_FORMAT ? obj.game : obj && (obj.v === 1 || obj.v === 2) && obj.player ? obj : null;
     if (!g) throw new Error("This isn't a Granite Hollow save file.");
     if (g.v !== 1 && g.v !== 2) throw new Error("This save file is from a different version of the game.");
-    if (g.v === 2 && !DEV && !RULES2_LIVE) throw new Error("This save file is from a development version of the game.");
+    if (g.v === 2 && !RULES2_LIVE && !DEV) throw new Error("This save file is from a newer version of the game.");
+    if (g.dev === true && !DEV) throw new Error("This save file was made in development mode, so it can't be played here.");
     (function walk(x) {
       if (typeof x === "string") { if (/[<>]/.test(x)) throw new Error("The save file contains text the game doesn't allow."); }
       else if (x && typeof x === "object") Object.values(x).forEach(walk);
@@ -1411,6 +1624,7 @@
     if (!num(g.bestGrade)) g.bestGrade = -1;
     migrateSave(g);
     if (g.v === 2 && World.validate(D, g)) throw new Error("This save file is damaged or incomplete.");
+    if (g.v === 1 && rulesLive()) upgrade(g);
     if (DEV) g.dev = true;
     g.day.encounter = null;
     const okWx = f => f && typeof f.date === "string" && /^\d{4}-\d\d-\d\d$/.test(f.date) && num(f.temp) && num(f.cond) && num(f.dusk)
@@ -1445,9 +1659,9 @@
   }
   function applySave(g) {
     G = g;
-    Object.assign(UI, { tab: "here", busy: false, confirmReset: false, levelPending: false });
+    Object.assign(UI, { tab: "here", busy: false, confirmReset: false, levelPending: false, summaryPending: false, kiosk: false, fresh: null });
     UI.expanded.clear(); UI.cl.problem = null;
-    $("#modal-root").innerHTML = "";
+    modalQueue.length = 0; $("#modal-root").innerHTML = "";
     save();
     $("#creator").hidden = true;
     showGame();
@@ -1478,7 +1692,7 @@
     const e = { name: pl.name.slice(0, 24), height: pl.height, ape: pl.ape, best: G.bestGrade, level: levelNow().level,
       sends: firstSends().length, days: daysSince(G.date), cdays: G.dayNo, ms: milestones(G), rk: rankSummaryForBoard() };
     // Which board: the rules this climber started under (migrated climbers stay on the old one).
-    if (v2()) { e.rules = G.rules === 2 ? 2 : 1; e.fa = Object.values(G.world.est).filter(x => x.by === "you").length; if (e.rules === 2) e.rk = { y: [], a: [] }; }
+    if (v2()) { e.rules = G.rules === 2 ? 2 : 1; e.fa = World.faCount(G); if (e.rules === 2) e.rk = { y: [], a: [] }; }
     return e;
   }
 
@@ -1598,8 +1812,8 @@
           <td>${m.p != null && K.visible(m.p) ? `<button type="button" class="linklike" data-cl="${m.p}">${esc(pname(m.p))}</button>` : K.all() ? esc(m.name) : ""}<div class="meta" style="margin:0">${m.grade != null ? `V${m.grade}` : ""}${m.style ? ` · ${esc(m.style)}` : ""}</div></td></tr>`; }).join("")}
         </tbody></table>` : `<p class="lede">Nobody has sent V${g} yet.</p>`}
       <h3>Everyone</h3>
-      <table><thead><tr><th>Climber</th><th>Hardest</th><th>Level</th><th>Sends</th><th>Days in</th></tr></thead><tbody>
-        ${others.map(c => `<tr class="${c.mine ? "lb-me" : ""}"><td>${who(c)}</td><td class="num">${c.best >= 0 ? "V" + c.best : "–"}</td><td class="num">V${c.level}</td><td class="num">${c.sends}</td><td class="num">${c.days + 1}</td></tr>`).join("")}
+      <table><thead><tr><th>Climber</th><th>Hardest</th><th>Level</th><th>Sends</th>${bucket === 2 ? "<th>FAs</th>" : ""}<th>Days in</th></tr></thead><tbody>
+        ${others.map(c => `<tr class="${c.mine ? "lb-me" : ""}"><td>${who(c)}</td><td class="num">${c.best >= 0 ? "V" + c.best : "–"}</td><td class="num">V${c.level}</td><td class="num">${c.sends}</td>${bucket === 2 ? `<td class="num">${c.fa || 0}</td>` : ""}<td class="num">${c.days + 1}</td></tr>`).join("")}
       </tbody></table>
       ${G.board.joined && LB.status !== "off" ? `<p class="meta" style="margin-top:14px"><button type="button" class="linklike" data-lb-leave>Take ${esc(G.player.name)} off the leaderboard</button></p>` : ""}`;
   }
@@ -1643,7 +1857,7 @@
     function draw() {
       const ftIn = cm => { const i = Math.round(cm / 2.54); return `${Math.floor(i / 12)}′${i % 12}″`; };
       el.innerHTML = `${CREATOR_ART}<p class="label-sm">A bouldering game</p><h1>Granite Hollow</h1>
-        <p class="intro">${DEV && devRules() === 2 ? "Granite Hollow has just reopened to climbing after nearly forty years. Its 75 boulders hold about 1,000 possible lines, and almost none of them are documented. You start at V0." : "1,000 problems on 75 boulders, from V0 warm-ups to V13 test pieces. You start at V0."} Every attempt is a roll against the grade, shaped by your strength, your style, your height, the beta you've worked out, your skin, and the weather.</p>
+        <p class="intro">${rulesLive() ? "Granite Hollow has just reopened to climbing after nearly forty years. Its 75 boulders hold about 1,000 possible lines, from V0 to V13, and almost none of them are documented yet. Find them, climb them first, and name them. You start at V0." : "1,000 problems on 75 boulders, from V0 warm-ups to V13 test pieces. You start at V0."} Every attempt is a roll against the grade, shaped by your strength, your style, your height, the beta you've worked out, your skin, and the weather.</p>
         <div class="cc-grid">
           <div class="cc-card"><h2>Your climber</h2><p class="help">Height and ape index decide which problems suit your body.</p>
             <div class="field"><label for="cc-name">Name</label><input type="text" id="cc-name" maxlength="24" placeholder="e.g. Maddie" value="${esc(st.name)}"></div>
@@ -1689,8 +1903,10 @@
     }
     if (DEV) devButton();
     renderAll();
+    if (justMigrated.has(G)) { justMigrated.delete(G); openModal(showWelcomeBack); }
+    if (UI.kiosk) { UI.kiosk = false; openModal(showKiosk); }
     if (!G.day.over && rainNow()) endDay(`It's ${G.day.weather.precip === "Snow" ? "snowing" : "raining"}. Wet granite is slick and holds can snap, so you head home.`);
-    else if (G.day.over) showSummary();
+    else if (G.day.over) openModal(showSummary);
   }
 
   // ======================================================= development mode
@@ -1777,6 +1993,13 @@
     "Summit Blocks": "Hawkwatch", "Fern Gully": "Bracken Gully", "Dam Area": "The Spillway", "Lost Crag": "The Cellar Holes",
     "Quarry Rim": "The Grout Piles",
   };
+  // An old-rules (v1) climber into the new rules, in place. Returns it, or throws.
+  function upgrade(g) {
+    World.migrate(D, g);
+    if (World.validate(D, g)) throw new Error("the converted save didn't check out: " + World.validate(D, g));
+    justMigrated.add(g);
+    return g;
+  }
   function migrateSave(g) {
     const fix = name => (name == null || D.sectorBy.has(name) ? name : OLD_SECTOR_NAMES[name] || null);
     g.loc = g.loc || { sector: null, boulder: null };
@@ -1813,7 +2036,17 @@
     if (hot && hot.snapshot) hot.snapshot(() => ({ G }));
     const start = data => {
       G = (data && data.G) || load();
-      if (G) { if (!G.id) G.id = newId(); if (!G.board) G.board = { joined: false }; if (DEV) { G.dev = true; G.board = { joined: false }; } migrateSave(G); save(); }
+      if (G) {
+        if (!G.id) G.id = newId(); if (!G.board) G.board = { joined: false }; if (DEV) { G.dev = true; G.board = { joined: false }; } migrateSave(G);
+        // A climber from before the reopening: keep a copy of the old save, then convert it.
+        if (G.v === 1 && G.day && rulesLive()) {
+          try { localStorage.setItem(DEV ? OLD_RULES_COPY + "-dev" : OLD_RULES_COPY, localStorage.getItem(SLOT) || JSON.stringify(G)); } catch (e) { }
+          // Converted on a copy: if anything goes wrong, you keep climbing under the old rules.
+          const up = safely("converting your climber", () => upgrade(JSON.parse(JSON.stringify(G))));
+          if (up) G = up;
+        }
+        save();
+      }
       if (G && (G.v === 1 || (G.v === 2 && (DEV || RULES2_LIVE))) && G.day) showGame(); else showCreator();
     };
     if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});

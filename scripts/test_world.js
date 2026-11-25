@@ -234,6 +234,53 @@ test("after migrating, the community never takes your lines", () => {
   for (const p of Object.keys(g.know.lines)) { const e = g.world.est[p]; assert(!e || e.by === "you" || e.old, `#${p} went to ${e && e.by}`); }
 });
 
+console.log("first ascents and naming (Stage 3)");
+test("you can name only your own first ascents, and the curated name is the default", () => {
+  const g = newSave(), K = Know.make(D, () => g);
+  let p = null;
+  for (let b = 0; b < D.boulders.length && p == null; b++) {
+    if (D.boulders[b].sector !== "The Tailgate" || g.know.boulders[b]) continue;
+    K.inspect(b, g.date);
+    p = D.boulders[b].problems.find(i => !g.world.est[i] && K.line(i) === "open");
+  }
+  assert(p != null, "an unclimbed line to try");
+  assert.strictEqual(World.nameFa(D, g, p, "Mine"), null, "not yours before you climb it");
+  g.ticks.push({ p, date: g.date, style: "Send" });
+  assert(World.recordSend(D, g, p, g.date, false).fa);
+  const before = clone(g.world.est[p]);
+  assert.strictEqual(World.nameFa(D, g, p, "  Moonshine  <b>"), "Moonshine b");
+  assert.strictEqual(K.name(p), "Moonshine b");
+  assert.strictEqual(g.world.est[p].by, before.by); assert.strictEqual(g.world.est[p].date, before.date);
+  assert.strictEqual(World.nameFa(D, g, p, D.problems[p].name), D.problems[p].name);
+  assert(!("name" in g.world.est[p]), "choosing the curated name stores nothing");
+  assert.strictEqual(World.nameFa(D, g, p, "!!!"), D.problems[p].name, "an unusable name keeps the default");
+  const nb = World.notebook(D)[0].p;
+  assert.strictEqual(World.nameFa(D, g, nb, "Taken"), null, "the notebook's problems aren't yours");
+  assert.strictEqual(World.validate(D, g), null); assert.deepStrictEqual(World.check(D, g), []);
+  assert.strictEqual(World.faCount(g), 1);
+});
+test("a duplicate name is noticed only among problems you can see", () => {
+  const g = newSave(), K = Know.make(D, () => g);
+  const nb = World.notebook(D)[0].p;
+  assert.strictEqual(K.sameName(-1, D.problems[nb].name.toUpperCase()), "The Tailgate");
+  assert.strictEqual(K.sameName(nb, D.problems[nb].name), null, "not against itself");
+  const hidden = D.problems.findIndex((p, i) => K.line(i) === "hidden" && !World.notebook(D).some(n => n.p === i) && !D.problems.some((q, j) => j !== i && q.name === p.name && K.line(j) !== "hidden"));
+  assert.strictEqual(K.sameName(-1, D.problems[hidden].name), null, "a hidden problem's name doesn't leak");
+});
+test("Open projects: lines you know of; stronger eyes find more on boulders you've looked over", () => {
+  const g = newSave(), K = Know.make(D, () => g);
+  assert.deepStrictEqual(K.identified().sort((a, b) => a - b), World.notebook(D).map(n => n.p).sort((a, b) => a - b), "a new climber knows the notebook's four");
+  assert.deepStrictEqual(K.lookAgain(), [], "nothing looked over yet");
+  // Find a boulder with lines beyond a V0 climber, look it over, then get stronger.
+  const b = D.boulders.findIndex((x, i) => x.sector === "The Tailgate" && !g.know.boulders[i] && x.problems.some(p => !Mech.canSpot(g.player, D.problems[p])));
+  K.inspect(b, g.date);
+  assert(K.inspected(b) && !K.lookAgain().includes(b));
+  g.player.xp = xpFor(8);
+  assert(K.lookAgain().includes(b), "a V8 climber sees more on it");
+  const r = K.inspect(b, g.date);
+  assert(r.lines.length > 0 && !r.found && !K.lookAgain().includes(b));
+});
+
 if (process.argv.includes("--curve")) {
   console.log("\nhow the crag develops with a player climbing 2 days in 3 at the current pacing (seed 'curve')");
   const g = newSave("curve"), K = Know.make(D, () => g);

@@ -184,7 +184,7 @@
   }
   // What a new climber knows: the kiosk map's three areas and the notebook page.
   function initialKnow(D, date) {
-    const k = { areas: {}, boulders: {}, lines: {}, newsSeen: date };
+    const k = { areas: {}, boulders: {}, lines: {}, looked: {}, newsSeen: date };
     for (const a of KIOSK_AREAS) if (dataOf(D).sectorOf.has(a)) k.areas[a] = 1;
     for (const n of dataOf(D).notebook) { k.lines[n.p] = { how: "kiosk", date }; k.boulders[D.problems[n.p].b] = 1; }
     return k;
@@ -362,6 +362,16 @@
     return { fa: false };
   }
   const isMine = (G, p) => !!(G.world && G.world.est[p] && G.world.est[p].by === "you");
+  // Name (or rename) one of your own first ascents: the only change the ledger
+  // allows to a record once it's written. The curated name is the default, so
+  // choosing it (or nothing usable) stores no name. Returns the name now shown.
+  function nameFa(D, G, p, name) {
+    if (!isMine(G, p)) return null;
+    const e = G.world.est[p], t = cleanName(name), curated = D.problems[p].name;
+    if (!t || t === curated) delete e.name; else e.name = t;
+    return e.name || curated;
+  }
+  const faCount = G => (G.world ? Object.values(G.world.est).filter(e => e.by === "you").length : 0);
 
   // Names the player gives problems: any letters, digits, punctuation or emoji,
   // without control or direction-override characters or < >. 1–40 characters,
@@ -394,7 +404,7 @@
     for (const t of g.tips || []) if (!k.lines[t.p]) k.lines[t.p] = { how: "told", date: isDay(t.date) ? t.date : g.date, from: "c" + t.from };
     for (const p of g.todo || []) if (!k.lines[p]) k.lines[p] = { how: "told", date: g.date };
     for (const p of first.keys()) if (!k.lines[p]) k.lines[p] = { how: "migrated", date: first.get(p).date };
-    for (const [p, st] of Object.entries(g.ps || {})) if (st && st.att > 0) k.boulders[D.problems[p].b] = 2;
+    for (const [p, st] of Object.entries(g.ps || {})) if (st && st.att > 0) { k.boulders[D.problems[p].b] = 2; k.looked[D.problems[p].b] = g.date; }
     if (g.loc && Number.isInteger(g.loc.boulder)) k.boulders[g.loc.boulder] = 2;
     for (const p of Object.keys(k.lines)) { const b = D.problems[p].b; if (!k.boulders[b]) k.boulders[b] = 1; }
     for (const s of g.visited || []) if (dd.sectorOf.has(s)) k.areas[s] = 2;
@@ -441,6 +451,7 @@
     if (!k.boulders || !Object.entries(k.boulders).every(([b, v]) => /^\d+$/.test(b) && +b < nB && lv(v))) return "bad boulders";
     if (!k.lines || !Object.entries(k.lines).every(([p, l]) => isP(p) && l && isDay(l.date) && ["spot", "told", "tried", "migrated", "kiosk", "dev"].includes(l.how) && (l.from == null || isWho(l.from)))) return "bad lines";
     if (!isDay(k.newsSeen)) return "bad newsSeen";
+    if (k.looked != null && (typeof k.looked !== "object" || !Object.entries(k.looked).every(([b, d]) => /^\d+$/.test(b) && +b < nB && isDay(d)))) return "bad looked";
     return null;
   }
   // The ledger's invariants (tests and dev mode). Returns a list of problems found.
@@ -487,7 +498,7 @@
   }
 
   const World = { REOPENED, BEFORE, PARAMS, NAMED, NOTEBOOK, LEGENDS, AREAS, KIOSK_AREAS,
-    create, initialKnow, step, recordSend, migrate, validate, check, cleanName, isMine, isWho, whoInfo, whoName,
+    create, initialKnow, step, recordSend, migrate, validate, check, cleanName, isMine, nameFa, faCount, isWho, whoInfo, whoName,
     faText, legendOf, devRevealAll, devEstablish, seedFrom, newSeed, stream, addDays, daysBetween, notebook: D => dataOf(D).notebook };
   if (typeof module !== "undefined") module.exports = World; else root.World = World;
 })(typeof window !== "undefined" ? window : globalThis);

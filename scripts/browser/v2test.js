@@ -10,11 +10,15 @@ global.Mech = require(GD + "mechanics.js"); global.World = require(GD + "world.j
 const Know = require(GD + "knowledge.js"), D = require(GD + "game-data.json");
 const SLOT = "granite-hollow-save-dev";
 const text = p => p.evaluate(() => document.querySelector("#tabbody").innerText);
+const modalText = p => p.evaluate(() => { const m = document.querySelector(".modal"); return m ? m.innerText : ""; });
 // Everything a player could see or hear: panels, the HUD, visible map labels, accessible names, hover cards.
 async function harvest(p) {
   const out = [];
   out.push(await p.evaluate(() => document.querySelector("#hud").innerText));
   for (const tab of ["here", "climber", "logbook", "journal", "craglog"]) { await click(p, `#tabs [data-tab="${tab}"]`); await sleep(120); out.push(await text(p)); }
+  await click(p, '#tabs [data-tab="journal"]');
+  for (const v of ["tried", "known", "sent"]) { await click(p, `[data-pj-view="${v}"]`); await sleep(100); out.push(await text(p)); }
+  await click(p, '#tabs [data-tab="craglog"]'); await sleep(100);
   for (const v of ["rankings", "leaders", "problems"]) { await click(p, `[data-cl-view="${v}"]`); await sleep(120); out.push(await text(p)); }
   const ids = await p.evaluate(() => [...document.querySelectorAll("[data-cl]")].map(b => +b.dataset.cl));
   for (const i of [...new Set(ids)].slice(0, 12)) { await p.evaluate(i => { const b = document.querySelector(`[data-cl="${i}"]`); if (b) b.click(); }, i); await sleep(80); out.push(await text(p)); await click(p, "[data-cl-back]"); await sleep(60); }
@@ -49,6 +53,10 @@ function leaks(g, all) {
   await ready(p); await sleep(500);
   let g = JSON.parse(await p.evaluate(k => localStorage.getItem(k), SLOT));
   console.log("new game: v", g.v, "rules", g.rules, "dev", g.dev, "| real slot untouched:", await p.evaluate(() => localStorage.getItem("granite-hollow-save-v1") === null));
+  const kiosk = await modalText(p);
+  console.log("the kiosk greets you:\n  " + kiosk.split("\n").filter(Boolean).slice(0, 9).join("\n  "));
+  console.log("LEAKS in the kiosk:", leaks(g, kiosk));
+  await click(p, ".modal [data-close]"); await sleep(200);
   console.log("parking lot panel:\n  " + (await text(p)).split("\n").slice(0, 12).join("\n  "));
   let all = await harvest(p);
   console.log("LEAKS at the start:", leaks(g, all));
@@ -92,14 +100,36 @@ function leaks(g, all) {
     if (fa) break;
   }
   console.log("result:", fa, "| banner:", await p.evaluate(() => document.querySelector("#banner").innerText.replace(/\s+/g, " ")));
+  // The naming dialog opens after the banner.
+  await p.waitForSelector(".modal #fa-name", { timeout: 5000 });
+  const naming = await modalText(p);
+  console.log("naming dialog:\n  " + naming.split("\n").filter(Boolean).slice(0, 7).join("\n  "));
+  console.log("  suggested:", await p.evaluate(() => document.querySelector("#fa-name").value), "| focused:", await p.evaluate(() => document.activeElement && document.activeElement.id));
+  g = JSON.parse(await p.evaluate(k => localStorage.getItem(k), SLOT));
+  console.log("LEAKS in the naming dialog:", leaks(g, naming));
+  await p.evaluate(() => { const i = document.querySelector("#fa-name"); i.value = ""; i.dispatchEvent(new Event("input")); });
+  console.log("  empty name:", await p.evaluate(() => [document.querySelector("[data-name]").disabled, document.querySelector("#fa-note").textContent]));
+  await p.focus("#fa-name"); await p.keyboard.type("  Pickles' Revenge <b> 🍉 ");
+  console.log("  typed:", await p.evaluate(() => document.querySelector("#fa-note").textContent || "(no note)"));
+  await p.keyboard.press("Enter"); await sleep(300); await settle(p);
   g = JSON.parse(await p.evaluate(k => localStorage.getItem(k), SLOT));
   const mine = Object.entries(g.world.est).filter(([, e]) => e.by === "you");
   console.log("ledger: your FAs", mine.map(([i, e]) => `${D.problems[i].name} V${e.grade} ${e.date}`), "| invariants:", World.check(D, g), "| valid:", World.validate(D, g));
   await click(p, '#tabs [data-tab="craglog"]'); await sleep(150);
-  console.log("CragLog:\n  " + (await text(p)).split("\n").slice(14, 40).join("\n  "));
+  console.log("CragLog:\n  " + (await text(p)).split("\n").filter(l => l.trim() && !/^V\d+$/.test(l.trim())).slice(10, 30).join("\n  "));
   const faId = Object.entries(g.world.est).find(([, e]) => e.by === "you")[0];
+  console.log("stored name:", JSON.stringify(g.world.est[faId].name), "| valid:", World.validate(D, g));
   await p.evaluate(i => document.querySelector(`[data-cl="${i}"]`).click(), faId); await sleep(150);
   console.log("its page:\n  " + (await text(p)).split("\n").slice(0, 8).join("\n  "));
+  // Rename it from its page, back to the suggestion.
+  await click(p, "[data-rename]"); await sleep(200);
+  await click(p, ".modal [data-curated]"); await sleep(200);
+  g = JSON.parse(await p.evaluate(k => localStorage.getItem(k), SLOT));
+  console.log("renamed back to the suggestion:", g.world.est[faId].name === undefined ? D.problems[faId].name : g.world.est[faId].name);
+  await click(p, '#tabs [data-tab="logbook"]'); await sleep(150);
+  console.log("logbook:\n  " + (await text(p)).split("\n").filter(l => /first ascent|carr/i.test(l)).slice(0, 4).join("\n  "));
+  await click(p, '#tabs [data-tab="journal"]'); await sleep(100); await click(p, '[data-pj-view="known"]'); await sleep(100);
+  console.log("journal, Open:\n  " + (await text(p)).split("\n").slice(1, 12).join("\n  "));
   // Reload: the FA and the discovery are still there.
   await p.reload({ waitUntil: "load" }); await ready(p); await sleep(300);
   const g2 = JSON.parse(await p.evaluate(k => localStorage.getItem(k), SLOT));
@@ -112,11 +142,13 @@ function leaks(g, all) {
   console.log("after 7 days' rest:", g3.date, "simulated through", g3.world.simDate, "established", Object.keys(g3.world.est).length, "climbers", Object.keys(g3.world.npc).length, "| invariants", World.check(D, g3));
   all = await harvest(p);
   console.log("LEAKS a week later:", leaks(g3, all));
-  // Migration: an old climber in the dev slot, converted.
+  // Migration: an old climber in the dev slot is converted when it loads.
   await p.evaluate((k, s) => { localStorage.setItem(k, s); }, SLOT, fs.readFileSync(FIX + "v1-midday.json", "utf8"));
-  await p.reload({ waitUntil: "load" }); await ready(p); await sleep(300);
-  await click(p, "#dev-btn"); await sleep(200); await click(p, '[data-dv="migrate"]'); await sleep(500);
+  await p.reload({ waitUntil: "load" }); await ready(p); await sleep(400);
   const gm = JSON.parse(await p.evaluate(k => localStorage.getItem(k), SLOT));
+  const welcome = await modalText(p);
+  console.log("welcome back:\n  " + welcome.split("\n").filter(Boolean).slice(0, 10).join("\n  "));
+  console.log("LEAKS in the welcome:", leaks(gm, welcome), "| old copy kept:", await p.evaluate(() => JSON.parse(localStorage.getItem("granite-hollow-save-before-reopening-dev") || "{}").v));
   const fx = JSON.parse(fs.readFileSync(FIX + "v1-midday.json", "utf8"));
   console.log("migrated: v", gm.v, "rules", gm.rules, "your FAs", Object.values(gm.world.est).filter(e => e.by === "you").length, "of", new Set(fx.ticks.filter(t => t.style !== "Repeat").map(t => t.p)).size, "first sends | XP kept:", gm.player.xp === fx.player.xp, "| invariants", World.check(D, gm));
   await p.evaluate(() => { const c = document.querySelector(".modal [data-close]"); if (c) c.click(); });

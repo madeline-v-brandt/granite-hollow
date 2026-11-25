@@ -786,6 +786,37 @@ tr.lb-me td { background: var(--gold-soft); }
   .dev-out { max-height: 220px; overflow: auto; font-size: 11px; background: var(--paper-2, rgba(0,0,0,.04)); padding: 8px; border-radius: 6px; white-space: pre-wrap; }
   .dev-out:empty { display: none; }
 
+  /* ---- Stage 3: finding boulders, spotting lines, first ascents */
+  .result.discover { border: 1.5px solid color-mix(in srgb, var(--accent) 45%, var(--rule)); border-left: 4px solid var(--accent); background: var(--accent-soft); }
+  .result.discover .rt::before { content: "Field note · "; font-family: var(--body); font-weight: 800; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--plus); vertical-align: 2px; }
+  .chip.new { background: var(--gold-soft); color: var(--gold); font-weight: 700; }
+  .toast.find { border-left-color: var(--accent); }
+  .meta.hint { margin-top: 10px; font-style: italic; }
+  @media (prefers-reduced-motion: no-preference) {
+    .prob.fresh { animation: spot-in .55s cubic-bezier(.2, .9, .3, 1) both; }
+    @keyframes spot-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    #map .lab-new .lt { animation: lab-new 2.4s ease-out both; }
+    @keyframes lab-new { 0%, 35% { fill: var(--gold); } 100% { } }
+  }
+  .cl-views.pj-views { display: flex; grid-column: 1 / -1; margin: 0; }
+  .cl-views.pj-views button { flex: 1; padding: 5px 8px; }
+  .fa-field input[type="text"] { width: 100%; font: 650 22px var(--serif); font-variation-settings: "SOFT" 100; padding: 8px 12px; }
+  .fa-note { min-height: 1.4em; margin-top: 6px; }
+  ul.welcome { margin: 10px 0 12px; padding-left: 20px; }
+  ul.welcome li { margin: 6px 0; color: var(--ink-2); line-height: 1.45; }
+  ul.welcome b { color: var(--ink); }
+  /* the old notebook page under the kiosk glass: lined paper, ink, a red margin. Its own colours in both themes. */
+  .notebook { position: relative; margin: 14px 6px 16px; padding: 10px 18px 10px 40px; color: #2c3550;
+    background-color: #f7f0db; background-image: repeating-linear-gradient(transparent 0 29px, rgba(70, 110, 165, .24) 29px 30px); background-position: 0 9px;
+    border: 1px solid rgba(90, 70, 40, .28); border-radius: 2px 3px 2px 4px; transform: rotate(-.7deg);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, .05), 0 8px 20px rgba(40, 30, 10, .16), inset 0 0 0 5px rgba(255, 255, 255, .3); }
+  .notebook::before { content: ""; position: absolute; left: 28px; top: 0; bottom: 0; border-left: 1.5px solid rgba(190, 70, 60, .4); }
+  .notebook ol { list-style: none; margin: 0; padding: 0; }
+  .notebook li { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 12px; align-items: baseline; font-family: var(--hand); font-size: 23px; line-height: 30px; }
+  .notebook .nb-name { font-weight: 700; }
+  .notebook .nb-what { font-size: 19px; color: #48506a; white-space: nowrap; }
+  .notebook .nb-margin { font-family: var(--hand); font-size: 19px; line-height: 1; color: #9a3b2e; text-align: right; transform: rotate(-3deg); margin: 2px 6px 2px 0; }
+
   /* ---- the paper trail map (paper.js): a folded park map opened over the game.
      It keeps its own printed colours in both themes. */
   .paper-back { position: fixed; inset: 0; z-index: 70; background: rgba(38, 31, 20, .5); display: grid; place-items: center; padding: 18px; }
@@ -894,11 +925,11 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=16"></script>
-<script src="art.js?v=16"></script>
-<script src="world.js?v=16"></script>
-<script src="knowledge.js?v=16"></script>
-<script src="illustrate.js?v=16"></script>
-<script src="paint.js?v=16"></script>
-<script src="paper.js?v=16"></script>
-<script src="game.js?v=16"></script>
+<script src="mechanics.js?v=17"></script>
+<script src="art.js?v=17"></script>
+<script src="world.js?v=17"></script>
+<script src="knowledge.js?v=17"></script>
+<script src="illustrate.js?v=17"></script>
+<script src="paint.js?v=17"></script>
+<script src="paper.js?v=17"></script>
+<script src="game.js?v=17"></script>
