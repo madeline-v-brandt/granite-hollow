@@ -117,9 +117,9 @@
       g.append("path").attr("d", `M${f1(bx0 - 14)},${f1(ry)}H${f1(bx1 + 14)}`).attr("stroke", "#7d6e58").attr("stroke-width", 6.2);
       g.append("path").attr("d", `M${f1(bx0 - 14)},${f1(ry)}H${f1(bx1 + 14)}`).attr("stroke", "#f6eed8").attr("stroke-width", 3.8);
       g.append("text").attr("class", "pp-road").attr("x", px(150, 0)[0]).attr("y", ry + 13).text("QUARRY HILL ROAD");
-      const [lx0, ly0] = px(-26, 4), [lx1, ly1] = px(26, -28);
+      const [lx0, ly0] = px(-35, 4), [lx1, ly1] = px(35, -30);
       g.append("rect").attr("x", lx0).attr("y", ly0).attr("width", lx1 - lx0).attr("height", ly1 - ly0).attr("rx", 3).attr("fill", "#e2dccd").attr("stroke", "#8a8070").attr("stroke-width", .8);
-      const [pxp, pyp] = px(-34, -12);
+      const [pxp, pyp] = px(-43, -12);
       g.append("rect").attr("x", pxp - 6).attr("y", pyp - 6).attr("width", 12).attr("height", 12).attr("rx", 2).attr("fill", "#3f6f9a");
       g.append("text").attr("class", "pp-p").attr("x", pxp).attr("y", pyp + 4.2).text("P");
       // Trails: red dashes.
@@ -219,7 +219,7 @@
         <h3>Climbing areas</h3>
         <ul class="pp-list">${known.map(a => `<li><button type="button" data-pp-area="${esc(a.name)}" class="${s.here === a.name ? "here" : ""}"><b>${esc(a.name)}</b><span>${esc(a.sub || "")}</span></button>${s.onGo && s.here !== a.name ? `<button type="button" class="pp-go" data-pp-go="${esc(a.name)}" aria-label="Walk to ${esc(a.name)}">Walk</button>` : ""}</li>`).join("") || `<li class="pp-none">None yet.</li>`}</ul>
         ${s.footnote ? `<p class="pp-foot">${esc(s.footnote)}</p>` : ""}
-        <p class="pp-hint">Pick an area, or anywhere on the map, to look at it. Looking doesn't move you or cost time.${s.onGo ? " <b>Walk</b> takes you there along the trails." : ""}</p>
+        <p class="pp-hint">Pick an area, or anywhere on the map, to look at it.</p>
         <button type="button" class="pp-x" data-pp-close aria-label="Fold up the trail map (M or Esc)" title="Fold it up (M)">×</button>`);
       side.selectAll("[data-pp-area]").on("click", function () { const sec = D.sectors.find(x => x.name === this.dataset.ppArea); pick({ x: sec.x, y: sec.y, sector: sec.name }); });
       side.selectAll("[data-pp-close]").on("click", close);

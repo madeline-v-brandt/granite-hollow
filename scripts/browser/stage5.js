@@ -42,7 +42,7 @@ function leaks(g, all) {
   console.log("set up:", s.date, "day", s.dayNo, "| regulars arrived:", World.CLIMBING_REGULARS.filter(w => s.world.npc[w]).map(w => World.whoName(D, w)).join(", "));
 
   // Each day, the regulars stand at boulders on the map (Stage 6): click each one,
-  // walk over, and use whatever they offer. Pickles is met at the Tailgate.
+  // walk over, and use whatever they offer. Pickles naps by his rock at the Tailgate.
   const seen = {}, used = {}, texts = [];
   for (let day = 0; day < 5; day++) {
     s = await g();
@@ -52,7 +52,7 @@ function leaks(g, all) {
     await put(s);
     const who = await p.evaluate(() => [...document.querySelectorAll("#map g.person")].map(e => e.dataset.who));
     console.log(`  day ${day + 1}: on the map: ${who.join(", ") || "nobody"}`);
-    for (const w of [...who, "pickles"]) {
+    for (const w of who.includes("n:pickles") ? who : [...who, "pickles"]) {   // Pickles is on the map (Stage 6); walking up to him is the fallback
       if (w === "pickles") {
         // Pickles: stand a few steps from where he's napping, by Pickles' Rock, and step closer.
         s = await g(); s.day.minute = 600; s.day.met = s.day.met.filter(x => x !== "n:pickles"); s.day.encounter = null;
@@ -90,7 +90,10 @@ function leaks(g, all) {
   await p.keyboard.press("Escape"); await sleep(150);
 
   // CragLog: Local Buzz and the Rankings.
-  await click(p, '#tabs [data-tab="craglog"]'); await sleep(150); await click(p, '[data-cl-view="problems"]'); await sleep(150);
+  await click(p, '#tabs [data-tab="craglog"]'); await sleep(150);
+  const views = await p.evaluate(() => [...document.querySelectorAll("[data-cl-view]")].map(b => b.textContent));
+  console.log("CragLog tabs:", views.join(" · "), "| Problems shows buzz:", await p.evaluate(() => { document.querySelector('[data-cl-view="problems"]').click(); return !!document.querySelector(".buzz"); }));
+  await click(p, '[data-cl-view="buzz"]'); await sleep(150);
   const buzz = await p.evaluate(() => { const b = document.querySelector(".buzz"); return b ? b.innerText : "(no buzz)"; });
   if (process.env.SHOTS) { const el = await p.$(".buzz"); if (el) await el.screenshot({ path: process.env.SHOTS + "/craglog-local-buzz.png" }); }
   console.log("Local Buzz:\n  " + buzz.split("\n").filter(Boolean).join("\n  "));

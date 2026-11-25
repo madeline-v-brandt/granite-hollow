@@ -17,7 +17,7 @@
   const justMigrated = new WeakSet();      // saves converted this session: they get a welcome back
   const START_DATE = "2025-09-06";
   const START_AREA = "The Tailgate";      // every climbing day starts in the lot, which is part of The Tailgate
-  const PARK_SPOT = [-20, -4.6];          // where you get out of the car: behind it, in the lot's north row (art.js parks it there)
+  const PARK_SPOT = [-24, -4.6];          // where you get out of the car: behind it, in the lot's north row (art.js parks it there)
   const WORLD_MIN_ZOOM = 3.2;              // the world view never zooms out past an area; the paper map shows the park
   const fmt = d3.format(",");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -562,13 +562,9 @@
     if (!n || !n.regular || G.dayNo < (n.arrive || 0)) return false;
     return n.dog || n.old ? true : !!G.world.npc[w];
   };
-  // Who you run into on arriving in an area: Pickles by the lot, the Bishop on
-  // the odd day he's out, the regulars mostly in their home areas.
-  function regularFor(sector) {
-    const met = w => G.day.met.includes(w);
-    if (sector === "The Tailgate" && isAround("n:pickles") && !met("n:pickles") && Math.random() < 0.5) return "n:pickles";
-    return null;            // everyone else is somewhere on the map today (peopleToday): walk up to them
-  }
+  // Who you run into on arriving in an area: nobody now. Everyone is somewhere
+  // on the map today (peopleToday, and Pickles asleep by his rock): walk up to them.
+  function regularFor(sector) { return null; }
   // Who's out today, and where (Stage 6): each regular who's around is at one of
   // their home areas' boulders, decided by the day (so a reload doesn't move them).
   // The Bishop only on his days. Drawn on the map; walk up to someone to talk.
@@ -664,7 +660,7 @@
       e.line = ctx.napping
         ? pick(first ? ["A scruffy dog is napping in the shade of the boulder. His tag says PICKLES. His tail thumps when he sees you."]
           : ["Pickles is napping in the shade of his rock. His tail thumps twice when he sees you.", "Pickles opens one eye, decides you're a friend, and rolls over for a belly rub.", "Pickles is guarding a very important stick beside his rock."])
-        : pick(first ? ["A scruffy dog trots over from the lot, tail going. His tag says PICKLES."] : ["Pickles trots over from the lot, tail going.", "Pickles is asleep under the kiosk. One ear lifts as you pass.",
+        : pick(first ? ["A scruffy dog trots over from the lot, tail going. His tag says PICKLES."] : ["Pickles trots over from the lot, tail going.",
           "Pickles has found a stick and would like you to admire it.", "Pickles is supervising the parking lot. He wags when he sees you."]);
       e.pet = true; return e;
     }
@@ -1082,7 +1078,7 @@
       const ok = G.day.no + "|" + G.day.weather.temp;
       if (ok !== outfitKey) { outfitKey = ok; P.setOutfit(outfitFor()); }
       const pk = G.date + "|" + !!G.day.bishop + "|" + peopleToday().length + "|" + !!G.day.over;
-      if (pk !== peopleKey) { peopleKey = pk; P.setPeople(G.day.over ? [] : peopleToday()); }
+      if (pk !== peopleKey) { peopleKey = pk; P.setPeople(G.day.over ? [] : [...peopleToday(), ...(v2() && isAround("n:pickles") ? [{ who: "n:pickles", name: "Pickles", dog: true }] : [])]); }
       if (!walk && !keys.size) P.setMe(G.pos, pose(false));
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
       P.setMarks({
@@ -1495,20 +1491,22 @@
     return { y: pack(topSends(mine, ...rankWindow("12m"))), a: pack(topSends(mine, ...rankWindow("all"))) };
   }
   // Local Buzz: what people are saying about the crag lately (K keeps it vague about places you don't know).
+  // Its own CragLog tab, next to Problems.
   function buzzHtml() {
-    if (K.all()) return "";
-    const items = K.buzz({ days: 21, max: 5 });
-    if (!items.length) return "";
-    return `<section class="buzz" aria-label="Local Buzz"><h3>Local Buzz</h3><ul>${items.map(it => `<li><span class="buzz-d">${esc(shortDate(it.date).replace(/,? \d{4}$/, ""))}</span><span class="buzz-t">${esc(it.text)}</span>${
+    const items = K.all() ? [] : K.buzz({ days: 30, max: 12 });
+    if (!items.length) return `${cragHead()}<p class="meta">Nothing new lately. When someone puts up a problem or finds a new area, you'll hear about it here.</p>`;
+    return `${cragHead()}<section class="buzz" aria-label="Local Buzz"><p class="meta" style="margin:2px 0 6px">What people are saying about the crag lately.</p><ul>${items.map(it => `<li><span class="buzz-d">${esc(shortDate(it.date).replace(/,? \d{4}$/, ""))}</span><span class="buzz-t">${esc(it.text)}</span>${
       it.p != null ? `<button type="button" class="linklike" data-cl="${it.p}">See it</button>` : it.go && K.canGo(it.go) && !G.day.over ? `<button type="button" class="linklike" ${it.go.boulder != null ? `data-go-boulder="${it.go.boulder}"` : `data-go-sector="${esc(it.go.sector)}"`}>Go there</button>` : ""}</li>`).join("")}</ul></section>`;
   }
+  // "First to" (the shared leaderboard) is hidden for now, until it's brought back
+  // online under the new rules; development mode still shows it.
+  const leadersShown = () => DEV;
+  const CL_VIEWS = () => [["problems", "Problems"], ...(K.all() ? [] : [["buzz", "Local Buzz"]]), ["rankings", "Rankings"], ...(leadersShown() ? [["leaders", "First to"]] : [])];
   function cragHead() {
-    const v = UI.cl.view;
+    const views = CL_VIEWS(), v = views.some(x => x[0] === UI.cl.view) ? UI.cl.view : "problems";
     return `<div class="cl-brand"><b>Crag<i>Log</i></b><span class="meta" style="margin:0">Logs and comments from Granite Hollow climbers</span></div>
       <div class="cl-views" role="group" aria-label="CragLog section">
-        <button type="button" data-cl-view="problems" aria-pressed="${v !== "rankings" && v !== "leaders"}">Problems</button>
-        <button type="button" data-cl-view="rankings" aria-pressed="${v === "rankings"}">Rankings</button>
-        <button type="button" data-cl-view="leaders" aria-pressed="${v === "leaders"}">First to</button></div>`;
+        ${views.map(([k, label]) => `<button type="button" data-cl-view="${k}" aria-pressed="${v === k}">${label}</button>`).join("\n        ")}</div>`;
   }
   // Under the new rules: who has put up the most problems since the reopening.
   function faRankingsHtml() {
@@ -1586,7 +1584,7 @@
       </div>
       <p class="meta">A score is the sum of a climber's 10 best sends ${r.window === "all" ? "ever" : `from ${shortDate(addDays(G.date, -364))} to today`}. Each send is worth 100 points per V-grade (V0 = 100, V5 = 600), plus 50 for a flash. Click a name to see their top 10.</p>
       <div class="lb-join" style="border-left-color:var(--accent)"><p class="lede" style="margin:0">${you}</p>
-        ${!G.board.joined && LB.status !== "off" ? `<p class="meta" style="margin:6px 0 0">Other players only see you here if you join the leaderboard in <button type="button" class="linklike" data-cl-view="leaders">First to</button>.</p>` : ""}</div>
+        ${!G.board.joined && LB.status !== "off" && leadersShown() ? `<p class="meta" style="margin:6px 0 0">Other players only see you here if you join the leaderboard in <button type="button" class="linklike" data-cl-view="leaders">First to</button>.</p>` : ""}</div>
       <table><thead><tr><th>#</th><th>Climber</th><th class="num">Score</th><th class="num">Top</th></tr></thead><tbody>${shown.join("")}</tbody></table>
       ${list.length > r.n ? `<p style="margin-top:10px"><button type="button" class="btn small" data-rk-more>Show ${Math.min(25, list.length - r.n)} more</button></p>` : ""}`;
   }
@@ -1664,7 +1662,8 @@
   function cragHtml() {
     if (UI.cl.problem != null) return cragProblemHtml(UI.cl.problem);
     if (UI.cl.view === "rankings") return rankingsHtml();
-    if (UI.cl.view === "leaders") return leadersHtml();
+    if (UI.cl.view === "leaders" && leadersShown()) return leadersHtml();
+    if (UI.cl.view === "buzz" && !K.all()) return buzzHtml();
     const c = UI.cl, q = c.q.trim().toLowerCase();
     const doneOk = p => !c.done || (c.done === "fa" ? World.isMine(G, p.id) : c.done === "sent" ? !!G.ps[p.id]?.sent : c.done === "tried" ? !!G.ps[p.id] && !G.ps[p.id].sent && G.ps[p.id].att > 0 : !G.ps[p.id]?.sent);
     const gr = p => K.grade(p.id), st = new Map();
@@ -1675,7 +1674,7 @@
     list.sort(sorts[c.sort]);
     const total = list.length; list = list.slice(0, 60);
     const gradeOpts = sel => d3.range(0, 14).map(g => `<option value="${g}" ${g === sel ? "selected" : ""}>V${g}</option>`).join("");
-    return `${cragHead()}${buzzHtml()}
+    return `${cragHead()}
       <div class="cl-filters">
         <input type="search" id="cl-q" placeholder="Search problems, boulders or styles" value="${esc(c.q)}" aria-label="Search">
         <select id="cl-sector" aria-label="Sector"><option value="">All sectors</option>${D.sectors.filter(s => K.area(s.name) >= 1).map(s => `<option ${s.name === c.sector ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
@@ -1704,7 +1703,7 @@
         ${c ? `<p>${esc(c)}</p>` : ""}</div>`;
     }).join("");
     const onTodo = G.todo.includes(i);
-    return `<button type="button" class="linklike" data-cl-back>← ${{ rankings: "Rankings", leaders: "First to" }[UI.cl.view] || "All problems"}</button>
+    return `<button type="button" class="linklike" data-cl-back>← ${{ rankings: "Rankings", leaders: "First to", buzz: "Local Buzz" }[UI.cl.view] || "All problems"}</button>
       <h2 style="margin-top:8px">${esc(p.name)} <span class="grade" style="font-size:24px">V${p.grade}</span></h2>
       <p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · ${p.stars != null ? `<span class="stars">★</span> ${p.stars.toFixed(1)} from ${p.ratings} ratings` : "no ratings"} · ${fmt(p.sends)} sends${cons ? ` · ${cons}` : ""}</p>
       ${p.boulder.desc ? `<p class="boulder-desc" style="font-size:14px">${esc(p.boulder.name)}: ${esc(p.boulder.desc)}</p>` : ""}
@@ -1735,7 +1734,7 @@
   // Granite Hollow, or, for a line nobody has climbed, just what you can see.
   function cragLineHtml(i) {
     const p = D.problems[i], st = G.ps[i], state = K.line(i), e = K.est(i);
-    const back = `<button type="button" class="linklike" data-cl-back>← ${{ rankings: "Rankings", leaders: "First to" }[UI.cl.view] || "All problems"}</button>`;
+    const back = `<button type="button" class="linklike" data-cl-back>← ${{ rankings: "Rankings", leaders: "First to", buzz: "Local Buzz" }[UI.cl.view] || "All problems"}</button>`;
     if (state === "hidden") return `${back}<p class="lede" style="margin-top:12px">You don't know about this one yet.</p>`;
     const x = K.stats(i), legend = K.legend(i), onTodo = G.todo.includes(i), go = K.canGo({ sector: p.sector, boulder: p.b });
     const mine = G.ticks.filter(t => t.p === i).reverse().map(t => `<div class="logentry mine"><span class="who">${esc(G.player.name)}<small>${G.player.height} cm</small></span>
@@ -2055,9 +2054,8 @@
     }).join("");
     modal(`<span class="label-sm">The trailhead kiosk</span><h2>Welcome to Granite Hollow</h2>
       <p class="lede">Climbing reopened here on September 1, after nearly forty years. The kiosk has the park's trail map, the new climbing rules, and, pinned under glass, the only page of the old climbers' notebook anyone has found.</p>
-      <figure class="notebook" aria-label="A page from the old kiosk notebook"><ol>${page}</ol>
-        <figcaption class="nb-margin">“with a stick!” — D.</figcaption></figure>
-      <p class="lede">Those four are the whole guidebook so far. Everything else in the park is waiting for someone to climb it first. Find boulders, look them over for lines, and if you're first up something, you get to name it.</p>
+      <figure class="notebook" aria-label="A page from the old kiosk notebook"><div class="nb-head"><span>Boulder name</span><span>Location / grade / FA</span></div><ol>${page}</ol></figure>
+      <p class="lede">Those four are the whole guidebook so far. Everything else in the park is waiting for someone to climb it first.</p>
       <p class="meta">The trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch.</p>
       <div class="acts"><button type="button" class="btn primary" data-close>Go climbing</button><button type="button" class="btn" data-paper>Open the trail map</button></div>`,
       (root, close) => {
@@ -2374,30 +2372,26 @@
   // ================================================================= creator
   // A little scene for the title page: granite, a crashpad, someone on the
   // boulder, and the woods in the colours of the day the game starts.
-  const CREATOR_ART = (() => {
-    const tree = (x, y, s, c) => `<g transform="translate(${x},${y}) scale(${s})"><path d="M0 0V-14M0 -8L-5 -14M0 -10L4 -16" stroke="var(--trunk)" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M0 -36c8 0 13 5 12 12 3 5 0 12-7 12-3 3-9 3-12 0-7 0-10-7-7-12-1-7 5-12 14-12z" fill="var(${c})" stroke="var(--tree-ink)" stroke-width="1.2"/></g>`;
-    const pine = (x, y, s, c) => `<g transform="translate(${x},${y}) scale(${s})"><path d="M0 0V-5" stroke="var(--trunk)" stroke-width="1.6"/><path d="M0 -40l9 13h-4l9 13h-4l8 11H-8l8-11h-4l9-13h-4z" fill="var(${c})" stroke="var(--tree-ink)" stroke-width="1.2" stroke-linejoin="round"/></g>`;
-    return `<svg class="vignette" viewBox="0 0 900 150" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-      <path d="M0 132C120 118 210 126 330 120S560 112 690 122 840 126 900 120V150H0Z" fill="var(--meadow)" opacity=".7"/>
-      <path d="M0 136C150 128 260 134 420 130S700 124 900 132" fill="none" stroke="var(--contour)" stroke-width="1.2" opacity=".7"/>
-      ${pine(40, 132, 1.25, "--ever-0")}${tree(88, 130, 1.1, "--maple-0")}${tree(130, 133, .9, "--birch-1")}${pine(168, 131, .95, "--ever-1")}
-      ${tree(700, 126, 1.15, "--maple-1")}${pine(745, 128, 1.3, "--ever-0")}${tree(792, 130, 1, "--oak-0")}${tree(835, 127, 1.2, "--maple-2")}${pine(870, 129, .9, "--ever-1")}
-      <ellipse cx="470" cy="136" rx="120" ry="9" fill="var(--granite-edge)" opacity=".16"/>
-      <path d="M368 134C360 104 382 70 430 60 470 50 520 56 548 78 572 96 578 120 570 134Z" fill="var(--granite)" stroke="var(--granite-edge)" stroke-width="1.6"/>
-      <path d="M400 92C410 76 436 66 462 66" fill="none" stroke="var(--granite-hi)" stroke-width="7" stroke-linecap="round" opacity=".8"/>
-      <path d="M470 84l6 22M512 96l-8 18" stroke="var(--granite-edge)" stroke-width="1.1" opacity=".5"/>
-      <rect x="430" y="128" width="64" height="9" rx="2.5" fill="var(--accent)" stroke="var(--ink)" stroke-width="1.2"/>
-      <g stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" fill="none">
-        <circle cx="495" cy="70" r="5" fill="var(--ink)"/><path d="M493 76l-8 16M490 82l-9-10M490 82l12-6M485 92l-10 6M485 92l6 12"/>
-      </g>
-      <circle cx="281" cy="40" r="15" fill="var(--gold)" opacity=".55"/>
-    </svg>`;
-  })();
+  // The landing page lies over the park's paper trail map (paper-map.svg, a static
+  // export of paper.js's map: scripts/browser/export_paper_map.js), loaded once.
+  function showLandingMap(on) {
+    const bg = $("#landing-map"); if (!bg) return;
+    bg.hidden = !on;
+    if (!on || bg.dataset.loaded) return;
+    bg.dataset.loaded = "1";
+    fetch("paper-map.svg?v=2").then(r => r.ok ? r.text() : "").then(t => {
+      if (!t) return;
+      bg.innerHTML = t;
+      const svg = bg.querySelector("svg"); if (!svg) return;
+      svg.setAttribute("preserveAspectRatio", "xMidYMid slice"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
+      requestAnimationFrame(() => bg.classList.add("ready"));
+    }).catch(() => {});
+  }
 
   function showCreator() {
     $("#game").hidden = true; $("#loading").hidden = true;
     applySeason(START_DATE);
-    const el = $("#creator"); el.hidden = false;
+    const el = $("#creator"); el.hidden = false; showLandingMap(true);
     const st = { name: "", height: 165, ape: 2, strengths: [], weakness: null };
     function reachNote() {
       const r = st.height + st.ape;
@@ -2407,26 +2401,42 @@
     }
     function draw() {
       const ftIn = cm => { const i = Math.round(cm / 2.54); return `${Math.floor(i / 12)}′${i % 12}″`; };
-      el.innerHTML = `${CREATOR_ART}<p class="label-sm">A bouldering game</p><h1>Granite Hollow</h1>
-        <p class="intro">${rulesLive() ? "Granite Hollow has just reopened to climbing after nearly forty years. Its 75 boulders hold about 1,000 possible lines, from V0 to V13, and almost none of them are documented yet. Find them, climb them first, and name them. You start at V0." : "1,000 problems on 75 boulders, from V0 warm-ups to V13 test pieces. You start at V0."} Every attempt is a roll against the grade, shaped by your strength, your style, your height, the beta you've worked out, your skin, and the weather.</p>
-        <div class="cc-grid">
-          <div class="cc-card"><h2>Your climber</h2><p class="help">Height and ape index decide which problems suit your body.</p>
-            <div class="field"><label for="cc-name">Name</label><input type="text" id="cc-name" maxlength="24" placeholder="e.g. Maddie" value="${esc(st.name)}"></div>
-            <div class="field"><label for="cc-height">Height <output>${st.height} cm · ${ftIn(st.height)}</output></label><input type="range" id="cc-height" min="150" max="200" step="1" value="${st.height}"></div>
-            <div class="field"><label for="cc-ape">Ape index <output>${st.ape >= 0 ? "+" : ""}${st.ape} cm</output></label><input type="range" id="cc-ape" min="-6" max="12" step="1" value="${st.ape}"></div>
-            <p class="reach-note">${reachNote()}</p></div>
-          <div class="cc-card"><h2>Strengths</h2><p class="help">Pick two styles you're naturally good at.</p>
-            <div class="stylepick">${Mech.PREF.map(t => `<button type="button" class="str" data-str="${t}" aria-pressed="${st.strengths.includes(t)}" title="${esc(STYLE[t][1])}" ${!st.strengths.includes(t) && (st.strengths.length >= 2 || st.weakness === t) ? "disabled" : ""}>${STYLE[t][0]}</button>`).join("")}</div>
-            <h2 style="margin-top:16px">Weakness</h2><p class="help">Optional. Pick one style you struggle with.</p>
-            <div class="stylepick">${Mech.PREF.map(t => `<button type="button" class="weak" data-weak="${t}" aria-pressed="${st.weakness === t}" title="${esc(STYLE[t][1])}" ${st.strengths.includes(t) ? "disabled" : ""}>${STYLE[t][0]}</button>`).join("")}</div></div>
-        </div>
-        <div class="cc-start"><button type="button" class="btn primary" id="cc-go" ${st.strengths.length === 2 ? "" : "disabled"}>Drive to the crag</button>
-          <span class="meta" style="margin:0">${st.strengths.length === 2 ? "Your progress saves in this browser." : `Pick ${2 - st.strengths.length} more ${st.strengths.length === 1 ? "strength" : "strengths"}.`}</span></div>
-        <p class="meta" style="margin-top:14px">Already have a climber? <button type="button" class="linklike" id="cc-load">Load a save file</button></p>`;
+      const ready = st.strengths.length === 2;
+      el.innerHTML = `<header class="cc-cartouche">
+          <span class="cc-kicker">A bouldering game</span>
+          <h1>Granite Hollow</h1>
+          <span class="cc-sub">State Park</span>
+          <p class="intro">${rulesLive() ? "Granite Hollow has just reopened to climbing after nearly forty years. Its 75 boulders hold about 1,000 possible lines, from V0 to V13, and almost none of them are documented yet. Find them, climb them first, and name them. You start at V0." : "1,000 problems on 75 boulders, from V0 warm-ups to V13 test pieces. You start at V0."}</p>
+        </header>
+        <div class="cc-sheet">
+          <div class="cc-grid">
+            <section class="cc-card"><h2>Your climber</h2>
+              <div class="field"><label for="cc-name">Name</label><input type="text" id="cc-name" maxlength="24" autocomplete="off" value="${esc(st.name)}"></div>
+              <div class="field"><label for="cc-height">Height <output>${st.height} cm · ${ftIn(st.height)}</output></label><input type="range" id="cc-height" min="150" max="200" step="1" value="${st.height}"></div>
+              <div class="field"><label for="cc-ape">Ape index <output>${st.ape >= 0 ? "+" : ""}${st.ape} cm</output></label><input type="range" id="cc-ape" min="-6" max="12" step="1" value="${st.ape}"></div>
+              <p class="reach-note">${reachNote()}</p></section>
+            <section class="cc-card"><h2>Strengths</h2><p class="help">Pick two styles you're naturally good at.</p>
+              <div class="stylepick">${Mech.PREF.map(t => `<button type="button" class="str" data-str="${t}" aria-pressed="${st.strengths.includes(t)}" title="${esc(STYLE[t][1])}" ${!st.strengths.includes(t) && (st.strengths.length >= 2 || st.weakness === t) ? "disabled" : ""}>${STYLE[t][0]}</button>`).join("")}</div>
+              <h2 class="cc-h2-2">Weakness</h2><p class="help">Optional. Pick one style you struggle with.</p>
+              <div class="stylepick">${Mech.PREF.map(t => `<button type="button" class="weak" data-weak="${t}" aria-pressed="${st.weakness === t}" title="${esc(STYLE[t][1])}" ${st.strengths.includes(t) ? "disabled" : ""}>${STYLE[t][0]}</button>`).join("")}</div></section>
+          </div>
+          <div class="cc-start">
+            <button type="button" class="btn primary" id="cc-go" ${ready ? "" : "disabled"}>Drive to the crag</button>
+            <span class="cc-status${ready ? " ok" : ""}">${ready ? "Ready. Your progress saves in this browser." : `Pick ${2 - st.strengths.length} more ${st.strengths.length === 1 ? "strength" : "strengths"} to start.`}</span>
+            <span class="cc-load">Already have a climber? <button type="button" class="linklike" id="cc-load">Load a save file</button></span>
+          </div>
+        </div>`;
       $("#cc-load").onclick = pickSaveFile;
       $("#cc-name").oninput = e => { st.name = e.target.value; };
-      $("#cc-height").oninput = e => { st.height = +e.target.value; drawKeepFocus("#cc-height"); };
-      $("#cc-ape").oninput = e => { st.ape = +e.target.value; drawKeepFocus("#cc-ape"); };
+      // The sliders update their readouts in place: redrawing the form mid-drag
+      // replaced the slider under the pointer, so it only moved a click at a time.
+      const sizeOut = () => {
+        el.querySelector('label[for="cc-height"] output').textContent = `${st.height} cm · ${ftIn(st.height)}`;
+        el.querySelector('label[for="cc-ape"] output').textContent = `${st.ape >= 0 ? "+" : ""}${st.ape} cm`;
+        el.querySelector(".reach-note").textContent = reachNote();
+      };
+      $("#cc-height").oninput = e => { st.height = +e.target.value; sizeOut(); };
+      $("#cc-ape").oninput = e => { st.ape = +e.target.value; sizeOut(); };
       el.querySelectorAll("[data-str]").forEach(b => b.onclick = () => {
         const t = b.dataset.str; st.strengths = st.strengths.includes(t) ? st.strengths.filter(x => x !== t) : [...st.strengths, t].slice(0, 2); draw();
       });
@@ -2436,7 +2446,6 @@
         save(); showGame();
       };
     }
-    function drawKeepFocus(sel) { draw(); const n = $(sel); if (n) n.focus(); }
     draw();
   }
 
@@ -2447,7 +2456,7 @@
     e.preventDefault(); safely("trail map", M.togglePaper);
   });
   function showGame() {
-    $("#creator").hidden = true; $("#loading").hidden = true; $("#game").hidden = false;
+    $("#creator").hidden = true; $("#loading").hidden = true; $("#game").hidden = false; showLandingMap(false);
     if (!M) {
       try { M = buildMap(); }
       catch (e) { reportError("map", e); M = { update() { safely("light", applyAtmosphere); }, togglePaper() {}, lookAtMe() {}, minutesToLot: () => 0, toLot() {}, walking: () => false,

@@ -348,11 +348,13 @@
       g.append("path").attr("class", "road-edge").attr("d", `M${f1(bx0 - 400)},38H${f1(bx1 + 400)}`);
       g.append("path").attr("class", "road").attr("d", `M${f1(bx0 - 400)},38H${f1(bx1 + 400)}`);
       g.append("path").attr("class", "road-line").attr("d", `M${f1(bx0 - 400)},38H${f1(bx1 + 400)}`);
-      // The lot goes round a grass island, where The Billboard stands facing the road.
-      g.append("path").attr("class", "lot").attr("fill-rule", "evenodd").attr("d", `M-3.5,40V30H-24Q-27,30 -27,27V-1Q-27,-4 -24,-4H24Q27,-4 27,-1V27Q27,30 24,30H3.5V40Z` + `M-7,2.5H7Q10,2.5 10,5.5V14.5Q10,17.5 7,17.5H-7Q-10,17.5 -10,14.5V5.5Q-10,2.5 -7,2.5Z`);
-      g.append("path").attr("class", "island").attr("d", `M-7,2.5H7Q10,2.5 10,5.5V14.5Q10,17.5 7,17.5H-7Q-10,17.5 -10,14.5V5.5Q-10,2.5 -7,2.5Z`);
+      // The lot is a U round a grass bay, open to the verge, where The Billboard stands
+      // facing the road: the bay holds its whole foot (x -10..15, y -4..-13), and its
+      // tall face rises over the grass behind, not the lot. The bay's curb is open at the top.
+      g.append("path").attr("class", "lot").attr("d", `M-3.5,40V30H-32Q-35,30 -35,27V-1Q-35,-4 -32,-4H-18V14Q-18,17 -15,17H15Q18,17 18,14V-4H32Q35,-4 35,-1V27Q35,30 32,30H3.5V40Z`);
+      g.append("path").attr("class", "island").attr("d", `M-18,-4V14Q-18,17 -15,17H15Q18,17 18,14V-4`);
       const stalls = [];
-      for (const y of [-4, 30]) for (const x of [-23, -17, -11, 11, 17, 23]) stalls.push(`M${x},${y}v${y < 0 ? 6 : -6}`);
+      for (const y of [-4, 30]) for (const x of [-33, -27, -21, 21, 27, 33]) stalls.push(`M${x},${y}v${y < 0 ? 6 : -6}`);
       g.append("path").attr("class", "stall").attr("d", stalls.join(""));
     }
     // Patches of sand: The Sandbox at the schoolhouse.
@@ -1512,10 +1514,13 @@
       updateTiles();
       placeLabels();
       placeMe();
+      sizePeople();
       placeBadges();
       if (opts.onZoom) opts.onZoom(T);
     }
     const meScale = () => clamp(.62 + T.k * .075, .95, 1.6);
+    const personK = () => meScale() / T.k;   // a person the size of you, in map units per figure unit
+    let peopleK = null;
     // Where the climber is on screen: the map point, less the margin, plus the slide
     // (the layer is a small box with the climber's feet at ME_FOOT).
     let meK = null;
@@ -1779,7 +1784,18 @@
     // The regulars where they are today: [{ who, name, b (a boulder id), side (±1), look }].
     // Standing figures in the map itself (they don't move, so they cost nothing
     // while you walk), beside their boulder, facing it, their pad down.
-    const PERSON_SCALE = .14;                // the figure is ~33 units tall: about 4.6 m, a little smaller than you
+    // People are drawn the same size as you at every zoom (you're sized in screen
+    // pixels, meScale; the figure is ~33 units tall), times look.size (a child, say).
+    function sizePeople() {
+      const k = personK(); if (peopleK && Math.abs(k / peopleK - 1) < .01) return;
+      peopleK = k;
+      people.selectAll("g.person").each(function () {
+        const n = this, z = k * (+n.dataset.size || 1), f = +n.dataset.facing;
+        d3.select(n).select(".person-fig").attr("transform", `scale(${f2(z * (f > 0 ? -1 : 1))},${f2(z)})`);
+        d3.select(n).select(".me-shadow").attr("rx", f2(z * 7.5)).attr("ry", f2(z * 2.4));
+        d3.select(n).select(".person-pads").attr("transform", `translate(${f2(-f * z * 5)},0)`);
+      });
+    }
     function poseStill(v) {
       if (v.kind === "side") {
         v.legs.forEach((l, i) => { const hx = i ? 1.9 : -1.9; l.up.attr("d", `M${hx},-10.5L${hx},-5.2`); l.low.attr("d", `M${hx},-10.5L${hx},-5.2L${hx},-1.2`); l.shoe.attr("d", `M${hx - 1.2},-.6h3`); });
@@ -1790,7 +1806,7 @@
     // Where each person stands: beside their boulder, somewhere no tree stands in
     // front of them (people are drawn over the woods, so they mustn't stand behind any).
     const personAt = new Map();
-    const treeInFront = (x, y, h = 4.8) => { let hit = false; S.tIndex.some([x, y], 24, t => {
+    const treeInFront = (x, y, h = 6) => { let hit = false; S.tIndex.some([x, y], 24, t => {
       if (!t.fg || t.y >= y) return false;
       const cr = t.crownR * 1.05, ch = t.crownR * 1.7;
       if (Math.abs(x - t.x) < cr + 1 && [0, .5, .9].some(f => Math.abs(y - t.y + f * h - ch) < cr + .5)) hit = true;
@@ -1799,6 +1815,7 @@
     function setPeople(list) {
       people.selectAll("*").remove(); personAt.clear();
       for (const p of list) {
+        if (p.dog) { drawDog(p); continue; }
         const bo = S.boulders[p.b]; if (!bo) continue;
         const R = bo.form.R, sd = p.side;
         const tries = [[sd * R * 1.1, -R * 1.15], [-sd * R * 1.1, -R * 1.15], [sd * R * 1.5, -R * .3], [-sd * R * 1.5, -R * .3], [0, -R * 1.7], [sd * R * 1.9, -R * 1.5], [-sd * R * 1.9, -R * 1.5]];
@@ -1806,18 +1823,37 @@
         for (const [tx, ty] of tries) { const x0 = bo.b.x + tx, y0 = bo.b.y + ty; if (standable(x0, y0) && !treeInFront(x0, y0)) { [ox, oy] = [tx, ty]; break; } }
         const x = bo.b.x + ox, y = bo.b.y + oy, facing = ox > 0 ? 1 : ox < 0 ? -1 : sd;
         personAt.set(p.who, { x, y, side: facing });
-        const g = people.append("g").attr("class", "person").attr("data-who", p.who).attr("transform", `translate(${f2(x)},${f2(-y)})`);
+        const g = people.append("g").attr("class", "person").attr("data-who", p.who).attr("data-facing", facing).attr("data-size", p.look.size || 1).attr("transform", `translate(${f2(x)},${f2(-y)})`);
         g.append("title").text(p.name);
-        if (p.look.pad) {                     // their pad, down beside them
+        if (p.look.pad) {                     // their pad, down beside them (pads are the same size as yours)
           const P2 = (pts) => "M" + pts.map(q => `${f2(q[0])},${f2(q[1])}`).join("L") + "Z";
-          const px = -facing * 1.6;
-          g.append("path").attr("class", "person-pad-side").attr("fill", d3.color(p.look.pad).darker(.6).formatHex()).attr("d", P2([[px - 1.3, .2], [px + 1.3, .2], [px + 1.3, -.4], [px - 1.3, -.4]]));
-          g.append("path").attr("class", "person-pad").attr("fill", p.look.pad).attr("d", P2([[px - 1.2, -1.2], [px + 1.2, -1.2], [px + 1.3, -.4], [px - 1.3, -.4]]));
+          const pg = g.append("g").attr("class", "person-pads"), px = -facing * 1.3;
+          pg.append("path").attr("class", "person-pad-side").attr("fill", d3.color(p.look.pad).darker(.6).formatHex()).attr("d", P2([[px - 1.3, .2], [px + 1.3, .2], [px + 1.3, -.4], [px - 1.3, -.4]]));
+          pg.append("path").attr("class", "person-pad").attr("fill", p.look.pad).attr("d", P2([[px - 1.2, -1.2], [px + 1.2, -1.2], [px + 1.3, -.4], [px - 1.3, -.4]]));
         }
-        g.append("ellipse").attr("class", "me-shadow").attr("rx", 1.1).attr("ry", .35);
-        const fig = g.append("g").attr("transform", `scale(${PERSON_SCALE})`).append("g").attr("transform", facing > 0 ? "scale(-1,1)" : null);
+        g.append("ellipse").attr("class", "me-shadow");
+        const fig = g.append("g").attr("class", "person-fig");
         poseStill(drawSide(fig, { skin: "#e6bf98", hair: "#4a3426", pants: "#3f4f63", pad: "#2f6b8f", ...p.look }));
       }
+      peopleK = null; sizePeople();
+    }
+    // Pickles, curled up asleep by Pickles' Rock: the landmark's drawing, but drawn
+    // with the people so he's dog-sized beside you at any zoom (about half your
+    // height long), and can be clicked like them. The game hides the landmark copy.
+    function drawDog(p) {
+      const lm = S.landmarks.find(l => l.kind === "dog"); if (!lm) return;
+      personAt.set(p.who, { x: lm.x, y: lm.y, side: 1 });
+      const g = people.append("g").attr("class", "person person-dog").attr("data-who", p.who).attr("data-facing", -1).attr("data-size", 1).attr("transform", `translate(${f2(lm.x)},${f2(-lm.y)})`);
+      g.append("title").text(p.name);
+      const d = g.append("g").attr("class", "person-fig").append("g").attr("transform", "scale(11)");
+      d.append("path").attr("class", "dog-shadow").attr("d", ell(.1, .05, .8, .24));
+      d.append("path").attr("class", "dog").attr("d", "M-.7,0C-.75,-.35 -.4,-.55 0,-.55C.42,-.55 .7,-.4 .72,-.15C.74,0 .55,.05 .4,.05H-.5C-.62,.05 -.7,.03 -.7,0Z");
+      d.append("path").attr("class", "dog").attr("d", "M.45,-.12C.45,-.38 .62,-.48 .82,-.45C1,-.42 1.05,-.25 1,-.1C.95,0 .6,.02 .45,-.12Z");
+      d.append("path").attr("class", "dog-ear").attr("d", "M.62,-.45L.7,-.62L.8,-.44Z");
+      d.append("path").attr("class", "dog-patch").attr("d", ell(-.2, -.3, .22, .14));
+      d.append("path").attr("class", "dog-tail").attr("d", "M-.68,-.05C-.85,-.1 -.9,.02 -.75,.08");
+      d.append("text").attr("class", "zzz").attr("x", .95).attr("y", -.75).attr("font-size", ".42px").text("z");
+      d.append("text").attr("class", "zzz").attr("x", 1.2).attr("y", -1.05).attr("font-size", ".32px").text("z");
     }
     drawMe();
     // Put world point (x, y) in the middle of the view, at zoom k (the current one by default); instant unless ms.

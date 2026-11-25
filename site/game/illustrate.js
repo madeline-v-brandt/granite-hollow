@@ -633,9 +633,9 @@
       const mossy = s.name === "Hemlock Hollow" || s.name === "Bracken Gully";      // the shady areas: smaller clearings, moss underfoot
       zones.push({ kind, name: s.name, sector: s, mossy, ...ragged("clear" + s.name, [s.x, s.y], s.radius * (kind === "grout" ? 1.12 : mossy ? .84 : .98), .45) });
     }
-    // The lot and the road (the game's: lot x -26..26, y -28..4, road along y -38).
+    // The lot and the road (the game's: lot x -35..35, y -30..4, road along y -38).
     const rect = (x0, x1, y0, y1) => p => Math.min(p[0] - x0, x1 - p[0], p[1] - y0, y1 - p[1]);
-    const lot = { kind: "lot", name: "lot", c: [0, -12], R: 40, depth: rect(-29, 29, -31, 7) };
+    const lot = { kind: "lot", name: "lot", c: [0, -12], R: 46, depth: rect(-37, 37, -31, 7) };
     const road = { kind: "road", name: "Quarry Hill Road", c: [0, -38], R: 1e4, depth: p => 7 - Math.abs(p[1] + 38) };
     const drive = { kind: "lot", name: "drive", c: [0, -34], R: 12, depth: rect(-4, 4, -40, -28) };
     zones.push(lot, road, drive);
@@ -933,7 +933,7 @@
       { kind: "bench", near: "The Lookout", gap: 3.5, foot: 1.8, prefer: Math.PI * .35, note: "best view in the park", find: "The reservoir one way, the quarry the other" },
     ],
     "The Tailgate": [
-      { kind: "kiosk", near: "at", exact: [-6.5, 9], foot: 2.5, note: "trailhead kiosk", find: "Maps, the guestbook and Ranger Gus's notices" },   // west of the trail, clear of The Tollbooth
+      { kind: "kiosk", near: "at", exact: [-2, 16], foot: 2.5, note: "trailhead kiosk", find: "Maps, the guestbook and Ranger Gus's notices" },   // west of the trail, north of where The Billboard's top reaches
       { kind: "bins", near: "The Dumpster", gap: 2.5, foot: 2, prefer: Math.PI * .8, note: null, find: null },
       { kind: "dog", near: "Pickles' Rock", gap: 1.2, foot: 1, prefer: -Math.PI * .35, note: "Pickles, asleep", name: "Pickles", find: "The lot dog, napping in the shade" },
       { kind: "picnic", near: "The Cooler", gap: 3.5, foot: 2.5, prefer: Math.PI * .7, note: null, find: null },

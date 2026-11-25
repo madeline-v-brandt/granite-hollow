@@ -24,6 +24,12 @@ from climbrec.simulate import naming
 PACE_M_PER_MIN = 45  # a woodsy approach trail with a pad on your back
 
 
+# Boulders placed by hand: {name: (x, y)} in metres. The Tollbooth was on the
+# lot's corner and the trailhead path; it now sits on the mown verge west of
+# the trail, north of the lot (2026-11-25, play-test feedback).
+MOVED = {"The Tollbooth": (-22.0, 12.0)}
+
+
 def _unit(angle: float) -> np.ndarray:
     return np.array([np.cos(angle), np.sin(angle)])
 
@@ -149,5 +155,11 @@ def make_layout(problems: pd.DataFrame, seed: int = 8) -> dict:
 
     trail_list = [dict(start=nodes[a]["xy"].round(1).tolist(), end=nodes[b]["xy"].round(1).tolist(), to=b)
                   for a, b in trails]
+    # Hand-placed boulders, moved after everything else is drawn from the random
+    # stream (so nothing else shifts): ones the random placement left on the
+    # parking lot or the trailhead path. A boulder keeps its index, so saves are fine.
+    for b in boulders:
+        if b["name"] in MOVED:
+            b["x"], b["y"] = MOVED[b["name"]]
     return dict(pace_m_per_min=PACE_M_PER_MIN, base_elevation_m=55, sectors=sectors,
                 boulders=boulders, trails=trail_list, features=features, hills=hills)

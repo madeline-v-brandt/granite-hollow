@@ -19,7 +19,7 @@ async function harvest(p) {
   await click(p, '#tabs [data-tab="journal"]');
   for (const v of ["tried", "known", "sent"]) { await click(p, `[data-pj-view="${v}"]`); await sleep(100); out.push(await text(p)); }
   await click(p, '#tabs [data-tab="craglog"]'); await sleep(100);
-  for (const v of ["rankings", "leaders", "problems"]) { await click(p, `[data-cl-view="${v}"]`); await sleep(120); out.push(await text(p)); }
+  for (const v of ["rankings", "buzz", "problems"]) { await click(p, `[data-cl-view="${v}"]`); await sleep(120); out.push(await text(p)); }
   const ids = await p.evaluate(() => [...document.querySelectorAll("[data-cl]")].map(b => +b.dataset.cl));
   for (const i of [...new Set(ids)].slice(0, 12)) { await p.evaluate(i => { const b = document.querySelector(`[data-cl="${i}"]`); if (b) b.click(); }, i); await sleep(80); out.push(await text(p)); await click(p, "[data-cl-back]"); await sleep(60); }
   await click(p, '#tabs [data-tab="here"]');
