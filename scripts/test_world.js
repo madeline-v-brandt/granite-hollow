@@ -19,7 +19,7 @@ const clone = x => JSON.parse(JSON.stringify(x));
 const START = "2025-09-06";
 
 // XP for a given ability (level + fraction), inverting Mech.levelInfo.
-function xpFor(a) { let xp = 0, need = 100; for (let l = 0; l < Math.floor(a); l++) { xp += need; need *= 1.6; } return xp + need * (a % 1); }
+function xpFor(a) { let xp = 0; for (let l = 0; l < Math.floor(a); l++) xp += Mech.levelCost(l); return xp + Mech.levelCost(Math.floor(a)) * (a % 1); }
 // The game's pacing: about V3 by climbing day 5, V5 by 12, V7 by 22, V9 by 39.
 const abilityOnDay = n => { const pts = [[0, 0], [5, 3], [12, 5], [22, 7], [39, 9], [80, 11]]; for (let i = 1; i < pts.length; i++) if (n <= pts[i][0]) { const [a, b] = [pts[i - 1], pts[i]]; return a[1] + (b[1] - a[1]) * (n - a[0]) / (b[0] - a[0]); } return 11; };
 

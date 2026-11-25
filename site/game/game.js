@@ -16,6 +16,11 @@
   // still start climbers under the old rules, for testing.
   const RULES2_LIVE = true;
   const OLD_RULES_COPY = "granite-hollow-save-before-reopening";
+  // Phase 3's balance (docs/phase3/stage0-design.md): saves carry bal: 3. Older ones
+  // are converted once on load (regrade), keeping a copy of the climber as they were.
+  const BAL_NOW = 3, OLD_BALANCE_COPY = "granite-hollow-save-before-regrade";
+  const REPEATS_XP = 3;                    // repeats earn XP this many times a day
+  const justRegraded = new WeakMap();      // saves regraded this session: what changed, for the welcome back
   const rulesLive = () => RULES2_LIVE && !(DEV && devRules() === 1);
   const justMigrated = new WeakSet();      // saves converted this session: they get a welcome back
   const START_DATE = "2025-09-06";
@@ -139,12 +144,12 @@
   // ================================================================ game state
   function newGame(opts) {
     const skills = Object.fromEntries(Mech.PREF.map(t => [t, 0]));
-    for (const t of opts.strengths) skills[t] = 0.6;
-    if (opts.weakness) skills[opts.weakness] = -0.5;
+    for (const t of opts.strengths) skills[t] = 0.4;
+    if (opts.weakness) skills[opts.weakness] = -0.4;
     G = {
-      v: 1, id: newId(),
+      v: 1, id: newId(), bal: BAL_NOW, balStart: BAL_NOW,
       player: { name: opts.name, height: opts.height, ape: opts.ape, strengths: opts.strengths, weakness: opts.weakness,
-        xp: 0, skills, energy: 100, skin: 100, consecutive: 0 },
+        xp: 0, tops: [], skills, energy: 100, skin: 100, consecutive: 0 },
       date: START_DATE, dayNo: 0, loc: { sector: null, boulder: null },
       ps: {}, ticks: [], tips: [], todo: [], ach: {}, visited: [], feed: [], bestGrade: -1, board: { joined: false },
       day: null,
@@ -182,7 +187,7 @@
     UI.recenter = true;                                   // the camera starts the day on you
     G.day = { no: G.dayNo, minute: 9 * 60 + Math.floor(Math.random() * 40), weather: w, startEnergy: s.energy,
       attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null, bishop: Math.random() < 0.13,
-      over: false, warned: false, levelBefore: Mech.levelInfo(G.player.xp).level };
+      over: false, warned: false, levelBefore: Mech.levelOf(G.player).level };
     const intro = first && v2()
       ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk's trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot. Everything else is waiting for a first ascent.`
       : first
@@ -217,8 +222,10 @@
   function load() { try { const s = localStorage.getItem(SLOT); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
   const pstate = i => (G.ps[i] = G.ps[i] || { att: 0, beta: 0, sent: false, flash: false, best: 0, sends: 0 });
   const firstSends = () => G.ticks.filter(t => t.style !== "Repeat");
-  const levelNow = () => Mech.levelInfo(G.player.xp);
-  const chanceFor = i => Mech.sendChance(Mech.margin(G.player, D.problems[i], G.ps[i], G.day.weather));
+  const levelNow = () => Mech.levelOf(G.player);
+  const chanceFor = i => Mech.chanceOf(G.player, D.problems[i], G.ps[i], G.day.weather);
+  // "Send 2 more V7s or harder for V8", while your level waits for proof.
+  const proofText = L => { const n = Mech.proofLeft(G.player); return `Send ${n} more V${L.level}${n === 1 ? "" : "s"} or harder for V${L.level + 1}`; };
   const reach = () => G.player.height + G.player.ape;
 
   // ============================================================ achievements
@@ -282,7 +289,8 @@
       sess[1]++;
     }
     const gains = Mech.skillGains(G.player, p, r.sent);
-    for (const [t, g] of Object.entries(gains)) { G.player.skills[t] += g; G.day.gains[t] = (G.day.gains[t] || 0) + g; }
+    Mech.applySkills(G.player, gains);
+    for (const [t, g] of Object.entries(gains)) G.day.gains[t] = (G.day.gains[t] || 0) + g;
 
     if (r.sent) {
       const first = !st.sent, flash = first && st.att === 1, newMax = first && p.grade > G.bestGrade;
@@ -290,12 +298,15 @@
       // Nobody had documented it: it's your first ascent, for good.
       const fa = first && v2() && World.recordSend(D, G, i, G.date, flash).fa;
       const tip = G.tips.find(t => t.p === i && !t.done);
-      const xp = Mech.sendXp(G.player, p, { first, flash, tip: !!tip && first, newMax });
+      // A project's sessions (days tried, counting today) earn a bonus; repeats earn XP a few times a day.
+      if (!first) G.day.repeats = (G.day.repeats || 0) + 1;
+      const xp = !first && G.day.repeats > REPEATS_XP ? 0
+        : Mech.sendXp(G.player, p, { first, flash, tip: !!tip && first, newMax, sessions: (st.log || []).length || 1 });
       const before = levelNow().level;
       G.player.xp += xp; G.day.xp += xp;
       st.sent = true; st.sends++; st.flash = st.flash || flash; st.sentOn = st.sentOn || G.date; st.best = 1;
       if (sess) { sess[2] = 1; sess[3] = 1; }
-      if (first) G.bestGrade = Math.max(G.bestGrade, p.grade);
+      if (first) { G.bestGrade = Math.max(G.bestGrade, p.grade); const t = G.player.tops = G.player.tops || []; t[p.grade] = (t[p.grade] || 0) + 1; }
       if (tip && first) tip.done = true;
       G.todo = G.todo.filter(t => t !== i || !first);
       const style = first ? (flash ? "Flash" : "Send") : "Repeat";
@@ -303,7 +314,7 @@
       G.day.sends.push({ p: i, style, xp, ...(fa ? { fa: true } : {}) });
       let text;
       if (flash) text = "Flash! You read every move from the ground.";
-      else if (!first) text = "Fun to climb it again, but you won't learn much from a repeat.";
+      else if (!first) text = xp ? "Fun to climb it again, but you won't learn much from a repeat." : "Fun to climb it again. You've done enough repeats today to learn anything more from them.";
       else if (st.att >= 10) text = `After ${st.att} tries it finally goes. That's what projecting feels like.`;
       else if (st.att >= 4) text = `Your ${ordinal(st.att)} try. Working out the beta paid off.`;
       else text = `You top out ${fa && openLabel ? "the " + openLabel.charAt(0).toLowerCase() + openLabel.slice(1) : pname(i)}.`;
@@ -328,7 +339,7 @@
       const frac = k / p.moves, newHigh = st.att > 1 && frac > st.best + 1e-6;
       if (frac > st.best) { st.best = frac; if (newHigh) G.day.highpoints++; }
       if (sess) sess[2] = Math.max(sess[2], frac);
-      const before = st.beta; st.beta = Math.min(Mech.BETA_MAX, st.beta + Mech.betaGain(st.beta));
+      const before = st.beta; st.beta = Math.min(Mech.BETA_MAX, st.beta + Mech.betaGain(st.beta, sess ? sess[1] : 1));
       let text = `${CRUX[r.crux] || "You came off."} Fell on move ${k} of ${p.moves}.`;
       if (newHigh) text += " New highpoint!";
       if (st.beta - before > 0.03 && st.att <= 6) text += " You worked out a bit more of the beta.";
@@ -424,8 +435,12 @@
   function rest() {
     if (UI.busy || G.day.over) return;
     G.day.minute += 20;
-    G.player.energy = Math.min(G.day.startEnergy, G.player.energy + 12);
-    G.day.last = { kind: "info", title: "Twenty minutes on the pad", text: "You eat a snack, retape a finger, and watch someone flail on a warm-up. Energy recovers a little; skin doesn't." };
+    const n = G.day.rests || 0;                        // each rest the same day gives back less
+    G.player.energy = Math.min(G.day.startEnergy, G.player.energy + Mech.restGain(n));
+    G.day.rests = n + 1;
+    G.day.last = { kind: "info", title: "Twenty minutes on the pad", text: n < 2
+      ? "You eat a snack, retape a finger, and watch someone flail on a warm-up. Energy recovers a little; skin doesn't."
+      : "Another rest. You're stiffening up, and each one gives back less than the last. Skin doesn't recover at all." };
     afterAction();
   }
 
@@ -489,12 +504,12 @@
   function playerFit(i) {
     const p = D.problems[i];
     if (G.ps[i]?.sent) return -Infinity;
-    const A = Mech.ability(G.player.xp) + 0.6;
+    const A = Mech.ability(G.player) + 0.6;
     return -0.5 * Math.pow((p.grade - (A + 0.3)) / 1.0, 2) + 1.2 * Mech.styleBonus(G.player, p) + 1.0 * Mech.morph(G.player, p)
       + 0.4 * ((p.stars ?? 2.3) - 2.3) + 0.12 * Math.log1p(p.sends);
   }
   function whyFor(i) {
-    const p = D.problems[i], A = Mech.ability(G.player.xp) + 0.6, out = [];
+    const p = D.problems[i], A = Mech.ability(G.player) + 0.6, out = [];
     if (p.grade > A + 0.4) out.push("it's a good project for you"); else if (p.grade >= A - 0.8) out.push("it's right at your level");
     else out.push("it's good mileage");
     const strong = p.tagList.filter(t => (G.player.skills[t] || 0) >= 0.3).sort((a, b) => G.player.skills[b] - G.player.skills[a]);
@@ -624,7 +639,7 @@
   }
   // A line on a boulder you know that you haven't noticed (too hard to read yet).
   function hiddenLineFor(strong) {
-    const A = Mech.ability(G.player.xp), out = [];
+    const A = Mech.ability(G.player), out = [];
     for (const b of Object.keys(G.know.boulders).map(Number)) for (const p of D.boulders[b].problems) if (K.line(p) === "hidden" && !G.world.est[p]) out.push(p);
     if (!out.length) return null;
     const aim = strong ? A + 4 : A + 1.5;
@@ -1264,7 +1279,7 @@
         <div class="block"><span class="who">${esc(G.player.name)}</span>
           <span class="small">${G.player.height} cm · reach ${reach()} cm · best ${G.bestGrade >= 0 ? "V" + G.bestGrade : "none yet"}</span>
           <div class="meter xp" title="XP to the next level"><i style="width:${(L.frac * 100).toFixed(1)}%"></i></div>
-          <span class="small">${fmt(Math.floor(L.into))} / ${fmt(Math.round(L.need))} XP to V${L.level + 1}</span></div>
+          <span class="small">${L.gated ? proofText(L) : `${fmt(Math.floor(L.into))} / ${fmt(Math.round(L.need))} XP to V${L.level + 1}`}</span></div>
       </div>
       <div class="hud-day block">
         <span class="label-sm">Day ${d.no} · ${season.name}</span><span class="day">${prettyDate(G.date)}</span>
@@ -1364,7 +1379,7 @@
     const label = {
       ability: `Your level`, style: `Your skill on ${p.tagList.filter(t => STYLE[t]).map(t => STYLE[t][0].toLowerCase()).join(", ") || "this style"}`,
       morph: Mech.reachDependence(p) < 0 ? "Bunchy, vs your reach" : "Reachy, vs your reach", beta: "Beta you've worked out",
-      conditions: "Today's friction", fatigue: "Tiredness", skin: "Thin skin", head: "Highball nerves", grade: `Grade V${p.grade}`,
+      conditions: "Today's friction", vibes: "Good vibes", fatigue: "Tiredness", skin: "Thin skin", head: "Highball nerves", grade: `Grade V${p.grade}`,
     };
     const graded = K.grade(i) != null;
     const chips = Object.entries(parts).filter(([k, v]) => (k === "ability" || k === "grade" ? graded : Math.abs(v) >= 0.05))
@@ -1468,17 +1483,17 @@
     const pl = G.player, L = levelNow(), sends = firstSends();
     const days = new Set(G.ticks.map(t => t.date)).size;
     const skills = Mech.PREF.map(t => [t, pl.skills[t]]).sort((a, b) => b[1] - a[1]);
-    const lo = -0.6, hi = Math.max(1.5, d3.max(skills, s => s[1]) + 0.1), x = v => (v - lo) / (hi - lo) * 100;
+    const lo = -1, hi = 1, x = v => (v - lo) / (hi - lo) * 100;
     const r = reach(), reachText = r < 170 ? "Short reach: bunchy problems suit you; reachy ones fight back." : r > 182 ? "Long reach: reachy problems suit you; cramped, bunchy ones fight back." : "Average reach: few problems care about your size.";
     return `<h2>${esc(pl.name)}</h2><p class="meta">${pl.height} cm, ape index ${pl.ape >= 0 ? "+" : ""}${pl.ape} cm, reach ${r} cm. ${reachText}</p>
-      <div class="kv"><div><b style="color:var(--gold)">V${L.level}</b><span>level, ${(L.frac * 100).toFixed(0)}% to V${L.level + 1}</span></div>
+      <div class="kv"><div><b style="color:var(--gold)">V${L.level}</b><span>level, ${L.gated ? proofText(L).replace(/^S/, "s") : `${(L.frac * 100).toFixed(0)}% to V${L.level + 1}`}</span></div>
         <div><b>${G.bestGrade >= 0 ? "V" + G.bestGrade : "–"}</b><span>hardest send</span></div><div><b>${sends.length}</b><span>problems sent</span></div>
         <div><b>${G.ticks.filter(t => t.style === "Flash").length}</b><span>flashes</span></div><div><b>${G.dayNo}</b><span>days at the crag</span></div>
         ${v2() ? `<div><b>${World.faCount(G)}</b><span>first ascents</span></div>` : ""}<div><b>${Object.keys(G.ach).length}</b><span>achievements</span></div></div>
       <h3>How leveling works</h3>
-      <p class="lede">Sends near your level are worth the most XP. Each grade harder doubles it; each grade easier halves it. Flashes, tips from locals and new hardest sends earn bonuses. Moving up gets slower as you get stronger, like it does outside.</p>
+      <p class="lede">Every first send earns XP: more for harder grades, extra when it's above your level, and less the further below your level it is. Flashes, tips from locals, new hardest sends and projects that took several sessions earn bonuses. Falling earns nothing, and repeats count a little, a few times a day. To move up a grade you also need three sends at your level or harder, so your level is always a grade you climb.</p>
       <h3>Style skills</h3>
-      <p class="meta">Sending a style makes you better at it. Skills add to your level on problems with those tags.</p>
+      <p class="meta">How each style compares with the rest of your climbing. Sending a style makes it more of a strength, a little at the expense of the others. On problems with those tags it adds to your level, or takes from it, by up to two thirds of a grade.</p>
       ${skills.map(([t, v]) => {
         const left = Math.min(x(0), x(v)), width = Math.abs(x(v) - x(0));
         const tag = pl.strengths.includes(t) ? `<span class="tag-str">strength</span>` : pl.weakness === t ? `<span class="tag-weak">weakness</span>` : "";
@@ -2090,6 +2105,30 @@
   }
 
   // A climber from before the reopening, converted on load: what changed.
+  // After the Phase 3 regrade: what changed for this climber.
+  function showRegraded(info) {
+    const pl = G.player, by = Mech.PREF.map(t => [t, pl.skills[t]]).sort((a, b) => b[1] - a[1]);
+    const best = by.slice(0, 2).map(([t]) => STYLE[t][0].toLowerCase()), worst = STYLE[by[by.length - 1][0]][0].toLowerCase();
+    const key = DEV ? OLD_BALANCE_COPY + "-dev" : OLD_BALANCE_COPY;
+    let copy = false; try { copy = !!localStorage.getItem(key); } catch (e) { }
+    const L = levelNow();
+    modal(`<span class="label-sm">Granite Hollow has changed</span><h2>Climbing has been rebalanced</h2>
+      <p class="lede">Your level now means the grades you climb. It's been worked out again from your logbook, under the new rules.</p>
+      <ul class="welcome">
+        <li><b>You're V${info.to} now${info.to !== info.from ? `, up from V${info.from}` : ""}.</b> Your hardest send is still V${Math.max(0, G.bestGrade)}.${L.gated ? ` ${proofText(L)}.` : ""}</li>
+        <li><b>Style skills now compare your styles with each other.</b> You're strongest on ${best.join(" and ")}, and weakest on ${worst}. Climbing a style makes it more of a strength.</li>
+        <li><b>Hard grades are harder.</b> A grade above your level is a real project, and two above needs everything going for you. Working a problem teaches you less with each try the same day, so projects take a few sessions.</li>
+        <li><b>Moving up a grade</b> takes three sends at your level or harder, as well as the XP. Falling earns no XP.</li>
+        <li><b>Rests</b> give back less energy each time the same day.</li>
+        <li>Your ticks, first ascents and their names, projects and journal are exactly as they were.</li>
+      </ul>
+      ${copy ? `<p class="meta">A copy of your climber from before the change is kept in this browser: <button type="button" class="linklike" data-old-bal>download it</button>.</p>` : ""}
+      <div class="acts"><button type="button" class="btn primary" data-close>Back to climbing</button></div>`,
+      (root, close) => {
+        root.querySelector("[data-close]").onclick = close;
+        const o = root.querySelector("[data-old-bal]"); if (o) o.onclick = () => exportCopy(key, "before-the-regrade");
+      });
+  }
   function showWelcomeBack() {
     const est = Object.values(G.world.est), fa = World.faCount(G), sent = new Set(firstSends().map(t => t.p)).size;
     const others = est.filter(e => e.by !== "you" && !e.old).length;
@@ -2127,7 +2166,7 @@
   }
   const slug = s => (s || "climber").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "climber";
   function saveSummary(g) {
-    return { name: g.player.name, level: Mech.levelInfo(g.player.xp).level, best: g.bestGrade,
+    return { name: g.player.name, level: Mech.levelOf(g.player).level, best: g.bestGrade,
       sends: g.ticks.filter(t => t.style !== "Repeat").length, date: g.date, days: g.dayNo };
   }
   const describeSave = s => `${s.name}: level V${s.level}, hardest send ${s.best >= 0 ? "V" + s.best : "none yet"}, ${s.sends} problems sent, ${prettyDate(s.date)} (day ${s.days})`;
@@ -2154,6 +2193,13 @@
       toast("Save file downloaded", filename, "info");
       renderPanel();
     } catch (e) { downloadFailed(e); }
+  }
+  // A copy of a climber kept in this browser when they were converted.
+  async function exportCopy(key, what) {
+    let g = null; try { g = JSON.parse(localStorage.getItem(key)); } catch (e) { }
+    if (!g || !g.player) { toast("No copy here", "There's no earlier copy of this climber saved in this browser.", "info"); return; }
+    const filename = `granite-hollow-${slug(g.player.name)}-${what}.json`;
+    try { await download(filename, saveFileBody(g)); toast("Save file downloaded", filename, "info"); } catch (e) { downloadFailed(e); }
   }
   // The copy of a climber kept when they were converted to the new rules.
   async function exportOldCopy() {
@@ -2199,6 +2245,7 @@
     migrateSave(g);
     if (g.v === 2 && World.validate(D, g)) throw new Error("This save file is damaged or incomplete.");
     if (g.v === 1 && rulesLive()) upgrade(g);
+    try { regrade(g); } catch (e) { throw new Error("This save file couldn't be brought up to date."); }
     if (DEV) g.dev = true;
     g.day.encounter = null;
     const okWx = f => f && typeof f.date === "string" && /^\d{4}-\d\d-\d\d$/.test(f.date) && num(f.temp) && num(f.cond) && num(f.dusk)
@@ -2261,12 +2308,17 @@
     }
     return out;
   }
+  // Which board a climber is on: the rules they started under. 3: since the
+  // reopening, under Phase 3's balance; 2: since the reopening, under the older
+  // balance (regraded climbers stay there); 1: before the reopening.
+  const boardRules = () => (!v2() || G.rules !== 2 ? 1 : G.balStart === BAL_NOW ? 3 : 2);
+  const BOARD_NAMES = { 3: "Since the reopening", 2: "Reopening, older rules", 1: "Before the reopening" };
   function boardEntry() {
     const pl = G.player;
     const e = { name: pl.name.slice(0, 24), height: pl.height, ape: pl.ape, best: G.bestGrade, level: levelNow().level,
       sends: firstSends().length, days: daysSince(G.date), cdays: G.dayNo, ms: milestones(G), rk: rankSummaryForBoard() };
     // Which board: the rules this climber started under (migrated climbers stay on the old one).
-    if (v2()) { e.rules = G.rules === 2 ? 2 : 1; e.fa = World.faCount(G); if (e.rules === 2) e.rk = { y: [], a: [] }; }
+    if (v2()) { e.rules = boardRules(); e.fa = World.faCount(G); if (e.rules >= 2) e.rk = { y: [], a: [] }; }
     return e;
   }
 
@@ -2334,7 +2386,7 @@
         const rkList = v => (Array.isArray(v) ? v.slice(0, RANK_TOP) : []).filter(x => Array.isArray(x) && Number.isInteger(x[0]) && x[0] >= 0
           && x[0] < D.problems.length && /^\d{4}-\d\d-\d\d$/.test(x[1])).map(x => ({ p: x[0], d: epochDays(x[1]), f: x[2] === 1, pts: rankPoints(D.problems[x[0]].grade, x[2] === 1) }));
         const rk = c.rk && typeof c.rk === "object" ? { y: rkList(c.rk.y), a: rkList(c.rk.a) } : null;
-        out.push({ rk, rules: c.rules === 2 ? 2 : 1, fa: n(c.fa, 0, 1e5) ?? 0, name: str(c.name, 24).trim() || "Climber", height: n(c.height, 100, 250), ape: n(c.ape, -30, 30),
+        out.push({ rk, rules: c.rules === 3 ? 3 : c.rules === 2 ? 2 : 1, fa: n(c.fa, 0, 1e5) ?? 0, name: str(c.name, 24).trim() || "Climber", height: n(c.height, 100, 250), ape: n(c.ape, -30, 30),
           best: n(c.best, -1, 17) ?? -1, level: n(c.level, 0, 17) ?? 0, sends: n(c.sends, 0, 1e6) ?? 0, days: n(c.days, 0, 1e5) ?? 0,
           cdays: n(c.cdays, 0, 1e5), ms, mine: false, yours: uid === LB.uid });
       }
@@ -2344,12 +2396,12 @@
   }
 
   function leadersHtml() {
-    const everyone = boardClimbers(), mineRules = v2() && G.rules === 2 ? 2 : 1;
+    const everyone = boardClimbers(), mineRules = boardRules();
     const bucket = UI.lbBucket || mineRules, rulesOf = c => (c.mine ? mineRules : c.rules || 1);
     const all = everyone.filter(c => rulesOf(c) === bucket);
-    const buckets = everyone.some(c => rulesOf(c) === 2) ? `<div class="cl-views" role="group" aria-label="Which leaderboard" style="margin-bottom:8px">
-      <button type="button" data-lb-bucket="2" aria-pressed="${bucket === 2}">Since the reopening</button>
-      <button type="button" data-lb-bucket="1" aria-pressed="${bucket === 1}">Before the reopening</button></div>` : "";
+    const present = [3, 2, 1].filter(k => k === bucket || everyone.some(c => rulesOf(c) === k));
+    const buckets = present.length > 1 ? `<div class="cl-views" role="group" aria-label="Which leaderboard" style="margin-bottom:8px">
+      ${present.map(k => `<button type="button" data-lb-bucket="${k}" aria-pressed="${bucket === k}">${BOARD_NAMES[k]}</button>`).join("")}</div>` : "";
     const ranked = g => all.filter(c => c.ms[g]).sort((a, b) => a.ms[g].days - b.ms[g].days
       || (a.ms[g].cday ?? 1e9) - (b.ms[g].cday ?? 1e9) || a.name.localeCompare(b.name));
     const counts = Object.fromEntries(BOARD_GRADES.map(g => [g, ranked(g).length]));
@@ -2490,6 +2542,7 @@
     if (DEV) devButton();
     renderAll();
     if (justMigrated.has(G)) { justMigrated.delete(G); openModal(showWelcomeBack); }
+    if (justRegraded.has(G)) { const info = justRegraded.get(G); justRegraded.delete(G); openModal(() => showRegraded(info)); }
     if (UI.kiosk) { UI.kiosk = false; openModal(showKiosk); }
     if (!G.day.over && rainNow()) endDay(`It's ${G.day.weather.precip === "Snow" ? "snowing" : "raining"}. Wet granite is slick and holds can snap, so you head home.`);
     else if (G.day.over) openModal(showSummary);
@@ -2508,7 +2561,7 @@
   function devPanel() {
     const W = G.world, kn = G.know, est = W ? Object.values(W.est) : [];
     const info = v2() ? [
-      ["Rules", `new (v2) · leaderboard bucket: ${G.rules === 2 ? "since the reopening" : "before the reopening"}${W.migrated ? " · migrated from v1" : ""}`],
+      ["Rules", `new (v2) · balance ${G.bal || "old"}${G.regraded ? ` (regraded ${G.regraded.date})` : ""} · leaderboard bucket: ${BOARD_NAMES[boardRules()].toLowerCase()}${W.migrated ? " · migrated from v1" : ""}`],
       ["Seed", W.seed], ["Simulated through", W.simDate],
       ["Established", `${est.length}: ${est.filter(e => e.by === "you").length} yours, ${est.filter(e => e.old).length} from the notebook, ${est.filter(e => e.by !== "you" && !e.old).length} by the community`],
       ["Community", `${Object.keys(W.npc).length} climbers have arrived; they know ${W.found.length} of ${D.boulders.length} boulders`],
@@ -2586,6 +2639,34 @@
     justMigrated.add(g);
     return g;
   }
+  // A climber from before Phase 3's balance, in place: their level worked out again
+  // by replaying their logbook under the new XP rules, their skills made relative,
+  // and their proof counted. Never lowers a level. Ticks, first ascents, names,
+  // projects and the journal are untouched. Returns true if it changed anything
+  // beyond recounting proof (saves already on the balance just get their tops
+  // recounted from the ticks, which are the record).
+  function regrade(g) {
+    const grade = p => D.problems[p].grade;
+    if (g.bal === BAL_NOW) { g.player.tops = Mech.topsOf(g.ticks || [], grade); return false; }
+    const pl = g.player;
+    let oldXp = pl.xp, was = 0; for (let need = 100; oldXp >= need && was < 16; was++) { oldXp -= need; need *= 1.6; }   // the old curve
+    const r = Mech.replay(g.ticks || [], {
+      grade,
+      sessions: (p, date) => { const lg = g.ps[p] && g.ps[p].log; return Array.isArray(lg) ? Math.max(1, lg.filter(s => s && s[0] <= date).length) : 1; },
+      tip: p => (g.tips || []).some(t => t.p === p && t.done),
+      repeatsPerDay: REPEATS_XP,
+    });
+    pl.xp = r.xp; pl.tops = r.tops;
+    // Never lower a level: top up the XP to the old level if the replay came out lower.
+    if (Mech.levelOf(pl).level < was) { let xp = 0; for (let n = 0; n < was; n++) xp += Mech.levelCost(n); pl.xp = Math.max(pl.xp, xp); }
+    const oldSkills = { ...pl.skills };
+    pl.skills = Mech.convertSkills(pl.skills);
+    g.bal = BAL_NOW;
+    g.regraded = { date: g.date, from: was, to: Mech.levelOf(pl).level };
+    if (g.day) g.day.levelBefore = Mech.levelOf(pl).level;          // no level-up dialog for the conversion
+    justRegraded.set(g, { from: was, to: Mech.levelOf(pl).level, oldSkills });
+    return true;
+  }
   function migrateSave(g) {
     const fix = name => (name == null || D.sectorBy.has(name) ? name : OLD_SECTOR_NAMES[name] || null);
     g.loc = g.loc || { sector: null, boulder: null };
@@ -2632,6 +2713,12 @@
           const up = safely("converting your climber", () => upgrade(JSON.parse(JSON.stringify(G))));
           if (up) G = up;
         }
+        // A climber from before Phase 3's balance: keep a copy, then regrade (on a copy too).
+        if (G.bal !== BAL_NOW && G.day) {
+          try { localStorage.setItem(DEV ? OLD_BALANCE_COPY + "-dev" : OLD_BALANCE_COPY, JSON.stringify(G)); } catch (e) { }
+          const g2 = JSON.parse(JSON.stringify(G));
+          if (safely("regrading your climber", () => regrade(g2)) != null) { if (justMigrated.has(G)) justMigrated.add(g2); G = g2; }   // if it fails, the old balance carries on
+        } else if (G.day) safely("counting your sends", () => regrade(G));
         save();
       }
       if (G && (G.v === 1 || (G.v === 2 && (DEV || RULES2_LIVE))) && G.day) showGame(); else showCreator();

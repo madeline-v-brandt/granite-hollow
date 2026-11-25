@@ -381,7 +381,7 @@
     if (!W || !isDay(upTo)) return [];
     const ctx = {
       dayNoAt: opts.dayNoAt || (() => G.dayNo || 0),
-      ability: Mech ? Mech.ability(G.player.xp) : 0,
+      ability: Mech ? (Mech.levelOf ? Mech.ability(G.player) : Mech.ability(G.player.xp)) : 0,
       protect: opts.protect || null, noSnipe: !!opts.noSnipe, today: opts.today || null,
     };
     const events = [];

@@ -9,6 +9,8 @@ const tmp = n => path.join(os.tmpdir(), n);
 const SLOT = "granite-hollow-save-v1", COPY = "granite-hollow-save-before-reopening";
 global.Mech = require(GAME_DIR + "mechanics.js");
 const World = require(GAME_DIR + "world.js"), D = require(GAME_DIR + "game-data.json");
+// A level on the old curve (before Phase 3's balance): 100 XP, then ×1.6 a level.
+const levelOld = xp => { let l = 0; for (let need = 100; xp >= need && l < 16; l++) { xp -= need; need *= 1.6; } return l; };
 (async () => {
   const { b, p, errs, url } = await open();
   const saved = () => p.evaluate(k => JSON.parse(localStorage.getItem(k)), SLOT);
@@ -33,7 +35,7 @@ const World = require(GAME_DIR + "world.js"), D = require(GAME_DIR + "game-data.
   await p.goto(url, { waitUntil: "load" }); await ready(p); await sleep(400);
   g = await saved();
   const copy = await p.evaluate(k => JSON.parse(localStorage.getItem(k) || "null"), COPY);
-  console.log("old climber on load:", await modalH2(), "| now v", g.v, "rules", g.rules, "| copy kept: v", copy && copy.v, copy && copy.player.name, "| XP kept:", g.player.xp === JSON.parse(fixture).player.xp);
+  console.log("old climber on load:", await modalH2(), "| now v", g.v, "rules", g.rules, "| copy kept: v", copy && copy.v, copy && copy.player.name, "| regraded: bal", g.bal, "level", Mech.levelOf(g.player).level, "not lower:", Mech.levelOf(g.player).level >= levelOld(JSON.parse(fixture).player.xp), "| then:", await (async () => { await click(p, ".modal [data-close]"); await sleep(200); return modalH2(); })());
   await click(p, ".modal [data-close]"); await sleep(200);
   await click(p, '#tabs [data-tab="climber"]'); await sleep(150);
   console.log("climber tab offers the old copy:", await p.evaluate(() => !!document.querySelector("#tabbody [data-old]")));

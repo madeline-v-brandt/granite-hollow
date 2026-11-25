@@ -14,8 +14,9 @@ const World = global.World = require(G_DIR + "world.js");
 const Know = require(G_DIR + "knowledge.js"), D = require(G_DIR + "game-data.json");
 const over = JSON.parse(process.argv[2] || "{}");
 (function merge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === "object" && !Array.isArray(b[k])) merge(a[k], b[k]); else a[k] = b[k]; } })(World.PARAMS, over);
-function xpFor(a) { let xp = 0, need = 100; for (let l = 0; l < Math.floor(a); l++) { xp += need; need *= 1.6; } return xp + need * (a % 1); }
-const abilityOnDay = n => { const pts = [[0, 0], [5, 3], [12, 5], [22, 7], [39, 9], [80, 11], [160, 12]]; for (let i = 1; i < pts.length; i++) if (n <= pts[i][0]) { const [a, b] = [pts[i - 1], pts[i]]; return a[1] + (b[1] - a[1]) * (n - a[0]) / (b[0] - a[0]); } return 12; };
+function xpFor(a) { let xp = 0; for (let l = 0; l < Math.floor(a); l++) xp += Mech.levelCost(l); return xp + Mech.levelCost(Math.floor(a)) * (a % 1); }
+// Level by climbing day under Phase 3's balance (balance_game.js, steady climbers).
+const abilityOnDay = n => { const pts = [[0, 0], [6, 3], [17, 5], [32, 7], [57, 9], [102, 11], [158, 13]]; for (let i = 1; i < pts.length; i++) if (n <= pts[i][0]) { const [a, b] = [pts[i - 1], pts[i]]; return a[1] + (b[1] - a[1]) * (n - a[0]) / (b[0] - a[0]); } return 13; };
 const PROFILES = { real: { every: [1, 1, 0], inspect: 1, sends: 4, areaEvery: 5 },  keen: { every: [1, 1, 0], inspect: 2, sends: 5 }, casual: { every: [1, 0, 0], inspect: 1, sends: 3 }, homebody: { every: [1, 1, 0], inspect: 0, sends: 0 } };
 const DATES = ["2025-10-01", "2025-11-01", "2025-12-01", "2025-12-31", "2026-03-01", "2026-05-01", "2026-12-31"];
 const walk = b => D.sectors.find(s => s.name === D.boulders[b].sector).walk_min;
