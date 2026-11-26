@@ -15,11 +15,18 @@ const modalText = p => p.evaluate(() => { const m = document.querySelector(".mod
 async function harvest(p) {
   const out = [];
   out.push(await p.evaluate(() => document.querySelector("#hud").innerText));
-  for (const tab of ["here", "climber", "logbook", "journal", "craglog"]) { await click(p, `#tabs [data-tab="${tab}"]`); await sleep(120); out.push(await text(p)); }
+  for (const tab of ["here", "climber", "journal", "craglog"]) { await click(p, `#tabs [data-tab="${tab}"]`); await sleep(120); out.push(await text(p)); }
   await click(p, '#tabs [data-tab="journal"]');
   for (const v of ["tried", "known", "sent"]) { await click(p, `[data-pj-view="${v}"]`); await sleep(100); out.push(await text(p)); }
   await click(p, '#tabs [data-tab="craglog"]'); await sleep(100);
-  for (const v of ["rankings", "buzz", "problems"]) { await click(p, `[data-cl-view="${v}"]`); await sleep(120); out.push(await text(p)); }
+  for (const v of ["mylog", "rankings", "buzz", "problems"]) { await click(p, `[data-cl-view="${v}"]`); await sleep(120); out.push(await text(p)); }
+  // Rankings by the 10 hardest ascents, with every climber's ten opened.
+  await click(p, '[data-cl-view="rankings"]'); await sleep(100);
+  await p.evaluate(() => { const s = document.querySelector("#rk-by"); if (s) { s.value = "hard"; s.dispatchEvent(new Event("change")); } }); await sleep(150);
+  const whos = await p.evaluate(() => [...document.querySelectorAll("[data-rk-open]")].map(b => b.dataset.rkOpen));
+  for (const w of whos.slice(0, 8)) { await click(p, `[data-rk-open="${w}"]`); await sleep(80); out.push(await text(p)); }
+  await p.evaluate(() => { const s = document.querySelector("#rk-by"); if (s) { s.value = "fa"; s.dispatchEvent(new Event("change")); } }); await sleep(100);
+  await click(p, '[data-cl-view="problems"]'); await sleep(100);
   const ids = await p.evaluate(() => [...document.querySelectorAll("[data-cl]")].map(b => +b.dataset.cl));
   for (const i of [...new Set(ids)].slice(0, 12)) { await p.evaluate(i => { const b = document.querySelector(`[data-cl="${i}"]`); if (b) b.click(); }, i); await sleep(80); out.push(await text(p)); await click(p, "[data-cl-back]"); await sleep(60); }
   await click(p, '#tabs [data-tab="here"]');
@@ -146,7 +153,7 @@ function leaks(g, all) {
   await click(p, ".modal [data-curated]"); await sleep(200);
   g = JSON.parse(await p.evaluate(k => localStorage.getItem(k), SLOT));
   console.log("renamed back to the suggestion:", g.world.est[faId].name === undefined ? D.problems[faId].name : g.world.est[faId].name);
-  await click(p, '#tabs [data-tab="logbook"]'); await sleep(150);
+  await click(p, '#tabs [data-tab="craglog"]'); await sleep(100); await click(p, '[data-cl-view="mylog"]'); await sleep(150);
   console.log("logbook:\n  " + (await text(p)).split("\n").filter(l => /first ascent|carr/i.test(l)).slice(0, 4).join("\n  "));
   await click(p, '#tabs [data-tab="journal"]'); await sleep(100); await click(p, '[data-pj-view="known"]'); await sleep(100);
   console.log("journal, Open:\n  " + (await text(p)).split("\n").slice(1, 12).join("\n  "));
@@ -173,7 +180,7 @@ function leaks(g, all) {
   const fx = JSON.parse(fs.readFileSync(FIX + "v1-midday.json", "utf8"));
   console.log("migrated: v", gm.v, "rules", gm.rules, "your FAs", Object.values(gm.world.est).filter(e => e.by === "you").length, "of", new Set(fx.ticks.filter(t => t.style !== "Repeat").map(t => t.p)).size, "first sends | XP kept:", gm.player.xp === fx.player.xp, "| invariants", World.check(D, gm));
   await p.evaluate(() => { const c = document.querySelector(".modal [data-close]"); if (c) c.click(); });
-  await click(p, '#tabs [data-tab="logbook"]'); await sleep(150);
+  await click(p, '#tabs [data-tab="craglog"]'); await sleep(100); await click(p, '[data-cl-view="mylog"]'); await sleep(150);
   console.log("migrated logbook:\n  " + (await text(p)).split("\n").slice(-8).join("\n  "));
   all = await harvest(p);
   console.log("LEAKS after migrating:", leaks(gm, all));

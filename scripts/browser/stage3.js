@@ -75,11 +75,11 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   check(dirty ? "an unclimbed line: the card says it's dirty, and the button says Brush it clean" : "a friction line: Brush the holds",
     dirty ? /Gritty/.test(s.note) && s.menu[3].l === "Brush it clean" : s.menu[3].l === "Brush the holds", `${s.menu[3].l} · ${s.note}`);
   if (SHOTS) await p.screenshot({ path: path.join(SHOTS, "stage3-gus.png") });
-  const before = pct(s && s.menu[0].l), brushSays = pct((s.menu.find(m => m.k === "brush") || {}).s.split("→")[1]);
+  const before = pct(s && s.menu[0].l), brushSays = before + pct((s.menu.find(m => m.k === "brush") || {}).s);      // "Increase odds +4%"
   await act("brush");
   s = await scene(); g = await saved();
   check("brushing raises the chance as the menu said" + (dirty ? ", and cleans the line for good" : ", for the day"),
-    (dirty ? g.ps[i] && g.ps[i].clean === true : g.day.brushed[i] === true) && pct(s.menu[0].l) > before && Math.abs(pct(s.menu[0].l) - brushSays) < 0.6, `${before}% → ${pct(s.menu[0].l)}% (menu said ${brushSays}%)`);
+    (dirty ? g.ps[i] && g.ps[i].clean === true : g.day.brushed[i] === true) && pct(s.menu[0].l) > before && Math.abs(pct(s.menu[0].l) - brushSays) < 1.01, `${before}% → ${pct(s.menu[0].l)}% (menu said ${brushSays}%)`);
   check("the card says brushed, and Brush is gone", /Brushed today/.test(s.note) && !s.menu.some(m => m.k === "brush"), s.note);
   for (let n = 0; n < 4; n++) { g = await saved(); if (!g.day.climb || g.day.over || (g.ps[i] && g.ps[i].sent)) break; await act("burn"); await settle(p); }
   g = await saved();
@@ -93,7 +93,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   for (const k of prove) { World.recordSend(D, g, k, g.date, false); g.ps[k] = { att: 1, beta: 0, sent: true, flash: false, best: 1, sends: 1, sentOn: g.date }; g.ticks.push({ p: k, date: g.date, day: g.dayNo, style: "Send", att: 1, stars: null }); }
   g.player.xp = 70 + 140 + 220 + 600 + 50; g.player.skin = 38; g.player.energy = 15; g.day.minute = 14 * 60;      // tired, so some lines here are still a Try
   g.learned = { brush: g.date };
-  g.day.climb = null; g.day.over = false;
+  g.day.climb = null; g.day.over = false; g.day.weather.rainAt = null; g.day.weather.pop = 0;      // a dry afternoon
   await write(g);
   // A line here you've fallen off once is a Try, not a Climb it, however strong you are.
   let v4 = await tryWhere(() => true);

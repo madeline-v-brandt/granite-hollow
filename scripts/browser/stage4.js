@@ -84,7 +84,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   check("and they cheer", said.length > 0 && !/undefined/.test(said), said.slice(-120));
   if (await p.$(".scene-root:not([hidden])")) { await click(p, ".scene-root [data-act='leave']"); await sleep(200); }
   await closeModals();
-  await click(p, "#tabs [data-tab='logbook']"); await sleep(200);
+  await click(p, "#tabs [data-tab='craglog']"); await sleep(100); await click(p, "[data-cl-view='mylog']"); await sleep(200);
   const log = await p.evaluate(() => document.querySelector("#tabbody").innerText);
   check("the logbook says who you sent it with", /with \w+/.test(log));
   // The odds panel: Good vibes, never a number.

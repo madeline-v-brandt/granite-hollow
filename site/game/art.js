@@ -248,9 +248,10 @@
     const rc = rand("lot-cars");
     // The spaces are the painted stalls, 6 m wide between lines at x -65, -59 … -17;
     // the north row from y -2 to 4 and the south row from y -18 to -12. Every car
-    // faces north (up the map); the first is yours, nearest the trailhead
-    // (PARK_SPOT in game.js is behind it).
-    [[-20, -.6, 0], [-26, -.6, 0], [-50, -.6, 0], [-62, -.6, 0], [-20, -15.6, 0], [-26, -15.6, 0], [-56, -15.6, 0], [-62, -15.6, 0]]
+    // faces north (up the map); the first is yours, two spaces along from the
+    // trailhead end (PARK_SPOT in game.js stays by the empty space at x -20, so
+    // you can walk straight out; you kept walking into the car when it was there).
+    [[-32, -.6, 0], [-26, -.6, 0], [-50, -.6, 0], [-62, -.6, 0], [-20, -15.6, 0], [-26, -15.6, 0], [-56, -15.6, 0], [-62, -15.6, 0]]
       .forEach(([x, y, rot], i) => { if (rc() < .55 || i === 0) marks.push({ kind: "car", x, y, rot, c: Math.floor(rc() * 4) }); });
     for (let i = 0; i < 4; i++) if (r() < .8 || i === 0) r();   // the old cars' draws, so everything after them keeps its place
     place("The Schoolhouse", "foundation", .95, 16);

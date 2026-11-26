@@ -455,14 +455,14 @@
         ${me.note ? `<div class="sc-sub">${esc(me.note)}</div>` : ""}`;
     }
     function say(text) { sayEl.textContent = text || ""; sayEl.classList.remove("in"); void sayEl.offsetWidth; sayEl.classList.add("in"); }
-    // items: [{ key, label, sub, disabled, primary, wide, prep (a slimmer preparation
+    // items: [{ key, label, sub, sub2 (a second line), disabled, primary, wide, prep (a slimmer preparation
     // button, under the rest), fresh (just learned) }], or a sub-menu with a "back" item.
     // reserve: keep room for the preparation row, so the picture doesn't jump as it comes and goes.
     function setMenu(items, { reserve = false } = {}) {
       const nPrep = items.filter(it => it.prep).length;
       menuEl.classList.toggle("reserve", reserve);
       menuEl.innerHTML = items.map(it => `<button type="button" class="sc-act${it.primary ? " primary" : ""}${it.wide ? " wide" : ""}${it.prep ? " prep" : ""}${it.prep && nPrep === 1 ? " alone" : ""}${it.fresh ? " fresh" : ""}" data-act="${esc(it.key)}" ${it.disabled ? "disabled" : ""}>
-        <span class="l">${esc(it.label)}</span>${it.sub ? `<span class="s">${esc(it.sub)}</span>` : ""}</button>`).join("");
+        <span class="l">${esc(it.label)}</span>${it.sub ? `<span class="s">${esc(it.sub)}</span>` : ""}${it.sub2 ? `<span class="s">${esc(it.sub2)}</span>` : ""}</button>`).join("");
       menuEl.classList.toggle("many", items.length - nPrep > 4);
       menuEl.querySelectorAll("[data-act]").forEach(b => { b.onclick = () => { if (!busy && opts.onAction) opts.onAction(b.dataset.act); }; });
       const first = menuEl.querySelector("button:not([disabled])"); if (first && el.contains(document.activeElement) === false) first.focus({ preventScroll: true });

@@ -1,8 +1,9 @@
 <title>Granite Hollow</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=43">
+<link rel="stylesheet" href="scene.css?v=45">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -902,6 +903,7 @@ tr.lb-me td { background: var(--gold-soft); }
   .map-hint { position: absolute; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 2; margin: 0; max-width: min(440px, calc(100% - 300px)); text-align: center;
     padding: 6px 12px; border-radius: 10px; background: color-mix(in srgb, var(--raised) 88%, transparent); border: 1px solid var(--rule-ink); font-size: 13px; color: var(--ink-2); pointer-events: none; }
   .map-hint kbd { margin: 0 1px; }
+  @media (max-width: 640px) { .map-hint { max-width: calc(100% - 24px); width: max-content; bottom: calc(40px + env(safe-area-inset-bottom, 0px)); } }   /* phones: room for the words */
   #map-me.lost { color: var(--accent); background: var(--accent-soft); }
   .pp-list li { display: flex; align-items: stretch; gap: 4px; }
   .pp-list li > [data-pp-area] { flex: 1; min-width: 0; }
@@ -1038,7 +1040,6 @@ tr.lb-me td { background: var(--gold-soft); }
         <nav class="tabs" role="tablist" id="tabs">
           <button type="button" role="tab" data-tab="here" id="tab-here">Here</button>
           <button type="button" role="tab" data-tab="climber" id="tab-climber">Climber</button>
-          <button type="button" role="tab" data-tab="logbook" id="tab-logbook">Logbook</button>
           <button type="button" role="tab" data-tab="craglog" id="tab-craglog">CragLog</button>
           <button type="button" role="tab" data-tab="journal" id="tab-journal">Journal</button>
         </nav>
@@ -1054,13 +1055,13 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=43"></script>
-<script src="art.js?v=43"></script>
-<script src="world.js?v=43"></script>
-<script src="knowledge.js?v=43"></script>
-<script src="illustrate.js?v=43"></script>
-<script src="paint.js?v=43"></script>
-<script src="paper.js?v=43"></script>
-<script src="travel.js?v=43"></script>
-<script src="scene.js?v=43"></script>
-<script src="game.js?v=43"></script>
+<script src="mechanics.js?v=45"></script>
+<script src="art.js?v=45"></script>
+<script src="world.js?v=45"></script>
+<script src="knowledge.js?v=45"></script>
+<script src="illustrate.js?v=45"></script>
+<script src="paint.js?v=45"></script>
+<script src="paper.js?v=45"></script>
+<script src="travel.js?v=45"></script>
+<script src="scene.js?v=45"></script>
+<script src="game.js?v=45"></script>

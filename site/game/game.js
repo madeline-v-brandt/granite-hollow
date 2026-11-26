@@ -25,7 +25,7 @@
   const justMigrated = new WeakSet();      // saves converted this session: they get a welcome back
   const START_DATE = "2025-09-06";
   const START_AREA = "The Tailgate";      // every climbing day starts in the lot, which is part of The Tailgate
-  const PARK_SPOT = [-20, -4.6];          // where you get out of the car: behind it, in the lot's north row (art.js parks it there)
+  const PARK_SPOT = [-20, -4.6];          // where every day starts, in the lot's north row by the trailhead end (your car's two spaces along: art.js)
   const WORLD_MIN_ZOOM = 3.2;              // the world view never zooms out past an area; the paper map shows the park
   const fmt = d3.format(",");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -110,7 +110,7 @@
   const nameGrade = i => (vg(i) ? `${vg(i)} ${pname(i)}` : pname(i));         // "V3 Name"
   const pref = i => (K.line(i) === "open" ? "the " + pname(i).charAt(0).toLowerCase() + pname(i).slice(1) : pname(i));   // in a sentence
   const gradeSpan = (i, style = "") => { const g = K.grade(i); return `<span class="grade"${style}${g == null ? ' title="Not climbed yet, so no grade"' : ""}>${g == null ? "?" : "V" + g}</span>`; };
-  const UI = { tab: "here", expanded: new Set(), cl: { q: "", sector: "", lo: 0, hi: 13, sort: "logs", problem: null, view: "problems", done: "" }, pj: { view: null, sort: "recent" }, rk: { window: "12m", height: "", open: null, n: 25 }, busy: false, confirmReset: false };
+  const UI = { tab: "here", expanded: new Set(), cl: { q: "", sector: "", lo: 0, hi: 13, sort: "logs", problem: null, view: "problems", done: "" }, pj: { view: null, sort: "recent" }, rk: { window: "12m", height: "", open: null, n: 25, by: "fa" }, busy: false, confirmReset: false };
 
   // ====================================================================== data
   function prepData() {
@@ -220,9 +220,13 @@
       ? `You pull into the Granite Hollow lot on ${an(w.sky.toLowerCase())} September morning, ${w.temp}°F. The boulders at The Tailgate are right beside the car. The trail map (press M) shows the rest of the park: The Schoolhouse is 5 minutes up the trail.`
       : `${w.sky}, ${w.temp}°F. ${w.note}`;
     G.day.last = { kind: "info", title: first ? "Welcome to Granite Hollow" : `Day ${G.dayNo}`, text: intro };
+    // Rained out: no climbing on wet granite, but the park's open (since the polish
+    // after Phase 3): look around, find boulders, talk to people, brush lines for
+    // when it dries. A day without climbing counts as rest.
     if (Mech.rainStart(w) === 0) {
-      G.day.over = true; G.day.rainedOut = true;
-      G.day.reason = `${w.pop != null ? `The ${Mech.rainChance(w)} came through, and the rock is soaked.` : `${w.precip === "Snow" ? "Snow" : "Rain"} all day.`} Wet granite is slick and holds can snap, so there's no climbing. It counts as a rest day.`;
+      G.day.rainedOut = true;
+      G.day.reason = `${w.pop != null ? `The ${Mech.rainChance(w)} came through, and the rock is soaked.` : `${w.precip === "Snow" ? "Snow" : "Rain"} all day.`} No climbing on wet granite, so it counts as a rest day.`;
+      G.day.last.text += ` ${w.precip === "Snow" ? "It's snowing" : "It's raining"}, so there's no climbing today: wet granite is slick and holds can snap. The park's still open, though. Look around, find a boulder or two, talk to whoever's out, or brush a new line for when it dries. A day without climbing counts as a rest day.`;
       note(`Day ${G.dayNo}: rained out.`);
     } else note(`Day ${G.dayNo}: ${w.sky}, ${w.temp}°F, ${w.label.toLowerCase()} conditions.`);
     if (v2()) K.visitArea(START_AREA);
@@ -331,6 +335,7 @@
   // Returns { r, style, fa, next }, or null if nothing happened.
   function tryProblem(i, opts = {}) {
     if (UI.busy || G.day.over) return null;
+    if (rainNow()) { toast("Too wet to climb", "Wet granite is slick and holds can snap. No climbing until another day.", "info"); return null; }
     const p = D.problems[i];
     if (G.loc.boulder !== p.b) { travel({ sector: p.sector, boulder: p.b }); return null; }
     const st = pstate(i);
@@ -461,8 +466,9 @@
     return Mech.chanceOf(G.player, D.problems[i], st, d) >= 0.8;
   };
   const pc = c => (c >= .1 ? Math.round(c * 100) + "%" : c >= .01 ? (Math.round(c * 1000) / 10) + "%" : c >= .002 ? "under 1%" : "almost none");
-  const shift = (a, b) => (pc(a) === pc(b) ? `send ${pc(a)}, barely changes` : `send ${pc(a)} → ${pc(b)}`);
   const KNOW = v => (v >= 0.67 ? "well" : v >= 0.34 ? "fairly well" : v > 0.05 ? "a little" : "not yet");
+  // How an action changes your odds of sending, in percentage points: "+3%", "+0.4%", "−5%".
+  const plus = (a, b) => { const d = (b - a) * 100, m = Math.abs(d), n = m >= 0.95 ? Math.round(m) : m >= 0.05 ? m.toFixed(1) : 0; return `${d < 0 && n ? "−" : "+"}${n}%`; };
   function openClimb(i) {
     if (UI.busy || G.day.over) return;
     const p = D.problems[i];
@@ -498,9 +504,12 @@
   function climbIntro(i) {
     const p = D.problems[i], st = G.ps[i];
     if (st && st.sent) return `You've sent ${pname(i)}. Climb it again, just for fun?`;
-    const f = Mech.feel(chanceFor(i)).label.toLowerCase(), vw = vibesWords(i);
-    if (st && st.att) return `Back under ${pname(i)}. ${st.att} ${st.att === 1 ? "try" : "tries"} so far, and it feels ${f === "not yet" ? "out of reach for now" : f} today.${vw ? " " + vw : ""}`;
-    return `You drop your pad under ${pname(i)} and look up at it. ${p.moves} moves to the top${p.sit ? ", from a sit start" : ""}. From the ground, it feels ${f === "not yet" ? "out of reach for now" : f}.${vw ? " " + vw : ""}`;
+    // How it feels, in a sentence: "like a warm-up", "like it should go", "hard", "like a project", "out of reach for now".
+    const f = { warmup: "like a warm-up", go: "like it should go", hard: "hard", project: "like a project", nope: "out of reach for now" }[Mech.feel(chanceFor(i)).key];
+    if (rainNow()) return `${st && st.att ? `Back under ${pname(i)}` : `You look up at ${pname(i)}`}. The holds are wet and slick, so there's no climbing it today.${isDirty(i) && knows("brush") ? " You could brush it clean for when it dries, though." : ""}`;
+    const vw = vibesWords(i);
+    if (st && st.att) return `Back under ${pname(i)}. ${st.att} ${st.att === 1 ? "try" : "tries"} so far, and it feels ${f} today.${vw ? " " + vw : ""}`;
+    return `You drop your pad under ${pname(i)} and look up at it. ${p.moves} moves to the top${p.sit ? ", from a sit start" : ""}. From the ground, it feels ${f}.${vw ? " " + vw : ""}`;
   }
   // The cards, through K (so an unclimbed line has no grade), and the menu with what
   // each choice would do to your chance of sending.
@@ -536,30 +545,34 @@
     if (G.day.climb.view === "work") {
       const mk = Mech.knowledge(p, { ...st }), seen = Math.max(1, Mech.seenOf(p, st));
       const items = p.seq.moves.slice(0, seen).map((m, j) => ({ key: "work:" + j, label: `Move ${j + 1}${m.kind === "crux" ? ", the crux" : m.kind === "top" ? ", the top-out" : ""}`,
-        sub: `${an(m.hold)}, known ${KNOW(mk[j])} · ${shift(now, Mech.previewWork(G.player, p, st, day, j, worked + 1).kept)}` }));
+        sub: mk[j] > 0.05 ? `You know it ${KNOW(mk[j])}` : "You don't know it yet", sub2: `Increase odds ${plus(now, Mech.previewWork(G.player, p, st, day, j, worked + 1).kept)}` }));
       return [...items, { key: "back", label: "Back", wide: items.length % 2 === 0 }];
     }
-    if (st.sent) return [{ key: "again", label: "Climb it again", sub: "A repeat, for fun", primary: true, disabled: G.day.over }, { key: "leave", label: "Leave", sub: "Back to the map" }];
+    const wet = rainNow();                     // no climbing on wet rock; brushing a new line is fine
+    if (st.sent) return [{ key: "again", label: "Climb it again", sub: wet ? "Too wet to climb" : "A repeat, for fun", primary: true, disabled: G.day.over || wet }, { key: "leave", label: "Leave", sub: "Back to the map" }];
     const c = Mech.attemptCost(G.player, p, day), wc = Mech.workCost(G.player, p, day), seen = Math.max(1, Mech.seenOf(p, st));
     const gains = st.att ? Array.from({ length: seen }, (_, j) => Mech.previewWork(G.player, p, st, day, j, worked + 1).kept) : [now];
-    const bestAt = gains.indexOf(Math.max(...gains)), bestName = p.seq.moves[bestAt].kind === "crux" ? "the crux" : `move ${bestAt + 1}`;
+    const bestAt = gains.indexOf(Math.max(...gains));
     const full = G.player.energy >= G.day.startEnergy - .5, fresh = k => G.learned && G.learned[k] === G.date && !(G.day.used || {})[k];
     const items = [
-      { key: "burn", label: `Send burn · ${pc(now)}`, sub: `Chance to send · ${Math.round(c.energy)} energy · ${Math.round(c.minutes)} min`, primary: true, disabled: G.day.over, wide: !knows("work") },
-      ...(knows("work") ? [{ key: "work", label: "Work a move", sub: st.att ? `Best: ${bestName}, ${shift(now, gains[bestAt])} · ${Math.round(wc.energy)} energy` : "Give it a burn first", disabled: G.day.over || !st.att, fresh: fresh("work") }] : []),
-      { key: "rest", label: "Rest", sub: full ? "You're fresh" : `20 min · +${Math.round(Mech.restGain(G.day.rests || 0))} energy · ${shift(now, Mech.previewRest(G.player, p, st, here(i, 20), G.day.rests || 0, G.day.startEnergy))}`, disabled: G.day.over || full },
+      wet ? { key: "burn", label: "Send burn", sub: "Too wet to climb", sub2: "Wet granite is slick, and holds can snap", primary: true, disabled: true, wide: !knows("work") }
+        : { key: "burn", label: `Send burn · ${pc(now)}`, sub: `Chance to send · ${Math.round(c.energy)} energy · ${Math.round(c.minutes)} min`, primary: true, disabled: G.day.over, wide: !knows("work") },
+      ...(knows("work") ? [{ key: "work", label: "Work a move", sub: wet ? "Too wet to climb" : st.att ? `Increase your odds of sending ${plus(now, gains[bestAt])}` : "Give it a burn first",
+        sub2: st.att && !wet ? `Cost: ${Math.round(wc.energy)} energy` : null, disabled: G.day.over || !st.att || wet, fresh: fresh("work") }] : []),
+      { key: "rest", label: "Rest", sub: full ? "You're fresh" : `Add ${Math.round(Math.min(Mech.restGain(G.day.rests || 0), G.day.startEnergy - G.player.energy))} energy. Increase odds ${plus(now, Mech.previewRest(G.player, p, st, here(i, 20), G.day.rests || 0, G.day.startEnergy))}`,
+        sub2: full ? null : "Cost: 20 min", disabled: G.day.over || full },
       { key: "leave", label: "Leave", sub: "Back to the map" },
     ];
     // Preparation, only where it matters: brushing a dirty line (for good) or friction holds (for the day), and tape for thin skin.
-    if (knows("brush") && (day.dirty || (Mech.frictionSensitivity(p) >= 0.6 && !day.brushed && now < 0.8)))
+    if (knows("brush") && (day.dirty || (!wet && Mech.frictionSensitivity(p) >= 0.6 && !day.brushed && now < 0.8)))
       items.push({ key: "brush", label: day.dirty ? "Brush it clean" : "Brush the holds", prep: true, fresh: fresh("brush"), disabled: G.day.over,
-        sub: `${Mech.BAL.brushMin} min · ${shift(now, Mech.chanceOf(G.player, p, st, { ...here(i, Mech.BAL.brushMin), dirty: false, brushed: true }))}` });
-    if (knows("tape") && (day.tape || G.player.skin < 60))
+        sub: wet ? "Clean for when it dries" : `Increase odds ${plus(now, Mech.chanceOf(G.player, p, st, { ...here(i, Mech.BAL.brushMin), dirty: false, brushed: true }))}`, sub2: `Cost: ${Mech.BAL.brushMin} min` });
+    if (knows("tape") && !wet && (day.tape || G.player.skin < 60))
       items.push(day.tape
         ? (G.day.flapper ? { key: "untape", label: "Taped for a flapper", prep: true, disabled: true, sub: "It stays on for the rest of the day" }
-          : { key: "untape", label: "Take the tape off", prep: true, sub: `${shift(now, Mech.chanceOf(G.player, p, st, { ...day, tape: false }))} · full skin cost` })
+          : { key: "untape", label: "Take the tape off", prep: true, sub: `Odds ${plus(now, Mech.chanceOf(G.player, p, st, { ...day, tape: false }))}`, sub2: "Burns cost full skin again" })
         : { key: "tape", label: "Tape up", prep: true, fresh: fresh("tape"), disabled: G.day.over,
-          sub: `${Mech.BAL.tapeMin} min · half the skin · ${shift(now, Mech.chanceOf(G.player, p, st, { ...here(i, Mech.BAL.tapeMin), tape: true }))}` });
+          sub: `Half the skin per burn. Odds ${plus(now, Mech.chanceOf(G.player, p, st, { ...here(i, Mech.BAL.tapeMin), tape: true }))}`, sub2: `Cost: ${Mech.BAL.tapeMin} min` });
     return items;
   }
   async function climbAction(k) {
@@ -601,7 +614,7 @@
   }
   // Working one move on its own: cheaper than a burn, and it teaches that move a lot.
   async function workInScene(i, at) {
-    if (SC.busy() || G.day.over) return;
+    if (SC.busy() || G.day.over || rainNow()) return;
     const p = D.problems[i], st = pstate(i), m = p.seq.moves[at];
     G.day.climb.view = "main";
     const faded = fadeIfAway(p, st);
@@ -634,8 +647,9 @@
       G.day.minute += Mech.BAL.brushMin;
       (G.day.brushed = G.day.brushed || {})[i] = true;
       if (dirty) st.clean = true;
-      G.day.last = { kind: "info", title: `Brushing ${titleOf(i)}`, p: i, text: dirty
-        ? pick(["You scrub the grit and lichen off every hold you can reach and blow the dust out of the cracks. It's climbable rock now.",
+      G.day.last = { kind: "info", title: `Brushing ${titleOf(i)}`, p: i, text: dirty && rainNow()
+        ? "You scrub the lichen and grit off the holds in the drizzle. It'll be clean and ready when it dries."
+        : dirty ? pick(["You scrub the grit and lichen off every hold you can reach and blow the dust out of the cracks. It's climbable rock now.",
           "Decades of lichen come off in green flakes. Underneath, the holds are rough and sharp and perfect."])
         : pick(["You brush the old chalk and grease off the holds. They feel crisp again.", "A few strokes of the brush on each sloper, and they bite like new."]) };
     } else if (k === "tape") {
@@ -698,9 +712,15 @@
     const w = G.day.weather, d = G.day;
     if (d.over) return;
     if (partnerNow() && d.minute >= d.partner.until) partWays(PARTNER[partnerNow().slice(2)].bye);
-    if (rainNow()) { endDay(`It started ${w.precip === "Snow" ? "snowing" : "raining"} at ${clock(Mech.rainStart(w))}. Wet granite is slick and holds can snap, so you pack up and head home.`); return; }
+    if (rainNow() && !d.rainedOut && !d.rainStarted) {
+      d.rainStarted = true;
+      const what = w.precip === "Snow" ? "snowing" : "raining";
+      G.day.last = { kind: "info", title: `It's ${what}`, text: `It started ${what} at ${clock(Mech.rainStart(w))}. Wet granite is slick and holds can snap, so that's it for climbing today. You can stay as long as you like: look around, talk to people, or brush a new line for when it dries.` };
+      toast(`It's ${what}`, "No more climbing today. You can stay and explore, or head home.", "info");
+      note(`It started ${what}: no more climbing today.`);
+    }
     if (d.minute >= w.dusk) { duskOut(); return; }
-    if (Mech.rainStart(w) != null && !d.rainWarned && d.minute >= Mech.rainStart(w) - 45) {
+    if (Mech.rainStart(w) != null && !rainNow() && !d.rainWarned && d.minute >= Mech.rainStart(w) - 45) {
       d.rainWarned = true; toast("Clouds rolling in", `${w.precip === "Snow" ? "Snow" : "Rain"} is on its way, due around ${clock(Mech.rainStart(w))}. Get your last burns in.`, "info");
     } else if (w.pop && w.rainFrom && Mech.rainStart(w) == null && !d.rainWarned && d.minute >= w.rainFrom) {
       d.rainWarned = true; toast("The rain held off", "Clear skies after all. Keep climbing until dusk.", "info");
@@ -723,7 +743,8 @@
   // otherwise the forecast's chance, until its time has passed.
   function rainHud(w) {
     const ra = Mech.rainStart(w);
-    if (G.day.over || ra === 0) return "";
+    if (G.day.over) return "";
+    if (rainNow()) return `<span class="small"><b style="color:var(--energy)">${w.precip === "Snow" ? "Snowing" : "Raining"}: no climbing</b></span>`;
     if (G.day.rainWarned && ra != null) return `<span class="small"><b style="color:var(--energy)">${esc(w.precip || "Rain")} coming, ~${clock(ra)}</b></span>`;
     if (w.pop && w.rainFrom && !G.day.rainWarned) return `<span class="small" style="color:var(--energy)">${esc(Mech.rainChance(w))}</span>`;
     if (w.pop == null && ra != null) return `<span class="small"><b style="color:var(--energy)">${esc(w.precip || "Rain")} at ${clock(ra)}</b></span>`;
@@ -1124,7 +1145,7 @@
       cheer: ["Dez nods, once. From Dez, that's a standing ovation.", "“Nice,” Dez says, and means it."] },
   };
   function canPartner(e) {
-    if (!e || !CLIMB_WITH.includes(e.who) || partnerNow() || G.day.over || UI.busy) return false;
+    if (!e || !CLIMB_WITH.includes(e.who) || partnerNow() || G.day.over || UI.busy || rainNow()) return false;
     return G.day.weather.dusk - G.day.minute >= 60;
   }
   function climbTogether() {
@@ -1888,7 +1909,7 @@
         <div><button type="button" class="linklike pname" data-expand="${i}" aria-expanded="${open}">${esc(pname(i))}</button>${status}
           <div class="chips">${tip}${p.tagList.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>${hp}</div>
         ${feelHtml(i)}
-        ${st?.sent || easyFor(i) ? `<button type="button" class="btn small ${st?.sent ? "" : "primary"}" data-climb="${i}" ${disabled} title="${st?.sent ? "Climb it again" : "One burn, right here"}">${st?.sent ? "Repeat" : "Climb it"}</button>`
+        ${st?.sent || easyFor(i) ? `<button type="button" class="btn small ${st?.sent ? "" : "primary"}" data-climb="${i}" ${disabled || (rainNow() ? "disabled" : "")} title="${rainNow() ? "Too wet to climb" : st?.sent ? "Climb it again" : "One burn, right here"}">${st?.sent ? "Repeat" : "Climb it"}</button>`
           : `<button type="button" class="btn small primary" data-try="${i}" ${disabled} title="Open the climbing scene">Try</button>`}
       </div>${open ? whyHtml(i) + `<div class="why"><button type="button" class="linklike" data-cl="${i}">See it on CragLog</button></div>` : ""}</div>`;
   }
@@ -2028,7 +2049,8 @@
   // "First to" (the shared leaderboard) is hidden for now, until it's brought back
   // online under the new rules; development mode still shows it.
   const leadersShown = () => DEV;
-  const CL_VIEWS = () => [["problems", "Problems"], ...(K.all() ? [] : [["buzz", "Local Buzz"]]), ["rankings", "Rankings"], ...(leadersShown() ? [["leaders", "First to"]] : [])];
+  const CL_VIEWS = () => [["problems", "Problems"], ["mylog", "My logbook"], ...(K.all() ? [] : [["buzz", "Local Buzz"]]), ["rankings", "Rankings"], ...(leadersShown() ? [["leaders", "First to"]] : [])];
+  const CL_BACK = { rankings: "Rankings", leaders: "First to", buzz: "Local Buzz", mylog: "My logbook" };
   function cragHead() {
     const views = CL_VIEWS(), v = views.some(x => x[0] === UI.cl.view) ? UI.cl.view : "problems";
     return `<div class="cl-brand"><b>Crag<i>Log</i></b><span class="meta" style="margin:0">Logs and comments from Granite Hollow climbers</span></div>
@@ -2052,12 +2074,58 @@
     const shown = list.slice(0, N).map(row);
     if (me >= N) shown.push(`<tr><td colspan="4" class="meta" style="text-align:center">…</td></tr>`, row(list[me], me));
     const total = list.reduce((a, r) => a + r.n, 0);
-    return `${cragHead()}
+    return `${cragHead()}${rankByHtml()}
       <p class="meta">First ascents since the park reopened: ${fmt(total)} problems by ${fmt(list.filter(r => r.n).length)} ${list.filter(r => r.n).length === 1 ? "climber" : "climbers"}. ${list[me].n ? `You've put up ${list[me].n}, #${me + 1} in the valley.` : "You haven't put up a problem yet."}</p>
       <table><thead><tr><th>#</th><th>Climber</th><th class="num">FAs</th><th class="num">Hardest</th></tr></thead><tbody>${shown.join("")}</tbody></table>`;
   }
+  // Under the new rules, two ways to rank: most first ascents, or a climber's 10
+  // hardest ascents since the reopening (UI.rk.by: "fa" | "hard").
+  const rankByHtml = () => `<div class="cl-filters"><select id="rk-by" aria-label="Rank by">
+      <option value="fa" ${UI.rk.by !== "hard" ? "selected" : ""}>Most first ascents</option><option value="hard" ${UI.rk.by === "hard" ? "selected" : ""}>10 hardest ascents</option></select></div>`;
+  // Everyone's ascents since the reopening: yours from your ticks (first sends), each
+  // local's from the ledger (their first ascents, and the ascents in each problem's
+  // log, which keeps the latest 20). { who: Map(problem -> { p, d, f (flash) }) }.
+  function ascentsSinceReopening() {
+    const by = new Map();
+    const add = (who, p, d, f) => { let m = by.get(who); if (!m) by.set(who, m = new Map()); const o = m.get(p); if (!o) m.set(p, { p, d, f: !!f }); else if (f) o.f = true; };
+    for (const [k, e] of Object.entries(G.world.est)) {
+      if (!e || e.old) continue;                                     // the old notebook's ascents
+      if (e.by !== "you") add(e.by, +k, e.date, false);
+      for (const l of e.logs || []) if (Array.isArray(l) && l[0] !== "you") add(l[0], +k, l[1], l[2] === "F");
+    }
+    for (const t of G.ticks) if (t.style !== "Repeat") add("you", t.p, t.date, t.style === "Flash");
+    return by;
+  }
+  const ascentPts = (p, f) => 100 * (D.problems[p].grade + 1) + (f ? 50 : 0);
+  function hardRankingsHtml() {
+    const rows = [];
+    for (const [who, m] of ascentsSinceReopening()) {
+      const top = [...m.values()].map(a => ({ ...a, pts: ascentPts(a.p, a.f) })).sort((a, b) => b.pts - a.pts || (a.d < b.d ? -1 : 1)).slice(0, RANK_TOP);
+      rows.push({ who, top, score: d3.sum(top, a => a.pts), hardest: d3.max(top, a => D.problems[a.p].grade) });
+    }
+    if (!rows.some(r => r.who === "you")) rows.push({ who: "you", top: [], score: 0, hardest: -1 });
+    const list = rows.filter(r => r.score > 0 || r.who === "you").sort((a, b) => b.score - a.score || b.hardest - a.hardest || (a.who < b.who ? -1 : 1));
+    const me = list.findIndex(r => r.who === "you"), N = 15, open = UI.rk.open;
+    const name = r => (r.who === "you" ? esc(G.player.name) + ` <span class="you-tag">you</span>` : esc(World.whoName(D, r.who).replace(/^the /, "The ")) + (World.whoInfo(D, r.who).regular ? ` <span class="chip">regular</span>` : ""));
+    // A line in an area you haven't found isn't named.
+    const lineName = p => (K.area(D.problems[p].sector) >= 1 ? `<button type="button" class="linklike" data-cl="${p}">${esc(pname(p))}</button>` : `<span class="meta">a line in an area you haven't found</span>`);
+    const row = (r, k) => `<tr class="${r.who === "you" ? "lb-me" : ""}"><td class="num">${k + 1}</td>
+        <td><button type="button" class="linklike" data-rk-open="${esc(r.who)}" aria-expanded="${open === r.who}"><b>${name(r)}</b></button></td>
+        <td class="num"><b>${fmt(r.score)}</b></td><td class="num">${r.hardest >= 0 ? "V" + r.hardest : "–"}</td></tr>`
+      + (open === r.who && r.top.length ? `<tr class="rk-detail"><td></td><td colspan="3"><ol>${r.top.map(a => `<li><span>V${D.problems[a.p].grade} ${lineName(a.p)}${a.f ? " · Flash" : ""} · ${shortDate(a.d)}</span><span class="num">${a.pts}</span></li>`).join("")}</ol></td></tr>` : "");
+    const shown = list.slice(0, N).map(row);
+    if (me >= N) shown.push(`<tr><td colspan="4" class="meta" style="text-align:center">…</td></tr>`, row(list[me], me));
+    const mine = list[me], tenth = mine.top.length >= RANK_TOP ? mine.top[RANK_TOP - 1] : null;
+    const you = !mine.score ? "You haven't sent anything yet. Go climb something!"
+      : `<b>You're #${me + 1}</b> of ${fmt(list.length)} with <b>${fmt(mine.score)} points</b>.` + (me > 0 ? ` ${fmt(list[me - 1].score - mine.score)} behind ${name(list[me - 1]).replace(/ <span.*$/, "")}.` : " You're on top!")
+        + (tenth ? ` Your 10th-hardest counts for ${tenth.pts} (V${D.problems[tenth.p].grade}${tenth.f ? " flash" : ""}), so anything harder raises your score.` : ` Only ${mine.top.length} of your 10 counting ascents are filled, so every new send adds points.`);
+    return `${cragHead()}${rankByHtml()}
+      <p class="meta">A climber's score is the sum of their 10 hardest ascents since the park reopened: 100 points per V-grade (V0 = 100, V5 = 600), plus 50 for a flash. Click a name to see their 10.</p>
+      <div class="lb-join" style="border-left-color:var(--accent)"><p class="lede" style="margin:0">${you}</p></div>
+      <table><thead><tr><th>#</th><th>Climber</th><th class="num">Score</th><th class="num">Top</th></tr></thead><tbody>${shown.join("")}</tbody></table>`;
+  }
   function rankingsHtml() {
-    if (!K.all()) return faRankingsHtml();
+    if (!K.all()) return UI.rk.by === "hard" ? hardRankingsHtml() : faRankingsHtml();
     const r = UI.rk, [from, to] = rankWindow(r.window);
     const rows = [];
     D.npcSends.forEach((list, ci) => {
@@ -2119,7 +2187,7 @@
   // ---- Logbook ----
   function logbookHtml() {
     const sends = firstSends();
-    if (!G.ticks.length && !Object.keys(G.ps).length) return `<h2>Logbook</h2><p class="lede">No ticks yet. Go send something!</p>`;
+    if (!G.ticks.length && !Object.keys(G.ps).length) return `<h2>My logbook</h2><p class="lede">No ticks yet. Go send something!</p>`;
     const maxG = Math.max(0, G.bestGrade);
     const counts = d3.range(maxG, -1, -1).map(g => [g, sends.filter(t => D.problems[t.p].grade === g).length]);
     const maxC = d3.max(counts, c => c[1]) || 1;
@@ -2134,7 +2202,7 @@
         <span class="s">${esc(D.problems[i].boulder.name)} · ${esc(D.problems[i].sector)} · ${shortDate(e.date)}${e.flash ? " · flashed" : ""}</span></span>
         <span class="v">${e.reps ? `${e.reps} ${e.reps === 1 ? "repeat" : "repeats"}` : "no repeats yet"}${e.classic ? `<span class="s">a classic</span>` : ""}</span></button></li>`).join("")}</ul>${fas.length > 40 ? `<p class="meta">Showing the latest 40.</p>` : ""}`
       : `<p class="meta">Be the first up a line nobody has climbed, and it goes in the guidebook under your name.</p>`}`;
-    return `<h2>Logbook</h2><p class="meta">${sends.length} ${sends.length === 1 ? "problem" : "problems"} sent, ${G.ticks.filter(t => t.style === "Flash").length} flashed${v2() ? `, ${fas.length} first ${fas.length === 1 ? "ascent" : "ascents"}` : ""}, over ${G.dayNo} ${G.dayNo === 1 ? "day" : "days"}.</p>
+    return `<h2>My logbook</h2><p class="meta">${sends.length} ${sends.length === 1 ? "problem" : "problems"} sent, ${G.ticks.filter(t => t.style === "Flash").length} flashed${v2() ? `, ${fas.length} first ${fas.length === 1 ? "ascent" : "ascents"}` : ""}, over ${G.dayNo} ${G.dayNo === 1 ? "day" : "days"}.</p>
       <h3>Grade pyramid</h3>
       <div class="pyr">${counts.map(([g, c]) => `<span class="g">V${g}</span><div class="bar"><i style="width:${(c / maxC * 82).toFixed(1)}%"></i>${c}</div>`).join("")}</div>
       ${projects.length ? `<h3>Projects in progress</h3><ul class="rowlist">${projects.slice(0, 12).map(([i, s]) => {
@@ -2189,6 +2257,7 @@
   function cragHtml() {
     if (UI.cl.problem != null) return cragProblemHtml(UI.cl.problem);
     if (UI.cl.view === "rankings") return rankingsHtml();
+    if (UI.cl.view === "mylog") return cragHead() + logbookHtml();
     if (UI.cl.view === "leaders" && leadersShown()) return leadersHtml();
     if (UI.cl.view === "buzz" && !K.all()) return buzzHtml();
     const c = UI.cl, q = c.q.trim().toLowerCase();
@@ -2230,7 +2299,7 @@
         ${c ? `<p>${esc(c)}</p>` : ""}</div>`;
     }).join("");
     const onTodo = G.todo.includes(i);
-    return `<button type="button" class="linklike" data-cl-back>← ${{ rankings: "Rankings", leaders: "First to", buzz: "Local Buzz" }[UI.cl.view] || "All problems"}</button>
+    return `<button type="button" class="linklike" data-cl-back>← ${CL_BACK[UI.cl.view] || "All problems"}</button>
       <h2 style="margin-top:8px">${esc(p.name)} <span class="grade" style="font-size:24px">V${p.grade}</span></h2>
       <p class="meta">${esc(p.boulder.name)} · ${esc(p.sector)} · ${p.stars != null ? `<span class="stars">★</span> ${p.stars.toFixed(1)} from ${p.ratings} ratings` : "no ratings"} · ${fmt(p.sends)} sends${cons ? ` · ${cons}` : ""}</p>
       ${p.boulder.desc ? `<p class="boulder-desc" style="font-size:14px">${esc(p.boulder.name)}: ${esc(p.boulder.desc)}</p>` : ""}
@@ -2261,7 +2330,7 @@
   // Granite Hollow, or, for a line nobody has climbed, just what you can see.
   function cragLineHtml(i) {
     const p = D.problems[i], st = G.ps[i], state = K.line(i), e = K.est(i);
-    const back = `<button type="button" class="linklike" data-cl-back>← ${{ rankings: "Rankings", leaders: "First to", buzz: "Local Buzz" }[UI.cl.view] || "All problems"}</button>`;
+    const back = `<button type="button" class="linklike" data-cl-back>← ${CL_BACK[UI.cl.view] || "All problems"}</button>`;
     if (state === "hidden") return `${back}<p class="lede" style="margin-top:12px">You don't know about this one yet.</p>`;
     const x = K.stats(i), legend = K.legend(i), onTodo = G.todo.includes(i), go = K.canGo({ sector: p.sector, boulder: p.b });
     const mine = G.ticks.filter(t => t.p === i).reverse().map(t => `<div class="logentry mine"><span class="who">${esc(G.player.name)}<small>${G.player.height} cm</small></span>
@@ -2427,7 +2496,7 @@
     on("[data-cl-view]", n => { UI.cl.view = n.dataset.clView; UI.cl.problem = null; renderPanel(); });
     on("[data-rk-open]", n => { UI.rk.open = UI.rk.open === n.dataset.rkOpen ? null : n.dataset.rkOpen; renderPanel(); });
     on("[data-rk-more]", () => { UI.rk.n += 25; renderPanel(); });
-    for (const [id, key] of [["#rk-window", "window"], ["#rk-height", "height"]]) {
+    for (const [id, key] of [["#rk-window", "window"], ["#rk-height", "height"], ["#rk-by", "by"]]) {
       const sel = el.querySelector(id); if (sel) sel.onchange = e => { UI.rk[key] = e.target.value; UI.rk.open = null; renderPanel(); };
     }
     on("[data-lb-grade]", n => { UI.lbGrade = +n.dataset.lbGrade; renderPanel(); });
@@ -2517,7 +2586,7 @@
       ${d.no - (G.backup ? G.backup.dayNo : 0) >= 10 ? `<p class="meta" style="margin-top:12px">It's been ${G.backup ? `${d.no - G.backup.dayNo} days since your last save file` : "a while and you haven't downloaded a save file yet"}. <button type="button" class="linklike" data-export>Download one now</button></p>` : ""}
       <p class="lede" style="margin-top:12px">Skin ${G.player.skin.toFixed(0)}%. Here's the forecast. When do you climb next?</p>
       <div class="plan-grid">${plans}</div>
-      <p class="meta" style="margin-top:8px">Nobody climbs wet granite. Morning rain soaks the rock for the whole day (it becomes a rest day); afternoon rain ends your day when it starts.</p>`,
+      <p class="meta" style="margin-top:8px">Nobody climbs wet granite. Morning rain soaks the rock for the whole day; afternoon rain ends the climbing when it starts. Either way you can stay and explore, and a day without climbing counts as rest.</p>`,
       (root, close) => {
         const ex = root.querySelector("[data-export]");
         if (ex) ex.onclick = () => exportSave().then(() => { if (G.backup && G.backup.dayNo === G.dayNo) ex.parentElement.textContent = "Save file downloaded."; });
@@ -2978,7 +3047,7 @@
           <div class="cc-grid">
             <section class="cc-card"><h2>Your climber</h2>
               <div class="field"><label for="cc-name">Name</label><input type="text" id="cc-name" maxlength="24" autocomplete="off" value="${esc(st.name)}"></div>
-              <div class="field"><label for="cc-height">Height <output>${st.height} cm · ${ftIn(st.height)}</output></label><input type="range" id="cc-height" min="150" max="200" step="1" value="${st.height}"></div>
+              <div class="field"><label for="cc-height">Height <output>${st.height} cm · ${ftIn(st.height)}</output></label><input type="range" id="cc-height" min="122" max="200" step="1" value="${st.height}"></div>
               <div class="field"><label for="cc-ape">Ape index <output>${st.ape >= 0 ? "+" : ""}${st.ape} cm</output></label><input type="range" id="cc-ape" min="-6" max="12" step="1" value="${st.ape}"></div>
               <p class="reach-note">${reachNote()}</p></section>
             <section class="cc-card"><h2>Strengths</h2><p class="help">Pick two styles you're naturally good at.</p>
@@ -3034,8 +3103,7 @@
     if (justRegraded.has(G)) { const info = justRegraded.get(G); justRegraded.delete(G); openModal(() => showRegraded(info)); }
     if (G.day.climb && !G.day.over) safely("the climbing scene", showClimb); else if (G.day.climb) G.day.climb = null;   // reloaded mid-climb
     if (UI.kiosk) { UI.kiosk = false; openModal(showKiosk); }
-    if (!G.day.over && rainNow()) endDay(`It's ${G.day.weather.precip === "Snow" ? "snowing" : "raining"}. Wet granite is slick and holds can snap, so you head home.`);
-    else if (G.day.over) openModal(showSummary);
+    if (G.day.over) openModal(showSummary);
   }
 
   // ======================================================= development mode

@@ -35,7 +35,7 @@
     // ---- the send chance
     lift: 0.6,                        // margin = ability + lift + adjustments − grade
     slope: 2.0, shift: 1.7,           // chance = sigmoid(slope × margin − shift) …
-    topFrom: 4, slopeTop: 0.06, shiftTop: 0.3,   // … both growing above V4, so hard grades are steeper
+    topFrom: 4, slopeTop: 0.06, shiftTop: 0.36,  // … both growing above V4, so hard grades are steeper (shiftTop 0.3 → 0.36 in Stage 5, for the pace)
     cap: 0.95, floor: 0.002,          // nothing is certain, nothing quite impossible
     ceiling: 1.3,                     // the good adjustments together approach this many grades, never pass it
     styleWorth: 0.7, morphMax: 0.6,
@@ -45,7 +45,7 @@
     // ---- moves (Stage 1): what a burn teaches the move you fell on and the moves you
     // passed, and working a move on its own; each try on a problem the same day teaches
     // learnDay as much as the last
-    learnFall: 0.15, learnPass: 0.06, learnWork: 0.3, learnDay: 0.7,
+    learnFall: 0.15, learnPass: 0.06, learnWork: 0.4, learnDay: 0.7,   // learnWork 0.3 → 0.4 in Stage 5
     knownShift: 0.6,                  // a move you know well carries this much less of the risk (where you fall)
     altBeta: 0.2,                     // the better way through a crux, once found, on top of betaMax
     altAt: 0.4, altOnFall: 0.12, altOnWork: 0.3,   // found by falling on (or working) a crux you know this well

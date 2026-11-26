@@ -19,7 +19,7 @@ const text = p => p.evaluate(() => document.querySelector("#tabbody").innerText.
     res[vn + ".here"] = await text(p);
     res[vn + ".hud"] = await p.evaluate(() => document.querySelector("#hud").innerText.replace(/\d{1,2}:\d\d [AP]M|\d+ min of light left|\d+ h \d+ min of light left/g, "#").replace(/\s+/g, " "));
     if (vn !== "atBoulder") continue;
-    for (const tab of ["climber", "logbook", "journal", "craglog"]) { await click(p, `#tabs [data-tab="${tab}"]`); await sleep(150); res[tab] = await text(p); }
+    for (const tab of ["climber", "journal", "craglog"]) { await click(p, `#tabs [data-tab="${tab}"]`); await sleep(150); res[tab] = await text(p); }
     await p.evaluate(() => { const s = document.querySelector("#cl-sort"); s.value = "stars"; s.dispatchEvent(new Event("change")); }); await sleep(100);
     res["craglog.stars"] = await text(p);
     await click(p, "[data-cl]"); await sleep(100); res["craglog.problem"] = await text(p);

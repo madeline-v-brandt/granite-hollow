@@ -144,13 +144,13 @@ function play(styleName, seed, build) {
   let flapped = false;                                                // a flapper teaches tape
   const knowsTape = () => { const L = levelOf(pl).level; return PREP && !!Mech.condAt && ((L >= 3 && pl.skin < 50) || L >= 5 || flapped || out.tapes > 0); };
   const withPartner = day => VIBES && day.minute < day.partnerUntil;
-  const here = (p, day, judge) => ({ ...day.w, cond: Mech.condAt ? condAt(day.w, day.minute, Mech.shadeOf(D.boulders[D.problems[p].b], +g.date.slice(5, 7) - 1)) : day.w.cond,
+  const condsOf = (p, day, judge) => ({ ...day.w, cond: Mech.condAt ? condAt(day.w, day.minute, Mech.shadeOf(D.boulders[D.problems[p].b], +g.date.slice(5, 7) - 1)) : day.w.cond,
     dirty: dirty(p) && !(judge && knowsBrush()), brushed: !!day.brushed[p], tape: !!day.tape,
     vibes: VIBES ? Mech.vibes({ ...day.vibe, partner: withPartner(day) }) : 0 });
   let lastHigh = -99;                                                 // climbing day of the last breakthrough
   function cand(p, day) {
     const pr = D.problems[p], st = stOf(p), L = levelOf(pl).level;
-    const ch = chanceOf(pl, pr, g.ps[p], here(p, day, true));
+    const ch = chanceOf(pl, pr, g.ps[p], condsOf(p, day, true));
     const xp = Mech.sendXp(pl, pr, { first: true, flash: !st.att, newMax: pr.grade > g.bestGrade, sessions: (daysOn[p] ? daysOn[p].size : 0) + 1 });
     return { p, pr, st, ch, xp, d: pr.grade - L, grade: pr.grade, open: open(p), day, pl };
   }
@@ -190,14 +190,14 @@ function play(styleName, seed, build) {
     // Preparation: brush a dirty line before the first burn, and a line you're working
     // on friction holds once a day; tape up when skin wears thin (not for slopers).
     if (knowsBrush()) {
-      const fric = Mech.frictionSensitivity(pr) >= 0.6, hard = chanceOf(pl, pr, st, here(p, day)) < 0.6;
+      const fric = Mech.frictionSensitivity(pr) >= 0.6, hard = chanceOf(pl, pr, st, condsOf(p, day)) < 0.6;
       if (dirty(p) || (fric && hard && !day.brushed[p] && (st.att > 0 || p === day.project))) {
         if (dirty(p)) st.clean = true;
         day.brushed[p] = true; day.minute += Mech.BAL.brushMin; out.brushes++;
       }
     }
     if (!day.tape && pl.skin < 45 && knowsTape() && Mech.tapeFeel(pr) < 1) { day.tape = true; day.minute += Mech.BAL.tapeMin; out.tapes++; }
-    const now = here(p, day), cost = Mech.attemptCost(pl, pr, now), r = Mech.attempt(pl, pr, st, now, rng);
+    const now = condsOf(p, day), cost = Mech.attemptCost(pl, pr, now), r = Mech.attempt(pl, pr, st, now, rng);
     pl.energy = Math.max(0, pl.energy - cost.energy); pl.skin = Math.max(0, pl.skin - cost.skin);
     day.minute += Math.round(cost.minutes);
     st.att++; day.tried[p] = (day.tried[p] || 0) + 1;
@@ -287,7 +287,7 @@ function play(styleName, seed, build) {
       }
       const stw = g.ps[p];
       if (S.work && stw && S.work({ pl, day }, p, stw)) {
-        const pr = D.problems[p], hw = here(p, day), c = Mech.workCost(pl, pr, hw), w = Mech.workMove(pl, pr, stw, hw, stw.lastFall, (day.worked[p] || 0) + 1, rng);
+        const pr = D.problems[p], hw = condsOf(p, day), c = Mech.workCost(pl, pr, hw), w = Mech.workMove(pl, pr, stw, hw, stw.lastFall, (day.worked[p] || 0) + 1, rng);
         pl.energy = Math.max(0, pl.energy - c.energy); pl.skin = Math.max(0, pl.skin - c.skin); day.minute += c.minutes;
         day.worked[p] = (day.worked[p] || 0) + 1; out.works++; out.workMin += c.minutes; if (w.alt) out.altsByWork++;
         lastOn[p] = cal; (daysOn[p] = daysOn[p] || new Set()).add(climbDays); stw.lastFall = null;
