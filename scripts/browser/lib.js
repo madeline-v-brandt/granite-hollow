@@ -37,4 +37,13 @@ async function settle(p) {
 }
 const GAME_DIR = require("path").join(__dirname, "..", "..", "site", "game") + "/";
 const FIX = require("path").join(__dirname, "fixtures") + "/";
-module.exports = { open, ready, click, settle, sleep, burnIfScene, TRY, BASE, GAME_DIR, FIX };
+// A conversation (Phase 4, Stage 2) is clicked through a beat at a time; this goes on
+// until the replies show (never past a goodbye).
+async function talkThrough(p) {
+  for (let k = 0; k < 8; k++) {
+    const st = await p.evaluate(() => ({ next: !!document.querySelector(".talk [data-next]"), choices: !!document.querySelector(".talk .talk-choice"), bye: /Bye/.test((document.querySelector(".talk [data-next]") || {}).textContent || "") }));
+    if (!st.next || st.choices || st.bye) return;
+    await click(p, ".talk [data-next]"); await sleep(60);
+  }
+}
+module.exports = { open, ready, click, settle, sleep, burnIfScene, talkThrough, TRY, BASE, GAME_DIR, FIX };

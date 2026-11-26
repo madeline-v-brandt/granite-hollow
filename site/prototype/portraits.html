@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Granite Hollow · dialogue portraits</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito+Sans:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { --paper: #f3e9cf; --ink: #3b3226; --ink-2: #6b5a45; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.45 "Nunito Sans", system-ui, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font: 800 30px Fraunces, Georgia, serif; letter-spacing: .02em; margin: 0 0 4px; }
+  .lede { color: var(--ink-2); max-width: 70ch; margin: 0 0 22px; }
+  .row { display: grid; grid-template-columns: 150px repeat(7, 1fr); gap: 10px; align-items: center; padding: 12px 0; border-top: 1px dashed #c9b994; }
+  .row h2 { font: 700 18px Fraunces, Georgia, serif; margin: 0; }
+  .row h2 small { display: block; font: 400 13px "Nunito Sans", sans-serif; color: var(--ink-2); }
+  figure { margin: 0; text-align: center; }
+  figure svg { width: 100%; max-width: 120px; height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 1px 1px rgba(60,40,20,.25)); }
+  figcaption { font: 600 16px Caveat, cursive; color: var(--ink-2); }
+  .head { font: 700 12px "Nunito Sans", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); text-align: center; }
+  .dark { background: #24211c; color: #eae0c8; border-radius: 14px; padding: 16px; margin-top: 28px; }
+  .dark h2 { color: #eae0c8; } .dark figcaption, .dark .head { color: #b7aa8c; }
+  .box { margin-top: 30px; display: flex; gap: 14px; align-items: flex-end; background: #fbf4e2; border: 2px solid var(--ink); border-radius: 14px; padding: 12px 16px; max-width: 640px; box-shadow: 0 3px 0 rgba(59,50,38,.25); }
+  .box svg { width: 110px; flex: none; }
+  .box .nm { font: 800 17px Fraunces, Georgia, serif; } .box p { margin: 4px 0 0; }
+  @media (max-width: 760px) { .row { grid-template-columns: repeat(4, 1fr); } .row h2 { grid-column: 1 / -1; } .head { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Dialogue portraits</h1>
+  <p class="lede">For review (Phase 4, Stage 2). Every regular, Pickles and two strangers, in each expression, drawn in SVG from the same colours and clothes as the figures on the map. Dark mode at the end, and a sample of the dialogue box.</p>
+  <div id="grid"></div>
+  <div class="dark" id="dark"></div>
+  <div class="box" id="box"></div>
+</main>
+<script src="../game/portraits.js"></script>
+<script>
+  const who = [["gus", "Ranger Gus", "the park ranger"], ["hollis", "Hollis Pruitt", "keeps the binder"], ["otis", "Otis Fairweather", "perfect sending weather"], ["rowan", "Rowan Ellery", "sketches between burns"],
+    ["bea", "Bea Marchetti", "seventeen, jumps for everything"], ["dez", "Dez Kowalczyk", "strongest, quietest"], ["bishop", "The Bishop", "climbed here in the seventies"],
+    ["pickles", "Pickles", "the lot dog"], ["stranger", "A climber", "someone you haven't met", "skybear"], ["stranger", "A climber", "someone you haven't met", "pebble77"]];
+  const moods = Portraits.MOODS;
+  const grid = (rows, el) => {
+    el.innerHTML = `<div class="row"><span></span>${moods.map(m => `<div class="head">${m}</div>`).join("")}<div class="head">${rows === who ? "" : ""}</div></div>`
+      + rows.map(([k, n, s, seed]) => `<div class="row"><h2>${n}<small>${s}</small></h2>${moods.map(m => `<figure>${Portraits.svg(k, m, { seed, label: n + ", " + m })}</figure>`).join("")}${k === "pickles" ? `<figure>${Portraits.svg(k, "sleepy", { label: "Pickles, sleepy" })}<figcaption>sleepy</figcaption></figure>` : "<span></span>"}</div>`).join("");
+  };
+  grid(who, document.getElementById("grid"));
+  grid(who.slice(0, 7), document.getElementById("dark"));
+  document.getElementById("box").innerHTML = `${Portraits.svg("bea", "excited", { label: "Bea, excited" })}<div><div class="nm">Bea</div><p>“I stuck the dyno on Rocket Science again this morning! Then I spent forty minutes on my slab project and got absolutely nowhere. Slab is fake.”</p></div>`;
+</script>
+</body>
+</html>

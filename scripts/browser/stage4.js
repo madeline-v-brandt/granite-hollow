@@ -3,7 +3,7 @@
 // pad in the climbing scene), cheer a send that the logbook remembers, and head
 // off; the odds panel says "Good vibes" without a number; nothing leaks.
 //   node scripts/browser/stage4.js            (screenshots to $SHOTS, if set)
-const { open, ready, click, settle, sleep, GAME_DIR } = require("./lib");
+const { open, ready, click, settle, sleep, talkThrough, GAME_DIR } = require("./lib");
 const path = require("path");
 const SLOT = "granite-hollow-save-v1";
 global.Mech = require(GAME_DIR + "mechanics.js");
@@ -34,7 +34,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
       // Walk up to the first climbing regular out today.
       for (const w of out) {
         await p.evaluate(w => { const el = document.querySelector(`g.person[data-who='${w}'] path, g.person[data-who='${w}'] circle`) || document.querySelector(`g.person[data-who='${w}']`); el.dispatchEvent(new MouseEvent("click", { bubbles: true })); }, w);
-        for (let t = 0; t < 120 && !(await p.$("[data-together]")); t++) await sleep(250);
+        for (let t = 0; t < 120 && !(await p.$("[data-together]")); t++) { await talkThrough(p); await sleep(250); }
         if (await p.$("[data-together]")) { met = w; break; }
       }
       if (met) break;

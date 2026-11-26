@@ -67,7 +67,9 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   if (onScreen) { await p.mouse.move(onScreen.x, onScreen.y); await sleep(150); }
   const during = await shownTags();
   await p.mouse.move(5, 5); await sleep(100);
-  const want = onScreen && metOut.find(x => x.who === onScreen.w).tag;
+  // (Whoever is actually under the cursor: two people can stand close together.)
+  const under = onScreen && await p.evaluate(({ x, y }) => { const el = document.elementFromPoint(x, y), g = el && el.closest("g.person"); return g ? g.dataset.who : null; }, onScreen);
+  const want = onScreen && ((metOut.find(x => x.who === under) || metOut.find(x => x.who === onScreen.w)).tag);
   check("name tags only show on hover", before.length === 0 && (!onScreen || (during.length === 1 && during[0] === want)), `before: ${before.join(",") || "none"} · hovering ${want || "(nobody on screen)"}: ${during.join(",")}`);
   // Hover over someone: their card.
   const one = metOut[0];

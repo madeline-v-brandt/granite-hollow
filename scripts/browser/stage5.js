@@ -4,7 +4,7 @@
 // areas until it has met the cast, and uses each kind of offer it's given.
 // Checks nothing hidden leaks through the new text.
 //   node scripts/browser/stage5.js          (SHOTS=dir also saves screenshots)
-const { open, ready, click, sleep, GAME_DIR: GD } = require("./lib");
+const { open, ready, click, sleep, talkThrough, GAME_DIR: GD } = require("./lib");
 global.Mech = require(GD + "mechanics.js"); global.World = require(GD + "world.js");
 const Know = require(GD + "knowledge.js"), D = require(GD + "game-data.json");
 global.Art = require(GD + "art.js");
@@ -68,9 +68,11 @@ function leaks(g, all) {
       const shot = async tag => { if (process.env.SHOTS) { const el = await p.$(".npc"); if (el) await el.screenshot({ path: `${process.env.SHOTS}/npc-${card.name.replace(/\W+/g, "-").toLowerCase()}-${tag}.png` }); } };
       await shot(seen[card.name]);
       console.log(`     ${card.name}: ${card.text.slice(0, 150)}${card.text.length > 150 ? "…" : ""}`);
-      for (const [sel, label] of [["[data-dir]", "ask the way"], ["[data-reveal]", "where exactly"], ["[data-pet]", "pet"], ["[data-accept]", "add tip"], ["[data-chat]", "sit and chat"]]) {
+      await talkThrough(p);
+      for (const [sel, label] of [["[data-dir]", "ask the way"], ["[data-reveal]", "where exactly"], ["[data-pet]", "pet"], ["[data-rec]", "what should I try"], ["[data-accept]", "add tip"], ["[data-chat]", "sit and chat"]]) {
         if (await p.$(".npc " + sel)) {
           await click(p, ".npc " + sel); await sleep(250); used[label] = (used[label] || 0) + 1;
+          await talkThrough(p);
           const after = await p.evaluate(() => { const n = document.querySelector(".npc"); return n ? n.innerText.replace(/\s+/g, " ") : ""; });
           const toast = await p.evaluate(() => [...document.querySelectorAll(".toast")].map(t => t.innerText.replace(/\s+/g, " ")).pop() || "");
           console.log(`       ${label} → ${toast && label !== "sit and chat" ? "toast: " + toast.slice(0, 90) + " | " : ""}${after.slice(-130)}`);

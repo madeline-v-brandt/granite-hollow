@@ -878,11 +878,11 @@
     }[type];
     let line = pick(greet);
     if (w.cond >= 0.3) line += " Friction's amazing today."; else if (w.cond <= -0.3) line += " Pretty greasy out here though.";
-    const { rec, recLine } = recommend("c" + ci, sector, D.liked[ci], h);
-    return { ci, who: "c" + ci, sector, line, rec, recLine, beta: betaFor(sector), accepted: false, betaTaken: false };
+    const { rec, recLine } = recommend("c" + ci, sector, D.liked[ci], h, { tell: false });
+    return { ci, who: "c" + ci, sector, line, rec, recLine, beta: betaFor(sector), accepted: false, betaTaken: false, open: true, idx: 0, used: [], beats: [{ t: line, mood: "happy" }] };
   }
   // A recommendation: something they liked that suits you (or the best fit here).
-  function recommend(who, sector, liked, h) {
+  function recommend(who, sector, liked, h, opts = {}) {
     const documented = i => !v2() || !!G.world.est[i];        // under the new rules, only what's been climbed
     let ranked = (liked || []).filter(i => !G.ps[i]?.sent && documented(i)).map(i => [i, playerFit(i)]).filter(x => x[1] > -4).sort((a, b) => b[1] - a[1]);
     let theirs = ranked.length > 0;
@@ -890,7 +890,7 @@
     const rec = ranked.length ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))][0] : null;
     let recLine = "";
     if (rec != null) {
-      K.tell(rec, who, G.date);                              // they've told you about it, so now you know
+      if (opts.tell !== false) K.tell(rec, who, G.date);     // they've told you about it, so now you know (in a conversation, once you ask)
       const p = D.problems[rec], why = whyFor(rec);
       const where = p.sector === sector ? `right here on ${p.boulder.name}` : `over at ${p.sector}`;
       recLine = `You should try ${titleOf(rec)}, ${where}. ${theirs ? "One of my favorites. " : ""}I think ${why.slice(0, 2).join(" and ")}.`;
@@ -910,21 +910,7 @@
   }
 
   // ---- the regulars (Stage 5): people you get to know. Who's around, where,
-  // and what they say. Names, places and lines only ever come through K.
-  const REGULAR_TALK = {
-    gus: { hello: ["Ranger Gus. Welcome to the Hollow. You're one of the first climbers allowed back in since '87, you know.", "Morning! Gus. I look after the park. Mostly I look after Pickles."],
-      again: ["Morning! Pack it in, pack it out. You know the drill.", "Pickles has been asking about you. Well. Staring at your car.", "If you see anyone feeding the geese, tell them Gus said no."] },
-    rowan: { hello: ["Oh! Hi. Sorry, I was sketching. I'm Rowan. This boulder has the best shadows in the morning.", "Hi, I'm Rowan. I come up here to draw the rocks and occasionally climb one."],
-      again: ["Hey, you're back! I was hoping someone would come up here.", "I've drawn this spot about six times now. It keeps changing with the light.", "Want to see what I've got so far? It's mostly lines. Some of them are even climbing lines.", "You climb like you're listening to the rock. Is that a weird thing to say? That's a weird thing to say."] },
-    hollis: { hello: ["Hollis Pruitt. I'm keeping notes on everything that goes up out here. Somebody has to.", "Hollis. I've documented every problem in this park. Some of them twice, in case the first one was wrong."],
-      again: ["Back again! I've updated the notes. Twice.", "Did you know the schoolhouse kids used these boulders as a recess spot? I have a whole page on it.", "Every line out here has a story. Most of them are mine, now."] },
-    otis: { hello: ["Otis! Isn't it perfect sending weather?", "Name's Otis. Perfect day for it, isn't it?"],
-      again: ["Perfect sending weather!", "I've been on the same slab since August. It's a relationship now.", "Some days you send, some days you sit on your pad and eat a sandwich. Both are climbing."] },
-    bea: { hello: ["I'm Bea! Have you tried jumping for it? You should always try jumping for it.", "Hi! Bea. Did you see that? I almost stuck it. Almost!"],
-      again: ["Did you see that? I almost stuck it! Almost!", "My mom drops me off on her way to work. Best deal ever.", "Okay but what if you just jumped?"] },
-    dez: { hello: ["Dez. Good to meet you.", "…Dez. Hi."],
-      again: ["Mm. Good conditions.", "You're getting strong.", "Nice to see you out."] },
-  };
+  // and what they say (talk.js, Phase 4). Names, places and lines only ever come through K.
   const isAround = w => {
     const n = World.NAMED[w.slice(2)];
     if (!n || !n.regular || G.dayNo < (n.arrive || 0)) return false;
@@ -936,15 +922,7 @@
   // Who's out today, and where (Stage 6): each regular who's around is at one of
   // their home areas' boulders, decided by the day (so a reload doesn't move them).
   // The Bishop only on his days. Drawn on the map; walk up to someone to talk.
-  const LOOKS = {
-    gus: { shirt: "#5f6b2d", pants: "#4a4031", hat: "cap", hatC: "#5f6b2d", skin: "#d1a27c", hair: "#9a958c", pad: null, longSleeves: true },
-    bishop: { shirt: "#9b3b2f", stripes: "rgba(30,20,15,.35)", pants: "#4b4a52", hat: null, skin: "#e2b996", hair: "#e6e2da", pad: null, longSleeves: true },
-    rowan: { shirt: "#e0b04a", pants: "#3c4a5c", hat: null, skin: "#a8734f", hair: "#2b1d16", pad: "#5a7d5a", chalk: "#e3dccb" },
-    hollis: { shirt: "#5f7fa6", pants: "#6b6457", hat: "bucket", hatC: "#8a7a55", skin: "#f0c9a6", hair: "#7a5a3a", pad: "#c9772b", chalk: "#2f6b4f" },
-    otis: { shirt: "#c46a3a", pants: "#2e3440", hat: "headband", hatC: "#d0a23a", skin: "#7a5038", hair: "#1e1a18", pad: "#2e4f6e", chalk: "#b5462e" },
-    bea: { shirt: "#b0436e", stripes: "rgba(255,255,255,.4)", pants: "#2e3440", shorts: true, hat: null, skin: "#c08a64", hair: "#3a2418", pad: "#3f7fa6", chalk: "#d0a23a" },
-    dez: { shirt: "#3b3f46", pants: "#5b4a3a", hat: "beanie", hatC: "#6d5aa8", skin: "#5e3b2a", hair: "#151210", pad: "#a43b2f", chalk: "#e3dccb" },
-  };
+  const LOOKS = (window.Portraits && Portraits.LOOKS) || {};           // each regular's colours and clothes (portraits.js; the map's figures and the portraits share them)
   let peopleCache = { key: "", list: [] };
   function peopleToday() {
     if (!v2()) return [];
@@ -1036,13 +1014,16 @@
     if (!v2() || G.day.over) return false;
     // Pickles, napping by Pickles' Rock.
     const dog = M.paint && M.paint.scene.landmarks.find(l => l.kind === "dog");
-    if (dog && isAround("n:pickles") && !G.day.met.includes("n:pickles") && Math.hypot(pos[0] - dog.x, pos[1] - dog.y) < 6) {
-      G.day.met.push("n:pickles"); G.day.encounter = buildRegular("n:pickles", "The Tailgate", { napping: true }); return true;
+    const again = w => UI.talkTo === w && !(G.day.encounter && G.day.encounter.who === w);
+    if (dog && isAround("n:pickles") && Math.hypot(pos[0] - dog.x, pos[1] - dog.y) < 6) {
+      if (!G.day.met.includes("n:pickles")) { G.day.met.push("n:pickles"); G.day.encounter = buildRegular("n:pickles", "The Tailgate", { napping: true }); UI.talkTo = null; return true; }
+      if (again("n:pickles")) { UI.talkTo = null; G.day.encounter = buildRegular("n:pickles", "The Tailgate", { again: true }); return true; }
     }
     for (const p of peopleNow()) {
-      if (G.day.met.includes(p.who)) continue;
       const at = M.paint && M.paint.personAt(p.who); if (!at) continue;
-      if (Math.hypot(pos[0] - at.x, pos[1] - at.y) < 7) { G.day.met.push(p.who); G.day.encounter = buildRegular(p.who, D.boulders[p.b].sector); return true; }
+      if (Math.hypot(pos[0] - at.x, pos[1] - at.y) >= 7) continue;
+      if (!G.day.met.includes(p.who)) { G.day.met.push(p.who); G.day.encounter = buildRegular(p.who, D.boulders[p.b].sector); UI.talkTo = null; return true; }
+      if (again(p.who)) { UI.talkTo = null; G.day.encounter = buildRegular(p.who, D.boulders[p.b].sector, { again: true }); return true; }
     }
     return false;
   }
@@ -1067,56 +1048,23 @@
     if (!strong && D.problems[out[0]].grade > A + 3) return null;
     return out[Math.floor(Math.random() * Math.min(3, out.length))];
   }
-  // Something of yours or theirs worth mentioning: your latest first ascent, or theirs.
-  function remarkFor(w) {
-    const W = G.world, since = addDays(G.date, -3);
-    const together = [...G.ticks].reverse().find(t => t.with === w && t.style !== "Repeat" && t.date >= addDays(G.date, -30));
-    if (together && Math.random() < 0.4) return pick([`Still thinking about your send of ${pname(together.p)}. What a day.`, `We should climb again soon. That day on ${pname(together.p)} was great.`]);
-    const mine = Object.entries(W.est).filter(([p, e]) => e.by === "you" && e.date >= since && e.date < G.date).sort((a, b) => (a[1].date < b[1].date ? 1 : -1))[0];
-    if (mine && Math.random() < 0.6) return pick([`Saw your name in CragLog. ${pname(+mine[0])}! Nice.`, `I heard you got the first ascent of ${pname(+mine[0])}. What's it like?`]);
-    const theirs = Object.entries(W.est).filter(([p, e]) => e.by === w && e.date >= addDays(G.date, -10)).sort((a, b) => (a[1].date < b[1].date ? 1 : -1))[0];
-    if (theirs) {
-      const p = +theirs[0], b = D.problems[p].b, s = D.boulders[b].sector;
-      if (K.line(p) === "est") return `I finally put up ${pname(p)} on ${D.boulders[b].name}. You should try it.`;
-      return `I put up something new ${K.area(s) >= 1 ? "at " + s : World.AREAS[s]?.hint || "out in the woods"} this week. Still buzzing.`;
-    }
-    return "";
-  }
-  const BISHOP_YEARS = [1971, 1973, 1974, 1976, 1977, 1978, 1979, 1981, 1983, 1986];
-  const BISHOP_HOW = ["In work boots.", "Without a pad. We didn't have pads. We had a doormat.", "In the rain, mind you.", "Dot spotted me. Or I spotted her. One of the two.",
-    "Backwards, as I recall.", "Twice. The second time for fun.", "Wearing a tie. It was a Sunday.", "With a stick. No, that was the other one."];
-  function bishopClaim() {
-    const sentToday = G.day.sends.filter(s => s.style !== "Repeat").map(s => s.p), proj = Object.keys(G.ps).map(Number).filter(i => !G.ps[i].sent && G.ps[i].att >= 3 && K.visible(i));
-    const yy = String(pick(BISHOP_YEARS)).slice(2);
-    if (sentToday.length) return `${pname(pick(sentToday))}? Oh, I did that one in '${yy}. ${pick(BISHOP_HOW)} Nice to see somebody repeat it.`;
-    if (proj.length) return `Still on ${pname(pick(proj))}? I did that in '${yy}. ${pick(BISHOP_HOW)} Dot will tell you different, but Dot's not here, is she?`;
-    return pick([`Back in '${yy} we climbed everything out here. Everything. Nobody wrote any of it down, of course.`, `You know who put up the first problem in this park? Me. Well. Me and Dot. Mostly me.`,
-      `They call me the Bishop. Don't ask why. It's a long story, and most of it's true.`]);
+  // Your project: the one you've tried most, unsent, worked on in the last week.
+  function currentProject() {
+    return Object.keys(G.ps).map(Number).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && K.visible(i) && (G.ps[i].log || []).some(x => Array.isArray(x) && String(x[0]) >= addDays(G.date, -7))).sort((a, b) => G.ps[b].att - G.ps[a].att)[0] ?? null;
   }
   function buildRegular(w, sector, ctx = {}) {
     const key = w.slice(2), n = World.NAMED[key], r = K.meet(w, G.date), first = r.n === 1;
     Social.moment(G, w, "met", G.date);
-    // They know what you're working on: your project with the most tries from the last week (for later conversations).
-    const proj = key === "pickles" ? null : Object.keys(G.ps).map(Number).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && K.visible(i) && (G.ps[i].log || []).some(x => Array.isArray(x) && String(x[0]) >= addDays(G.date, -7))).sort((a, b) => G.ps[b].att - G.ps[a].att)[0];
+    // They know what you're working on (for later conversations).
+    const proj = key === "pickles" ? null : currentProject();
     if (proj != null) Social.moment(G, w, "proj", G.date, proj);
-    const e = { who: w, sector, line: "", rec: null, recLine: "", beta: null, accepted: false, betaTaken: false };
-    if (key === "pickles") {
-      e.line = ctx.napping
-        ? pick(first ? ["A scruffy dog is napping in the shade of the boulder. His tag says PICKLES. His tail thumps when he sees you."]
-          : ["Pickles is napping in the shade of his rock. His tail thumps twice when he sees you.", "Pickles opens one eye, decides you're a friend, and rolls over for a belly rub.", "Pickles is guarding a very important stick beside his rock."])
-        : pick(first ? ["A scruffy dog is lying by the boulder, tail going. His tag says PICKLES."] : ["Pickles thumps his tail at you from the shade of his rock.",
-          "Pickles has found a stick and would like you to admire it.", "Pickles lifts his head from his paws and wags when he sees you."]);
-      e.pet = true; return e;
-    }
-    if (key === "bishop") {
-      e.say = true;     // narration with his words in it, not a plain quote
-      e.line = first ? `A tall old man in a flannel shirt looks you up and down. “They call me the Bishop. I climbed here before you were born. ${bishopClaim()}”` : `“${bishopClaim()}”`;
-    } else {
-      const t = REGULAR_TALK[key];
-      e.line = pick(first ? t.hello : t.again);
-      if (key === "otis" && G.day.weather.cond <= -0.3 && !first) e.line += " Well. Perfect-ish.";
-      const rm = first ? "" : remarkFor(w); if (rm) e.line += " " + rm;
-    }
+    const e = { who: w, sector, line: "", rec: null, recLine: "", beta: null, accepted: false, betaTaken: false, open: true, idx: 0, used: [] };
+    // What they say: a hello and their news (talk.js), or, back again today, a short hello.
+    e.beats = ctx.again ? Talk.reply(talkEnv(), w, "again") : Talk.opening(talkEnv(), w);
+    if (!e.beats.length) e.beats = [{ t: "Hello again.", mood: "happy" }];
+    e.line = e.beats.map(b => b.t).join(" ");
+    if (key === "pickles") { e.pet = true; return e; }
+    if (key === "bishop") e.say = true;
     // What they offer: the way to an area, a line you haven't noticed, or a recommendation (and beta).
     const strong = key === "dez" || key === "bishop" || (n.level || 0) >= 9;
     const dirTo = directionsTo(), hidden = hiddenLineFor(strong);
@@ -1126,7 +1074,7 @@
       const b = D.problems[hidden].b;
       e.reveal = hidden;
       e.revealLine = key === "bishop" ? `“There's a line on ${D.boulders[b].name} nobody's done since me,” he says. “Ha.”` : key === "dez" ? `There's a line on ${D.boulders[b].name}. Hard. Nobody's touched it.` : `Have you seen the line on ${D.boulders[b].name}? It's easy to miss.`;
-    } else if (key !== "bishop") Object.assign(e, recommend(w, sector, null, n.h));
+    } else if (key !== "bishop") Object.assign(e, recommend(w, sector, null, n.h, { tell: false }));
     if (key !== "bishop") e.beta = betaFor(sector);
     return e;
   }
@@ -1149,35 +1097,13 @@
     }
     save(); renderAll();
   }
-  // Sitting down with someone for twenty minutes: a rest, in company, and a story.
-  const CHATS = {
-    gus: ["Gus tells you about the closure in '87: insurance, mostly, and one very loud town meeting. “Took thirty-eight years and a new county commissioner to get that gate open again.”",
-      "Gus explains that Pickles turned up at the lot as a puppy one spring and simply never left. “He's not my dog. I just feed him. Every day. And he sleeps in my truck.”",
-      "Gus points out the old quarry road through the trees, and the stone wall the farmers built before there was a park. “Everything out here was something else first.”"],
-    bishop: ["The Bishop tells you how the crag got its name. The story takes nineteen minutes, involves a mule, and doesn't seem to be about the crag.",
-      "The Bishop says Dot was the best climber he ever saw. He says it quietly, and for once he doesn't add anything funny.",
-      "The Bishop shows you how they used to tape their fingers in the seventies. It involves electrical tape. You decide not to try it."],
-    rowan: ["Rowan shows you a sketchbook full of boulders, each with tiny arrows for the moves. “I can't always climb them. But I can draw them.”",
-      "Rowan moved to the village in the spring for a job at the library, and found the park by accident on a walk. “I thought the rocks looked like they wanted to be climbed.”",
-      "You talk about nothing much for twenty minutes: the light on the rock, the best sandwich in the village, a song you both half-remember. It's nice."],
-    hollis: ["Hollis has a binder. An actual binder, with tabs. Every problem in the park is in it, with sketches, and some of them have footnotes.",
-      "Hollis explains that the schoolhouse boulders are named after the 1920s attendance book. “Somebody had to. It might as well be accurate.”",
-      "Hollis admits to never having made a first ascent. “I'm a historian. Someone has to write it down.” Then, quieter: “There's one I've been looking at, though.”"],
-    otis: ["Otis has been climbing since 1994, mostly at the same three crags. “People ask why. Well, look at it.” You look at it. He has a point.",
-      "Otis shares half his sandwich. It's an excellent sandwich. He's been on the same slab since August and says it's the best thing he's ever not done.",
-      "Otis tells you about the one time it was truly bad weather. Then he decides it wasn't that bad."],
-    bea: ["Bea demonstrates a dyno on a log. She doesn't stick it. She is delighted anyway.",
-      "Bea wants to know your hardest send, your favourite problem, your shoe size and whether you've ever fallen off the top of something. All at once.",
-      "Bea admits she's a bit scared of highballs. “Don't tell anyone. Especially Dez.”"],
-    dez: ["Dez doesn't say much. You sit and watch the light move across the rock. After a while: “That one's been bugging me for a month.”",
-      "Dez says the trick to hard climbing is resting properly. Then demonstrates, by lying down on the pad and closing their eyes.",
-      "Dez asks what you're working on, and listens properly to the whole answer. “You'll get it,” Dez says, as if it's a fact."],
-  };
   function sitChat() {
     const e = G.day.encounter; if (!e || !e.who || !e.who.startsWith("n:") || e.pet || e.chatted || UI.busy || G.day.over) return;
-    const key = e.who.slice(2), r = K.chat(e.who, G.date), lines = CHATS[key] || ["You sit and talk for a while."];
+    K.chat(e.who, G.date);
     Social.moment(G, e.who, "chat", G.date);
-    e.chatted = lines[(r.chats - 1) % lines.length];
+    const told = Talk.reply(talkEnv(), e.who, "story");
+    e.chatted = told.length ? told[0].t : "You sit and talk for a while.";
+    talkAdd(e, told.length ? told : [{ t: e.chatted, mood: "happy", narr: true }]);
     G.day.minute += 20;
     G.player.energy = Math.min(G.day.startEnergy, G.player.energy + 15);
     note(`Sat and talked with ${whoOf(e.who).replace(/^the /, "the ")}.`);
@@ -1185,11 +1111,11 @@
   }
   function petDog() {
     const e = G.day.encounter; if (!e || !e.pet || e.petted) return;
-    const n = K.pet(e.who, G.date);
-    const gusOut = peopleNow().some(x => x.who === "n:gus");
-    e.petted = n < 3 ? "He leans into your hand." : n < 10 ? "He leans his whole weight against your leg and sighs."
-      : gusOut ? "He follows you a few steps toward the trail before Gus whistles him back." : "He follows you a few steps toward the trail, then thinks better of it and flops back down in the shade.";
+    K.pet(e.who, G.date);
     Social.moment(G, e.who, "pet", G.date);
+    const b = Talk.reply(talkEnv(), e.who, "pet");
+    e.petted = b.length ? b[0].t : "He leans into your hand.";
+    talkAdd(e, b.length ? b : [{ t: e.petted, mood: "happy", narr: true }]);
     save(); renderAll();
   }
   function acceptTip() {
@@ -1302,6 +1228,119 @@
     save(); renderAll();
   }
 
+  // ---- conversations (Phase 4, Stage 2): a box over the map, with a portrait ----------------
+  // G.day.encounter is the conversation: its beats (what's been said, { t, mood,
+  // narr }), which one you're on (idx), the replies you've used, and what they can
+  // offer (directions, a line you'd miss, a recommendation, beta, climbing together).
+  // Words come from talk.js; actions are the same as before. Walking away ends it.
+  function talkEnv() {
+    const pr = v2() ? K.met("n:pickles") : null;
+    return { G, D, K, World, Social, minute: G.day.minute, wet: rainNow(), rng: Math.random, playerName: G.player.name, pets: (pr && pr.pets) || 0, gusOut: peopleNow().some(x => x.who === "n:gus") };
+  }
+  function talkAdd(e, beats) {
+    if (!e || !beats || !beats.length) return;
+    e.beats = e.beats || []; e.beats.push(...beats); e.idx = e.beats.length - beats.length;
+  }
+  function talkChoices(e) {
+    if (e.closing) return [];
+    const n = typeof e.who === "string" && e.who.startsWith("n:"), key = n ? e.who.slice(2) : null, used = k => (e.used || []).includes(k), out = [];
+    if (e.pet) {
+      if (!e.petted) out.push(["pet", "Pet him", "data-pet"]);
+      if (!used("stick")) out.push(["stick", "Throw his stick", "data-stick"]);
+      out.push(["bye", "Leave him to his nap", "data-bye"]);
+      return out;
+    }
+    const mine = currentProject();
+    if (n && key !== "bishop" && !used("ask")) out.push(["ask", "What are you working on?", "data-ask"]);
+    if (n && key !== "bishop" && mine != null && !used("tell")) out.push(["tell", `I'm working on ${pname(mine)}`, "data-tell"]);
+    if (canPartner(e) && !e.partnered) out.push(["together", "Climb together?", "data-together"]);
+    if (e.beta && !e.betaTaken) out.push(["beta", `Any tips for ${pname(e.beta.p)}?`, "data-beta"]);
+    if (e.dir && !e.dirTaken) out.push(["dir", key === "bishop" ? "Ask where else is worth a look" : "Know any other good spots?", "data-dir"]);
+    if (e.dir && e.dirTaken && !G.day.over) out.push(["go-sector", `Walk to ${e.dir}`, "data-go-sector"]);
+    if (e.reveal != null && !e.revealTaken) out.push(["reveal", "Seen any lines I'd miss?", "data-reveal"]);
+    if (e.reveal != null && e.revealTaken && !G.day.over) out.push(["go-boulder", "Go and look", "data-go-boulder"]);
+    if (e.rec != null && !used("rec")) out.push(["rec", "What should I try?", "data-rec"]);
+    if (e.rec != null && used("rec") && !e.accepted) out.push(["accept", "Add it to my list", "data-accept"]);
+    if (n && !e.chatted) out.push(["chat", key === "bishop" ? "Ask about the old days · 20 min" : "Sit and chat · 20 min", "data-chat", UI.busy || G.day.over]);
+    out.push(["bye", "Bye!", "data-bye"]);
+    return out;
+  }
+  function talkAct(k) {
+    const e = G.day.encounter; if (!e) return;
+    const env = talkEnv(), use = () => { e.used = e.used || []; if (!e.used.includes(k)) e.used.push(k); };
+    const who = typeof e.who === "string" && e.who.startsWith("n:") ? whoOf(e.who).replace(/^the /, "The ") : whoOf(e.ci ?? e.who);
+    switch (k) {
+      case "next": if (e.idx < e.beats.length - 1) e.idx++; else if (e.closing) return closeTalk(); break;
+      case "ask": use(); talkAdd(e, Talk.reply(env, e.who, "ask")); break;
+      case "tell": { use(); const p = currentProject(); if (p != null) Social.moment(G, e.who, "proj", G.date, p); talkAdd(e, Talk.reply(env, e.who, "tell")); break; }
+      case "together": climbTogether(); if (e.partnered) talkAdd(e, [{ t: e.partnered.replace(/^“|”$/g, ""), mood: "happy" }]); break;
+      case "beta": { const t = e.beta && e.beta.text; takeBeta(); if (t) talkAdd(e, [{ t, mood: "thoughtful" }]); break; }
+      case "dir": { const line = e.dirLine; askWay(); talkAdd(e, [{ t: line, mood: "thoughtful", narr: e.who === "n:bishop" }, { t: `${e.who === "n:bishop" ? "He draws" : who + " draws"} you a little map to ${e.dir} on the back of a receipt.`, mood: "happy", narr: true }]); break; }
+      case "reveal": { const line = e.revealLine; hearLine(); talkAdd(e, [{ t: line, mood: "thoughtful", narr: e.who === "n:bishop" }]); break; }
+      case "rec": use(); if (e.rec != null) K.tell(e.rec, e.who, G.date); talkAdd(e, [{ t: e.recLine, mood: "happy" }]); break;
+      case "accept": acceptTip(); talkAdd(e, [{ t: "You add it to your list.", mood: "happy", narr: true }]); break;
+      case "chat": sitChat(); return;
+      case "pet": petDog(); return;
+      case "stick": use(); talkAdd(e, Talk.reply(env, e.who, "stick")); break;
+      case "bye": {
+        const b = typeof e.who === "string" && e.who.startsWith("n:") ? Talk.reply(env, e.who, "bye") : [];
+        e.closing = true; talkAdd(e, b.length ? b : [{ t: pick(["See you around!", "Have a good one!", "Happy climbing!"]), mood: "happy" }]); break;
+      }
+      case "go-sector": { const d = e.dir; closeTalk(); travel({ sector: d, boulder: null }); return; }
+      case "go-boulder": { const b = D.problems[e.reveal].b; closeTalk(); travel({ sector: D.boulders[b].sector, boulder: b }); return; }
+    }
+    save(); renderAll();
+  }
+  function closeTalk() { G.day.encounter = null; UI.talkKey = ""; save(); renderAll(); }
+  const dogSpot = () => (M && M.paint && M.paint.scene.landmarks.find(l => l.kind === "dog")) || null;
+  function renderTalk() {
+    const root = $("#talk-root"); if (!root) return;
+    const e = G && G.day && G.day.encounter;
+    const hide = () => { root.hidden = true; root.innerHTML = ""; UI.talkKey = ""; $("#mapwrap").classList.remove("talking"); };
+    if (!e || G.day.over || climbing()) return hide();
+    if (!Array.isArray(e.beats) || !e.beats.length) { e.beats = [{ t: [e.line, e.recLine].filter(Boolean).join(" ") || "Hello!", mood: "neutral", narr: !!(e.say || e.pet) }]; e.idx = 0; e.used = e.used || []; }   // from before Stage 2
+    // Walked away: the conversation's over.
+    const n = typeof e.who === "string" && e.who.startsWith("n:"), key = n ? e.who.slice(2) : null;
+    const at = key === "pickles" ? dogSpot() : n && e.who !== partnerNow() && M && M.paint ? M.paint.personAt(e.who) : null;
+    if (at && G.pos && Math.hypot(G.pos[0] - at.x, G.pos[1] - at.y) > 16) { G.day.encounter = null; return hide(); }
+    const idx = Math.max(0, Math.min(e.idx || 0, e.beats.length - 1)), b = e.beats[idx], last = idx >= e.beats.length - 1;
+    let name, sub;
+    if (n) {
+      const i = World.whoInfo(D, e.who), lvl = World.REG.includes(e.who) ? World.levelOn(e.who, G.date) : i.level, t = Social.tier(G, e.who);
+      name = i.name.replace(/^the /, "The ");
+      sub = [i.blurb.replace(/^is /, ""), i.type !== "dog" && !i.old ? `climbs around V${Math.round(lvl)}` : "", t && t.n > 0 ? t.words.toLowerCase() : ""].filter(Boolean).join(" · ");
+    } else {
+      const [nm, h, type, lvl] = D.climbers[e.ci] || ["A climber", 170, "regular", 0];
+      name = nm; sub = `${{ local_hero: "local", regular: "regular", occasional: "weekend climber", tourist: "visiting" }[type] || "climber"} · climbs around V${Math.round(lvl)}`;
+    }
+    const choices = last ? talkChoices(e) : [];
+    const sig = JSON.stringify([e.who, idx, e.beats.length, b.mood, choices.map(c => c[0] + (c[3] ? "!" : ""))]);
+    if (sig === UI.talkKey && !root.hidden) return;
+    const fresh = UI.talkKey === "" || JSON.parse(UI.talkKey || "[]")[0] !== e.who;
+    UI.talkKey = sig;
+    const portrait = Portraits.svg(n ? key : "stranger", b.mood || "neutral", { seed: String(e.who), label: `${name}, ${b.mood || "neutral"}` });
+    const text = b.narr ? `<p class="talk-text narr">${esc(b.t)}</p>` : `<p class="talk-text"><q>${esc(b.t.replace(/^“|”$/g, ""))}</q></p>`;
+    const btns = last && !e.closing ? choices.map(([k, label, attr, off], j) => `<button type="button" class="talk-choice" data-act="${k}" ${attr} ${off ? "disabled" : ""}><span class="talk-k" aria-hidden="true">${j + 1}</span>${esc(label)}</button>`).join("")
+      : `<button type="button" class="talk-next" data-act="next" data-next aria-label="${last ? "Close" : "Next"}">${last ? "Bye" : "Next"} <span aria-hidden="true">▸</span></button>`;
+    root.innerHTML = `<div class="talk npc${n ? " regular" : ""}${fresh ? " arrive" : ""}" role="dialog" aria-label="Talking with ${esc(name)}">
+      <div class="talk-portrait">${portrait}</div>
+      <div class="talk-body"><div class="nm">${esc(name)}<small>${esc(sub)}</small></div>
+        <div class="talk-say" aria-live="polite">${text}</div>
+        <div class="talk-choices">${btns}</div></div>
+      <button type="button" class="talk-x" data-act="dismiss" data-dismiss aria-label="Leave the conversation" title="Leave (Esc)">×</button></div>`;
+    root.hidden = false; $("#mapwrap").classList.add("talking");
+    root.querySelectorAll("[data-act]").forEach(x => { x.onclick = ev => { ev.stopPropagation(); x.dataset.act === "dismiss" ? closeTalk() : talkAct(x.dataset.act); }; });
+    const focus = root.querySelector("[data-next], .talk-choice:not([disabled])"); if (focus && !document.querySelector(".modal")) focus.focus({ preventScroll: true });
+  }
+  // Keys while you're talking: Esc leaves, 1–9 pick a reply, Enter or Space goes on.
+  document.addEventListener("keydown", ev => {
+    const root = $("#talk-root"); if (!root || root.hidden || ev.metaKey || ev.ctrlKey || ev.altKey || $("#modal-root").children.length || climbing()) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((ev.target && ev.target.tagName) || "")) return;
+    if (ev.key === "Escape") { ev.preventDefault(); closeTalk(); return; }
+    if (/^[1-9]$/.test(ev.key)) { const x = root.querySelectorAll(".talk-choice")[+ev.key - 1]; if (x && !x.disabled) { ev.preventDefault(); x.click(); } return; }
+    if ((ev.key === "Enter" || ev.key === " ") && !(ev.target && ev.target.closest && ev.target.closest("#talk-root"))) { const x = root.querySelector("[data-next]"); if (x) { ev.preventDefault(); x.click(); } }
+  });
+
   // ================================================================ the map
   // An illustrated hiking map. World layers (terrain, water, trails, scenery,
   // trees) live in one group that pans and zooms; boulders, labels and the
@@ -1324,7 +1363,13 @@
       onBoulder: id => { const b = D.boulders[id]; goTo({ sector: b.sector, boulder: b.id }, { tap: true }); },
       onGround: (x, y) => goToPoint([x, y]),
       // Clicking someone walks you over to them (and you say hello when you get there).
-      onPerson: who => { const p = personSpot(who); if (p) goToPoint(p); },
+      onPerson: who => {
+        UI.talkTo = who;                                  // when you get there, you'll talk (again, if you already have today)
+        const p = who === "n:pickles" ? (d => d && [d.x + 3, d.y - 1])(dogSpot()) : personSpot(who);
+        if (!p) return;
+        if (G.pos && Math.hypot(G.pos[0] - p[0], G.pos[1] - p[1]) < 1.5) { if (meetNearby(G.pos)) renderAll(); return; }
+        goToPoint(p);
+      },
       personTipHtml,
       onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
@@ -1779,6 +1824,7 @@
       $("#tabbody").innerHTML = `<p class="lede">This panel couldn't be drawn. You can still walk to an area from the map, or try another tab.</p>`;
     }
     safely("map", () => M.update());
+    safely("conversation", renderTalk);
   }
 
   // Hand-drawn weather icons: strokes only, coloured by the text around them.
@@ -1906,42 +1952,7 @@
       ${r.xp ? `<p><b style="color:var(--gold)">+${fmt(r.xp)} XP</b></p>` : ""}
       ${gains ? `<div class="chips gains">${gains}</div>` : ""}${rate}</div>`;
   }
-  function npcHtml() {
-    const e = G.day.encounter; if (!e) return "";
-    let name, sub, initials;
-    if (e.who && e.who.startsWith("n:")) {
-      const i = World.whoInfo(D, e.who), r = K.met(e.who);
-      name = i.name.replace(/^the /, "The "); initials = i.type === "dog" ? "🐾" : name.replace(/^The /, "").split(" ").map(x => x[0]).join("").slice(0, 2).toUpperCase();
-      const lvl = World.REG.includes(e.who) ? World.levelOn(e.who, G.date) : i.level;
-      sub = [i.blurb.replace(/^is /, ""), i.type !== "dog" && !i.old ? `climbs around V${Math.round(lvl)}` : "", r && r.n > 1 ? `met ${r.n} times` : "first meeting"].filter(Boolean).join(" · ");
-    } else {
-      const [nm, h, type, lvl] = D.climbers[e.ci];
-      name = nm; initials = nm.slice(0, 2).toUpperCase();
-      sub = `${h} cm · ${{ local_hero: "local", regular: "regular", occasional: "weekend climber", tourist: "visiting" }[type]} · climbs around V${Math.round(lvl)}`;
-    }
-    const say = t => (e.say || e.pet ? `<p class="npc-say">${esc(t)}</p>` : `<q>${esc(t)}</q>`);
-    const quote = say([e.line, e.recLine].filter(Boolean).join(" ")) + (e.petted ? `<p class="npc-say">${esc(e.petted)}</p>` : "");
-    return `<div class="npc${e.who && e.who.startsWith("n:") ? " regular" : ""}"><div class="avatar" aria-hidden="true">${esc(initials)}</div><div>
-      <div class="nm">${esc(name)}<small>${esc(sub)}</small></div>
-      ${quote}
-      ${e.dir && !e.dirTaken ? say(e.dirLine) : ""}
-      ${e.dir && e.dirTaken ? `<p class="npc-say">${esc(`${e.who === "n:bishop" ? "He draws" : name + " draws"} you a little map to ${e.dir} on the back of a receipt.`)}</p>` : ""}
-      ${e.reveal != null ? say(e.revealLine) : ""}
-      ${e.beta && !e.betaTaken ? `<q>${esc(e.beta.text)}</q>` : ""}
-      ${e.chatted ? `<p class="npc-say npc-story">${esc(e.chatted)}</p>` : ""}
-      ${e.partnered ? `<q>${esc(e.partnered.replace(/^“|”$/g, ""))}</q>` : ""}
-      <div class="acts">
-        ${e.pet && !e.petted ? `<button type="button" class="btn small primary" data-pet>Pet Pickles</button>` : ""}
-        ${canPartner(e) && !e.partnered ? `<button type="button" class="btn small primary" data-together title="Climb together for a few hours">Climb together</button>` : ""}
-        ${e.who && e.who.startsWith("n:") && !e.pet && !e.chatted ? `<button type="button" class="btn small" data-chat ${UI.busy || G.day.over ? "disabled" : ""}>Sit and chat · 20 min</button>` : ""}
-        ${e.dir ? (e.dirTaken ? `<button type="button" class="btn small primary" data-go-sector="${esc(e.dir)}">Go there</button>` : `<button type="button" class="btn small primary" data-dir>Ask the way</button>`) : ""}
-        ${e.reveal != null ? (e.revealTaken ? `<button type="button" class="btn small" data-go-boulder="${D.problems[e.reveal].b}">Go there</button>` : `<button type="button" class="btn small primary" data-reveal>Where exactly?</button>`) : ""}
-        ${e.rec != null ? (e.accepted ? `<span class="chip good">Added to your journal</span>` : `<button type="button" class="btn small primary" data-accept>Add to my list</button>`) : ""}
-        ${e.rec != null ? `<button type="button" class="btn small" data-go-problem="${e.rec}">Go there</button>` : ""}
-        ${e.beta && !e.betaTaken ? `<button type="button" class="btn small" data-beta>Thanks for the beta</button>` : ""}
-        <button type="button" class="btn small" data-dismiss>Say bye</button>
-      </div></div></div>`;
-  }
+  function npcHtml() { return ""; }            // (Phase 4, Stage 2: conversations happen in the box over the map, renderTalk)
   // Where the good vibes come from, in words (for the odds panel's chip).
   function vibesWhy() {
     const vb = vibesNow(), out = [];
@@ -2584,7 +2595,7 @@
     on("[data-chat]", sitChat);
     on("[data-beta]", takeBeta);
     on("[data-together]", climbTogether);
-    on("[data-dismiss]", () => { G.day.encounter = null; save(); renderPanel(); });
+    on("[data-dismiss]", () => closeTalk());
     on("[data-rate]", n => { const t = G.ticks[G.day.last.tick]; t.stars = +n.dataset.rate; save(); renderPanel(); });
     on("[data-summary]", showSummary);
     on("[data-export]", exportSave);
@@ -3383,6 +3394,8 @@
     if (!window.World) await loadScript("world.js");
     if (!window.Know) await loadScript("knowledge.js");
     if (!window.Social) await loadScript("social.js");
+    if (!window.Portraits) await loadScript("portraits.js");
+    if (!window.Talk) await loadScript("talk.js");
     if (!window.Travel) await loadScript("travel.js");
     if (!window.Scene) await loadScript("scene.js").catch(() => {});        // without it, Try climbs from the panel
     D = await fetch("game-data.json" + ASSET_V).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });

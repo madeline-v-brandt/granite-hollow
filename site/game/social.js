@@ -11,6 +11,8 @@
 //     last  { kind: date }  the last day of each kind
 //     m     [[date, kind, p]]  the latest moments, newest first (what they remember;
 //           p is a problem id, or null)
+//     said  { lineId: date }  what they last said to you, and when (Stage 2: so
+//           nobody repeats themselves)
 //
 // Moments: met (you talked), chat (sat and talked), climb (climbed together),
 // sendWith (a send with them there), beta (they gave you beta), proj (they know
@@ -21,7 +23,7 @@
 (function (root) {
   "use strict";
   const KINDS = { met: 1, chat: 2, climb: 3, sendWith: 3, beta: 1, proj: 0, pet: 1, lesson: 2 };
-  const MEMORY = 40;
+  const MEMORY = 40, SAID = 300;
   // How well you know each other, in words (never a number on screen). Thresholds are a first guess (Stage 4 tunes them).
   const TIERS = [
     { at: 0, key: "met", words: "You've met" },
@@ -33,7 +35,7 @@
   const isNpc = w => typeof w === "string" && /^n:[a-z]{2,12}$/.test(w);
   const count = x => (typeof x === "number" && isFinite(x) && x >= 0 ? Math.min(100000, Math.floor(x)) : 0);
 
-  function blank() { return { k: {}, last: {}, m: [] }; }
+  function blank() { return { k: {}, last: {}, m: [], said: {} }; }
   // A save's social record: made from what it already knows if it has none, and
   // anything that doesn't check out dropped (save files are untrusted).
   function ensure(G, nP = Infinity) {
@@ -49,7 +51,9 @@
       }
       const m = (Array.isArray(r.m) ? r.m : []).filter(x => Array.isArray(x) && x.length === 3 && isDay(x[0]) && x[1] in KINDS
         && (x[2] === null || (Number.isInteger(x[2]) && x[2] >= 0 && x[2] < nP))).slice(0, MEMORY);
-      S.npc[w] = { k, last, m };
+      const said = {};
+      if (r.said && typeof r.said === "object") for (const [id, d] of Object.entries(r.said).slice(-SAID)) if (/^[a-z0-9_.-]{1,48}$/.test(id) && isDay(d)) said[id] = d;
+      S.npc[w] = { k, last, m, said };
     }
     return S;
   }
@@ -107,6 +111,16 @@
     return e.m.filter(x => ks.includes(x[1]) && x[0] >= since);
   }
 
-  const Social = { KINDS, TIERS, MEMORY, ensure, seed, moment, bond, tier, remembers };
+  // Lines: when someone last said a line to you (null if never), and noting that they just did.
+  function saidOn(G, who, id) { const e = G && G.social && G.social.npc[who]; return (e && e.said && e.said[id]) || null; }
+  function say(G, who, id, date) {
+    if (!G || G.v !== 2 || !isNpc(who) || !/^[a-z0-9_.-]{1,48}$/.test(id) || !isDay(date)) return;
+    if (!G.social) G.social = seed(G);
+    const e = G.social.npc[who] || (G.social.npc[who] = blank()), s = e.said || (e.said = {});
+    delete s[id]; s[id] = date;
+    const ks = Object.keys(s); if (ks.length > SAID) for (const k of ks.slice(0, ks.length - SAID)) delete s[k];
+  }
+
+  const Social = { KINDS, TIERS, MEMORY, ensure, seed, moment, bond, tier, remembers, saidOn, say };
   if (typeof module !== "undefined") module.exports = Social; else root.Social = Social;
 })(typeof window !== "undefined" ? window : globalThis);
