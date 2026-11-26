@@ -2,6 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="scene.css?v=41">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -692,8 +693,16 @@ svg#map:active { cursor: grabbing; }
 .prob .status.sent { color: var(--plus); }
 .prob .chips { margin-top: 3px; }
 .hp { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
-.hp .meter { width: 90px; height: 5px; }
-.hp .meter > i { background: var(--project); }
+/* A tried problem's moves (moveStrip): a dot each, a diamond for a crux, filled as you learn it. */
+.moves { display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.mv { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--project); box-sizing: border-box; background: transparent; }
+.mv.k1 { background: color-mix(in srgb, var(--project) 30%, transparent); }
+.mv.k2 { background: color-mix(in srgb, var(--project) 62%, transparent); }
+.mv.k3 { background: var(--project); }
+.mv.crux { border-radius: 1.5px; transform: rotate(45deg) scale(.92); margin: 0 1px; }
+.mv.alt { border-color: var(--gold); }
+.mv.unseen { border: 1.5px dashed var(--muted); opacity: .55; }
+.mv.hi { box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 3px var(--ink-2); }
 .feel { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 66px; }
 .feel .bars { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
 .feel .bars i { width: 5px; border-radius: 1px; background: var(--chip); }
@@ -816,10 +825,8 @@ tr.lb-me td { background: var(--gold-soft); }
 .pj-name .grade { font-size: 15px; }
 .pj-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
 .pj-lbl { font-size: 13px; color: var(--ink-2); }
-.pj-moves { display: flex; gap: 2px; flex: 1; max-width: 190px; min-width: 100px; }
-.pj-moves i { flex: 1; height: 8px; border-radius: 2px; background: var(--chip); }
-.pj-moves i.on { background: var(--project); }
-.pj-moves i.hi { box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 3px var(--project); }
+.pj-moves { display: flex; flex: 1; max-width: 220px; min-width: 100px; }
+.pj-moves .mv { width: 11px; height: 11px; }
 .pj-hist { display: flex; align-items: flex-end; gap: 3px; height: 26px; margin-top: 7px; }
 .pj-hist span { width: 10px; height: 100%; display: flex; align-items: flex-end; background: var(--chip); border-radius: 2px; }
 .pj-hist i { display: block; width: 100%; background: var(--project); border-radius: 2px; }
@@ -1040,18 +1047,20 @@ tr.lb-me td { background: var(--gold-soft); }
     </main>
   </div>
 </div>
+<div id="scene-root" class="scene-root" hidden></div>
 <div id="modal-root"></div>
 <input type="file" id="save-file" accept=".json,application/json" hidden>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=39"></script>
-<script src="art.js?v=39"></script>
-<script src="world.js?v=39"></script>
-<script src="knowledge.js?v=39"></script>
-<script src="illustrate.js?v=39"></script>
-<script src="paint.js?v=39"></script>
-<script src="paper.js?v=39"></script>
-<script src="travel.js?v=39"></script>
-<script src="game.js?v=39"></script>
+<script src="mechanics.js?v=41"></script>
+<script src="art.js?v=41"></script>
+<script src="world.js?v=41"></script>
+<script src="knowledge.js?v=41"></script>
+<script src="illustrate.js?v=41"></script>
+<script src="paint.js?v=41"></script>
+<script src="paper.js?v=41"></script>
+<script src="travel.js?v=41"></script>
+<script src="scene.js?v=41"></script>
+<script src="game.js?v=41"></script>

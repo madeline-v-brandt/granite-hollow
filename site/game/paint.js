@@ -184,6 +184,203 @@
   // park is drawn in 90 m tiles, each built the first time it comes into view
   // and hidden while it's off screen: canopy, foreground trees, understory,
   // shadows, boulders and landmarks.
+  // ---- shared with the climbing scene (Phase 3, Stage 2) ---------------------
+  const bump = (d, a, b, w) => smooth(a - w, a, d) * (1 - smooth(b, b + w, d));
+  const slot = t => t.ever ? `${t.kind}-${t.v % 2}` : `${t.kind}-${t.v}`;
+  // A polygon with its corners eased (each corner cut by a short curve): crisp
+  // planes, but no razor-sharp points. Used for the faceted rocks' silhouettes.
+  const roundPoly = (pts, k = .18) => {
+    const n = pts.length; let d = "";
+    for (let i = 0; i < n; i++) {
+      const p = pts[i], a = pts[(i + n - 1) % n], c = pts[(i + 1) % n];
+      d += (i ? "L" : "M") + f2(p[0] + (a[0] - p[0]) * k) + "," + f2(p[1] + (a[1] - p[1]) * k) + "Q" + f2(p[0]) + "," + f2(p[1]) + " " + f2(p[0] + (c[0] - p[0]) * k) + "," + f2(p[1] + (c[1] - p[1]) * k);
+    }
+    return d + "Z";
+  };
+  // The soft gradients and the granite grain the rocks use, with ids prefixed by pre.
+  function artDefs(defs, pre = "") {
+    for (const [id, cls] of [["soft-dark", "sd"], ["soft-light", "sl"], ["soft-earth", "se"]]) {
+      const gr = defs.append("radialGradient").attr("id", pre + id);
+      gr.append("stop").attr("offset", 0).attr("class", cls + "0"); gr.append("stop").attr("offset", .55).attr("class", cls + "1"); gr.append("stop").attr("offset", 1).attr("class", cls + "2");
+    }
+    // A faint, irregular granite grain for the rocks (a few flecks per tile, not a speckle carpet).
+    {
+      const rg = Art.rand("rock-grain"), pat = defs.append("pattern").attr("id", pre + "rock-grain").attr("patternUnits", "userSpaceOnUse").attr("width", 3.4).attr("height", 2.6);
+      for (let i = 0; i < 9; i++) {
+        const x = rg() * 3.4, y = rg() * 2.6, a = rg() * 180;
+        pat.append("ellipse").attr("cx", f2(x)).attr("cy", f2(y)).attr("rx", f2(.05 + rg() * .09)).attr("ry", f2(.03 + rg() * .04))
+          .attr("transform", `rotate(${a | 0} ${f2(x)} ${f2(y)})`).attr("class", rg() < .55 ? "grain-dk" : "grain-lt");
+      }
+    }
+  }
+  // A boulder's rock, from its form (illustrate.js facetForm): planes softly
+  // weathered, lit by the clock, with grain, lichen, chalk and snow. The map draws
+  // every boulder with it, and the climbing scene (scene.js) draws one close up.
+  // defs: where its clip paths go; pre: a prefix for ids, so two drawings on one
+  // page don't share clip paths; id and seed: this boulder's (seed: its name).
+  function boulderArt(g, F, { defs, id, seed, pre = "" }) {
+    const smoothRing = d3.line().curve(d3.curveCatmullRomClosed.alpha(.5));
+      const R = F.R, hullD = roundPoly(F.hull, .32);
+      const clipId = `${pre}bclip-${id}`;
+      defs.append("clipPath").attr("id", clipId).append("path").attr("d", hullD);
+      g.append("path").attr("class", "r-contact").attr("d", smoothRing(F.base.map(p => [p[0] * 1.14, p[1] * 1.3 + R * .1]))).attr("fill", `url(#${pre}soft-dark)`);
+      if (F.overhang) g.append("path").attr("class", "r-contact r-overhang").attr("d", smoothRing(F.overhang.map(p => [p[0] * 1.05, p[1] * 1.15 + R * .05]))).attr("fill", `url(#${pre}soft-dark)`);
+      {
+        // Planes, but weathered: every edge bows a little (the same curve for both
+        // faces that share it, so they meet without seams), the tones sit a bit
+        // closer together, and a soft band of the in-between tone blurs each
+        // internal edge.
+        const rr = Art.rand("soften" + seed), key = p => f1(p[0]) + "," + f1(p[1]);
+        const ekey = (a, b) => key(a) < key(b) ? key(a) + "|" + key(b) : key(b) + "|" + key(a);
+        // Which edges two visible faces share (inside the rock) and which are on its outline.
+        const owners = new Map();
+        F.faces.forEach(f => f.pts.forEach((p, i) => { const q = f.pts[(i + 1) % f.pts.length], k = ekey(p, q); if (!owners.has(k)) owners.set(k, { p, q, faces: [] }); owners.get(k).faces.push(f); }));
+        // Each edge's line, from its canonical end, shared by both faces so they meet without seams.
+        // Outline edges keep their gentle bow (the silhouette doesn't change). Edges inside the rock
+        // wander: the bow plus an uneven wave, so no transition between planes runs straight.
+        const lines = new Map();
+        const lineOf = (a, b) => {
+          const k = ekey(a, b);
+          if (!lines.has(k)) {
+            const [p, q] = key(a) < key(b) ? [a, b] : [b, a], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+            const h = Art.rand(k), bow = (h() - .5) * .16, pts = [p];
+            if ((owners.get(k)?.faces.length || 0) < 2) pts.push([(p[0] + q[0]) / 2 + nx * bow * L, (p[1] + q[1]) / 2 + ny * bow * L]);
+            else {
+              const ph = h() * TAU, amp = Math.min(.035 + h() * .03, R * .05 / L), m = L > R * .5 ? 5 : 3;
+              for (let i = 1; i <= m; i++) {
+                const t = i / (m + 1), o = L * (bow * 2 * t * (1 - t) * 2 + amp * Math.sin(t * TAU * 1.4 + ph) * Math.sin(Math.PI * t) + (h() - .5) * .02);
+                pts.push([p[0] + dx * t + nx * o, p[1] + dy * t + ny * o]);
+              }
+            }
+            pts.push(q);
+            lines.set(k, pts);
+          }
+          const pts = lines.get(k);
+          return key(a) < key(b) ? pts : [...pts].reverse();
+        };
+        // A chain of points as quadratic curves through the midpoints of its controls (reversible: the
+        // same curve either way round).
+        const chainD = pts => {
+          const n = pts.length - 1; let d = "";
+          if (n === 1) return "L" + f2(pts[1][0]) + "," + f2(pts[1][1]);
+          for (let i = 1; i < n - 1; i++) { const c = pts[i], e = [(c[0] + pts[i + 1][0]) / 2, (c[1] + pts[i + 1][1]) / 2]; d += "Q" + f2(c[0]) + "," + f2(c[1]) + " " + f2(e[0]) + "," + f2(e[1]); }
+          return d + "Q" + f2(pts[n - 1][0]) + "," + f2(pts[n - 1][1]) + " " + f2(pts[n][0]) + "," + f2(pts[n][1]);
+        };
+        // Points along that curve, evenly spaced, for the soft bands.
+        const chainAt = (pts, m) => {
+          const segs = [], n = pts.length - 1;
+          let s = pts[0];
+          for (let i = 1; i < n; i++) { const c = pts[i], e = i < n - 1 ? [(c[0] + pts[i + 1][0]) / 2, (c[1] + pts[i + 1][1]) / 2] : pts[n]; segs.push([s, c, e]); s = e; }
+          const dense = [];
+          for (const [a, c, e] of segs) for (let j = 0; j < 6; j++) { const t = j / 6, u = 1 - t; dense.push([u * u * a[0] + 2 * u * t * c[0] + t * t * e[0], u * u * a[1] + 2 * u * t * c[1] + t * t * e[1]]); }
+          dense.push(pts[n]);
+          const acc = [0]; for (let i = 1; i < dense.length; i++) acc.push(acc[i - 1] + Math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]));
+          const tot = acc[acc.length - 1] || 1, out = [];
+          for (let j = 0, i = 0; j <= m; j++) { const want = tot * j / m; while (i < dense.length - 2 && acc[i + 1] < want) i++; const f = clamp((want - acc[i]) / ((acc[i + 1] - acc[i]) || 1), 0, 1); out.push([dense[i][0] + (dense[i + 1][0] - dense[i][0]) * f, dense[i][1] + (dense[i + 1][1] - dense[i][1]) * f]); }
+          return out;
+        };
+        const facetD = f => {
+          let d = "M" + f2(f.pts[0][0]) + "," + f2(f.pts[0][1]);
+          f.pts.forEach((p, i) => { d += chainD(lineOf(p, f.pts[(i + 1) % f.pts.length])); });
+          return d + "Z";
+        };
+        const fillOf = f => Art.mix(f.fill, F.rock.mid, .09);
+        const body0 = g.append("g").attr("clip-path", `url(#${clipId})`);
+        // The solid's far and under sides first, in deep shade: wherever the near faces
+        // leave a gap (under an overhang's lip), you see rock in shadow, not the ground.
+        if (F.back && F.back.length) body0.append("path").attr("class", "r-back").attr("d", F.back.map(pts => "M" + pts.map(p => f2(p[0]) + "," + f2(p[1])).join("L") + "Z").join("")).attr("fill", Art.mix(F.rock.deep, F.rock.shade, .35)).attr("stroke", Art.mix(F.rock.deep, F.rock.shade, .35)).attr("stroke-width", .15);
+        for (const f of F.faces) body0.append("path").attr("class", "r-facet").attr("d", facetD(f)).attr("fill", fillOf(f)).attr("stroke", fillOf(f));
+        // Soft, uneven transitions: along each edge inside the rock, a few stacked feathered bands of the
+        // two faces' blended tone. Each band swells and narrows and drifts to one side or the other, so the
+        // change from light to shade wanders like weathering rather than following a ruled line. The bands
+        // overlap at the corners, which takes the point off the triangles where three planes meet.
+        const smoothClosed = d3.line().curve(d3.curveCatmullRomClosed.alpha(.5));
+        for (const [k, { p, q, faces }] of owners) if (faces.length === 2) {
+          const tone = Art.mix(fillOf(faces[0]), fillOf(faces[1]), .5), h = Art.rand("feather" + k), m = 10;
+          const c = chainAt(lineOf(p, q), m), ph = h() * TAU, drift = .25 + h() * .3, wob = d3.range(m + 1).map(() => .7 + h() * .6);
+          const nrm = c.map((pt, j) => { const a = c[Math.max(0, j - 1)], b = c[Math.min(m, j + 1)], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1; return [-dy / L, dx / L]; });
+          for (const [W, cls] of [[R * .07, "r-feather f0"], [R * .042, "r-feather f1"], [R * .02, "r-feather f2"]]) {
+            const L = [], Rt = [];
+            c.forEach((pt, j) => {
+              const t = j / m, env = .4 + .6 * Math.pow(Math.sin(Math.PI * t), .7), w = W * env * wob[j], s = W * drift * Math.sin(t * TAU * .9 + ph) * Math.sin(Math.PI * t);
+              L.push([pt[0] + nrm[j][0] * (s + w), pt[1] + nrm[j][1] * (s + w)]);
+              Rt.push([pt[0] + nrm[j][0] * (s - w), pt[1] + nrm[j][1] * (s - w)]);
+            });
+            body0.append("path").attr("class", cls).attr("d", smoothClosed([...L, ...Rt.reverse()].map(pt => [+f2(pt[0]), +f2(pt[1])]))).attr("fill", tone);
+          }
+        }
+        // Light, shade, texture, lichen and snow stay on the rock itself (not the open ground under an overhang).
+        defs.append("clipPath").attr("id", clipId + "-f").append("path").attr("d", F.faces.map(facetD).join(""));
+        const body = body0.append("g").attr("clip-path", `url(#${clipId}-f)`);
+        // The clock's light and shade, softly, over the planes.
+        const cy = -F.H * .45, ry = (F.H + R * .6) * .75;
+        for (const [cls, dx, grad] of [["r-light e", .55, "soft-light"], ["r-light w", -.55, "soft-light"], ["r-shade e", .7, "soft-dark"], ["r-shade w", -.7, "soft-dark"]])
+          body.append("ellipse").attr("class", cls + " soft").attr("cx", f2(R * dx)).attr("cy", f2(cy)).attr("rx", f2(R * .95)).attr("ry", f2(ry)).attr("fill", `url(#${pre}${grad})`);
+        // A little texture: a few broad weathering blotches, and a faint grain when you're close.
+        const xs = F.hull.map(p => p[0]), ys = F.hull.map(p => p[1]), [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+        for (let i = 0; i < 7; i++) {
+          const light = rr() < .45, x = x0 + (x1 - x0) * (.15 + .7 * rr()), y = y0 + (y1 - y0) * (.15 + .7 * rr());
+          body.append("ellipse").attr("class", "r-blotch " + (light ? "lt" : "dk")).attr("cx", f2(x)).attr("cy", f2(y)).attr("rx", f2(R * (.18 + rr() * .22))).attr("ry", f2(R * (.1 + rr() * .14)))
+            .attr("transform", `rotate(${f2((rr() - .5) * 50)} ${f2(x)} ${f2(y)})`).attr("fill", `url(#${pre}${light ? "soft-light" : "soft-dark"})`);
+        }
+        body.append("rect").attr("class", "r-grain").attr("x", f2(x0)).attr("y", f2(y0)).attr("width", f2(x1 - x0)).attr("height", f2(y1 - y0)).attr("fill", `url(#${pre}rock-grain)`);
+        body.append("path").attr("class", "r-lichen").attr("fill", F.rock.lichen).attr("d", F.lichen.map(l => ell(l.x, l.y, l.r, l.r * .7)).join(""));
+        body.append("path").attr("class", "r-chalk lod-c").attr("d", F.chalk.map(c => ell(c.x, c.y, c.r * 1.3, c.r)).join(""));
+        body.append("path").attr("class", "r-snow").attr("d", F.faces.filter(f => f.up > .55).map(facetD).join(""));
+      }
+      const front = F.base.filter(p => p[1] > -R * .15).sort((a, b) => a[0] - b[0]);
+      g.append("path").attr("class", "r-foot").attr("d", d3.line().curve(d3.curveBasis)(front)).attr("clip-path", `url(#${clipId})`);
+      return { hullD, clipId };
+  }
+  function drawTree(Lr, t, scale = 1, extraCls = "") {
+    const g = treeGlyph(t.kind, t.shape, true), s = t.size * scale, X = t.x, Y = -t.y;
+    const tg = Lr.append("g").attr("class", `fg cs c-${slot(t)} ${t.ever ? "ever" : "decid"} ${extraCls}`);
+    tg.append("path").attr("class", "contact").attr("d", ell(X, Y + .1, g.tw * 4 * s, g.tw * 1.4 * s));
+    if (g.limbs) tg.append("path").attr("class", "limb").attr("d", bake(g.limbs, X, Y, s, t.flip, 2));
+    else g.bare.forEach((b, i) => b.length && tg.append("path").attr("class", "bare b" + i).attr("d", bake(b, X, Y, s, t.flip, 2)));
+    tg.append("path").attr("class", g.birch ? "trunk birch" : "trunk").attr("d", bake(g.trunk, X, Y, s, t.flip, 2));
+    if (g.marks.length) tg.append("path").attr("class", "birch-mark").attr("d", bake(g.marks, X, Y, s, t.flip, 2));
+    for (const layer of ["dark", "mid", "hlE", "hlW"]) tg.append("path").attr("class", "L-" + layer).attr("d", bake(g[layer], X, Y, s, t.flip, 2));
+    if (g.fruit) tg.append("path").attr("class", "L-fruit").attr("d", bake(g.fruit, X, Y, s, t.flip, 2));
+    if (g.ever) tg.append("path").attr("class", "L-snow").attr("d", bake(g.snow, X, Y, s, t.flip, 2));
+    return { g, tg };
+  }
+  // The season's colours and small events as CSS custom properties (and the palette).
+  function dateVars(date) {
+    const P = Illu.paletteAt(date), d = P.day;
+    const v = { "--leaf": P.leaf, "--snow": P.snow, "--flowers": P.flowers, "--fernness": P.ferns, "--berries": P.berries, "--shrooms": P.shrooms,
+      "--floor": P.floor, "--floor2": P.floor2, "--meadow": P.meadow, "--bald-c": P.bald, "--grass-c": P.grass, "--fern-c": P.fern,
+      "--shrub-c": P.shrub, "--bb": P.blueberry, "--litter-0": P.litter[0], "--litter-1": P.litter[1], "--water": P.water,
+      "--shade-c": P.shade, "--canopy": P.canopy, "--trunk": P.trunk, "--season-tint": P.tint };
+    ["maple", "oak", "birch", "ever"].forEach(k => P[k].forEach((c, i) => { v[`--${k}-${i}`] = c; }));
+    P.fl.forEach((c, i) => { v[`--fl-${i}`] = c; });
+    v["--bare-d"] = P.leaf >= .97 ? "none" : "inline";      // bare branches only when the canopy isn't full
+    v["--snow-d"] = P.snow < .01 ? "none" : "inline";       // nor snow when there's none
+    // The calendar's own small events.
+    const blossom = bump(d, 128, 146, 6), apples = bump(d, 246, 300, 10);
+    v["--fruit"] = Math.max(blossom, apples * .95); v["--fruit-c"] = blossom > apples ? "#fbe6ee" : "#c8362b";
+    v["--lilac"] = bump(d, 130, 152, 6);
+    v["--lily"] = bump(d, 160, 262, 18);
+    v["--bales"] = d >= 205 && d <= 340 ? 1 : 0;
+    v["--mown"] = bump(d, 205, 300, 8);
+    v["--ice"] = P.snow > .3 ? Math.min(1, (P.snow - .3) / .4) : 0;
+    return { vars: v, P };
+  }
+  const SUN = { "Morning": "#fff0cf", "Midday": "#fffbea", "Afternoon": "#fff3d0", "Golden hour": "#ffd17a", "Dusk": "#ffb38c", "Night": "#9fb0e0" };
+  // The clock's light as CSS custom properties (and the light itself).
+  function timeVars(minute, dusk, sky = "Sunny", over = false) {
+    const L = Art.lightAt(minute, dusk, { sky, over });
+    const sunX = -L.shadow[0] / (Math.hypot(...L.shadow) || 1);
+    const cloudy = /overcast|rain|snow/i.test(sky);
+    const sun = L.phase === "Dusk" ? Art.mix("#ffc58c", "#d9a3c8", Math.max(0, Math.min(1, 1 - (dusk - minute) / 90))) : SUN[L.phase];
+    const hlE = cloudy ? .18 : .2 + .65 * Math.max(0, sunX) + .2 * L.alt, hlW = cloudy ? .18 : .2 + .65 * Math.max(0, -sunX) + .2 * L.alt;
+    const v = { "--tint": L.tint, "--tint-op": L.op.toFixed(3), "--veil": L.veil, "--veil-op": L.veilOp.toFixed(3),
+      "--shadow-op": (cloudy ? .14 : .3 + .08 * (1 - L.alt)).toFixed(3), "--sun": sun, "--hl-e": hlE.toFixed(3), "--hl-w": hlW.toFixed(3),
+      "--hle-d": hlE < .3 ? "none" : "inline", "--hlw-d": hlW < .3 ? "none" : "inline",
+      "--tint-d": L.op < .01 ? "none" : "inline" };          // the multiply blend costs a full-map composite: skip it when there's no tint
+    return { vars: v, L };
+  }
+
   function paint(svgEl, D, opts = {}) {
     const d3 = root.d3;
     const S = Illu.parkScene(D);
@@ -195,19 +392,7 @@
     const nameOf = bo => (known ? known.boulders[bo.id] || null : bo.b.name);
     const ariaOf = bo => { const n = nameOf(bo); return n ? `${n}, ${bo.b.sector}` : "Unfamiliar boulder"; };
     const defs = svg.append("defs");
-    for (const [id, cls] of [["soft-dark", "sd"], ["soft-light", "sl"], ["soft-earth", "se"]]) {
-      const gr = defs.append("radialGradient").attr("id", id);
-      gr.append("stop").attr("offset", 0).attr("class", cls + "0"); gr.append("stop").attr("offset", .55).attr("class", cls + "1"); gr.append("stop").attr("offset", 1).attr("class", cls + "2");
-    }
-    // A faint, irregular granite grain for the rocks (a few flecks per tile, not a speckle carpet).
-    {
-      const rg = Art.rand("rock-grain"), pat = defs.append("pattern").attr("id", "rock-grain").attr("patternUnits", "userSpaceOnUse").attr("width", 3.4).attr("height", 2.6);
-      for (let i = 0; i < 9; i++) {
-        const x = rg() * 3.4, y = rg() * 2.6, a = rg() * 180;
-        pat.append("ellipse").attr("cx", f2(x)).attr("cy", f2(y)).attr("rx", f2(.05 + rg() * .09)).attr("ry", f2(.03 + rg() * .04))
-          .attr("transform", `rotate(${a | 0} ${f2(x)} ${f2(y)})`).attr("class", rg() < .55 ? "grain-dk" : "grain-lt");
-      }
-    }
+    artDefs(defs);
     const [bx0, bx1, by0, by1] = S.bounds;
     const W = bx1 - bx0, H = by1 - by0;
     const world = svg.append("g").attr("class", "world");
@@ -238,16 +423,6 @@
     const basisRing = d3.line().curve(d3.curveBasisClosed);
     const ringD = pts => basisRing(pts.map(p => [f1(p[0]), f1(-p[1])]));
     const lineD = pts => d3.line().curve(d3.curveLinear)(pts.map(p => [f1(p[0]), f1(-p[1])]));
-    // A polygon with its corners eased (each corner cut by a short curve): crisp
-    // planes, but no razor-sharp points. Used for the faceted rocks' silhouettes.
-    const roundPoly = (pts, k = .18) => {
-      const n = pts.length; let d = "";
-      for (let i = 0; i < n; i++) {
-        const p = pts[i], a = pts[(i + n - 1) % n], c = pts[(i + 1) % n];
-        d += (i ? "L" : "M") + f2(p[0] + (a[0] - p[0]) * k) + "," + f2(p[1] + (a[1] - p[1]) * k) + "Q" + f2(p[0]) + "," + f2(p[1]) + " " + f2(p[0] + (c[0] - p[0]) * k) + "," + f2(p[1] + (c[1] - p[1]) * k);
-      }
-      return d + "Z";
-    };
     const state = opts.state || {};
     const wl = d3.line().curve(d3.curveCatmullRom);
     const drystone = (Lr, lines, w = 1.25, stones = true) => {
@@ -520,7 +695,6 @@
     for (const m of S.marks.filter(m => m.kind === "car")) drawCar(ruins, m);
 
     // ---- the park view: the forest as one light drawing, boulders as their planes
-    const slot = t => t.ever ? `${t.kind}-${t.v % 2}` : `${t.kind}-${t.v}`;
     {
       const bySlot = new Map(), clumps = new Map();
       const shadeD = [];
@@ -698,135 +872,13 @@
     }
 
     // A foreground tree: the full drawing, with a trunk you can see.
-    function drawTree(Lr, t, scale = 1, extraCls = "") {
-      const g = treeGlyph(t.kind, t.shape, true), s = t.size * scale, X = t.x, Y = -t.y;
-      const tg = Lr.append("g").attr("class", `fg cs c-${slot(t)} ${t.ever ? "ever" : "decid"} ${extraCls}`);
-      tg.append("path").attr("class", "contact").attr("d", ell(X, Y + .1, g.tw * 4 * s, g.tw * 1.4 * s));
-      if (g.limbs) tg.append("path").attr("class", "limb").attr("d", bake(g.limbs, X, Y, s, t.flip, 2));
-      else g.bare.forEach((b, i) => b.length && tg.append("path").attr("class", "bare b" + i).attr("d", bake(b, X, Y, s, t.flip, 2)));
-      tg.append("path").attr("class", g.birch ? "trunk birch" : "trunk").attr("d", bake(g.trunk, X, Y, s, t.flip, 2));
-      if (g.marks.length) tg.append("path").attr("class", "birch-mark").attr("d", bake(g.marks, X, Y, s, t.flip, 2));
-      for (const layer of ["dark", "mid", "hlE", "hlW"]) tg.append("path").attr("class", "L-" + layer).attr("d", bake(g[layer], X, Y, s, t.flip, 2));
-      if (g.fruit) tg.append("path").attr("class", "L-fruit").attr("d", bake(g.fruit, X, Y, s, t.flip, 2));
-      if (g.ever) tg.append("path").attr("class", "L-snow").attr("d", bake(g.snow, X, Y, s, t.flip, 2));
-      return { g, tg };
-    }
 
     // ---- boulders: faceted granite, softly weathered, lit by the clock
     function drawBoulder(Lr, bo, st, F = bo.form) {
       const X = bo.b.x, Y = -bo.b.y, name = bo.b.name;
       const g = Lr.append("g").attr("class", `boulder k-${F.kind}`).attr("data-id", bo.id).attr("tabindex", 0).attr("role", "button")
         .attr("aria-label", ariaOf(bo)).attr("transform", `translate(${f2(X)},${f2(Y)})`);
-      const R = F.R, hullD = roundPoly(F.hull, .32);
-      const clipId = `bclip-${bo.id}`;
-      defs.append("clipPath").attr("id", clipId).append("path").attr("d", hullD);
-      g.append("path").attr("class", "r-contact").attr("d", smoothRing(F.base.map(p => [p[0] * 1.14, p[1] * 1.3 + R * .1]))).attr("fill", "url(#soft-dark)");
-      if (F.overhang) g.append("path").attr("class", "r-contact r-overhang").attr("d", smoothRing(F.overhang.map(p => [p[0] * 1.05, p[1] * 1.15 + R * .05]))).attr("fill", "url(#soft-dark)");
-      {
-        // Planes, but weathered: every edge bows a little (the same curve for both
-        // faces that share it, so they meet without seams), the tones sit a bit
-        // closer together, and a soft band of the in-between tone blurs each
-        // internal edge.
-        const rr = Art.rand("soften" + bo.b.name), key = p => f1(p[0]) + "," + f1(p[1]);
-        const ekey = (a, b) => key(a) < key(b) ? key(a) + "|" + key(b) : key(b) + "|" + key(a);
-        // Which edges two visible faces share (inside the rock) and which are on its outline.
-        const owners = new Map();
-        F.faces.forEach(f => f.pts.forEach((p, i) => { const q = f.pts[(i + 1) % f.pts.length], k = ekey(p, q); if (!owners.has(k)) owners.set(k, { p, q, faces: [] }); owners.get(k).faces.push(f); }));
-        // Each edge's line, from its canonical end, shared by both faces so they meet without seams.
-        // Outline edges keep their gentle bow (the silhouette doesn't change). Edges inside the rock
-        // wander: the bow plus an uneven wave, so no transition between planes runs straight.
-        const lines = new Map();
-        const lineOf = (a, b) => {
-          const k = ekey(a, b);
-          if (!lines.has(k)) {
-            const [p, q] = key(a) < key(b) ? [a, b] : [b, a], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
-            const h = Art.rand(k), bow = (h() - .5) * .16, pts = [p];
-            if ((owners.get(k)?.faces.length || 0) < 2) pts.push([(p[0] + q[0]) / 2 + nx * bow * L, (p[1] + q[1]) / 2 + ny * bow * L]);
-            else {
-              const ph = h() * TAU, amp = Math.min(.035 + h() * .03, R * .05 / L), m = L > R * .5 ? 5 : 3;
-              for (let i = 1; i <= m; i++) {
-                const t = i / (m + 1), o = L * (bow * 2 * t * (1 - t) * 2 + amp * Math.sin(t * TAU * 1.4 + ph) * Math.sin(Math.PI * t) + (h() - .5) * .02);
-                pts.push([p[0] + dx * t + nx * o, p[1] + dy * t + ny * o]);
-              }
-            }
-            pts.push(q);
-            lines.set(k, pts);
-          }
-          const pts = lines.get(k);
-          return key(a) < key(b) ? pts : [...pts].reverse();
-        };
-        // A chain of points as quadratic curves through the midpoints of its controls (reversible: the
-        // same curve either way round).
-        const chainD = pts => {
-          const n = pts.length - 1; let d = "";
-          if (n === 1) return "L" + f2(pts[1][0]) + "," + f2(pts[1][1]);
-          for (let i = 1; i < n - 1; i++) { const c = pts[i], e = [(c[0] + pts[i + 1][0]) / 2, (c[1] + pts[i + 1][1]) / 2]; d += "Q" + f2(c[0]) + "," + f2(c[1]) + " " + f2(e[0]) + "," + f2(e[1]); }
-          return d + "Q" + f2(pts[n - 1][0]) + "," + f2(pts[n - 1][1]) + " " + f2(pts[n][0]) + "," + f2(pts[n][1]);
-        };
-        // Points along that curve, evenly spaced, for the soft bands.
-        const chainAt = (pts, m) => {
-          const segs = [], n = pts.length - 1;
-          let s = pts[0];
-          for (let i = 1; i < n; i++) { const c = pts[i], e = i < n - 1 ? [(c[0] + pts[i + 1][0]) / 2, (c[1] + pts[i + 1][1]) / 2] : pts[n]; segs.push([s, c, e]); s = e; }
-          const dense = [];
-          for (const [a, c, e] of segs) for (let j = 0; j < 6; j++) { const t = j / 6, u = 1 - t; dense.push([u * u * a[0] + 2 * u * t * c[0] + t * t * e[0], u * u * a[1] + 2 * u * t * c[1] + t * t * e[1]]); }
-          dense.push(pts[n]);
-          const acc = [0]; for (let i = 1; i < dense.length; i++) acc.push(acc[i - 1] + Math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]));
-          const tot = acc[acc.length - 1] || 1, out = [];
-          for (let j = 0, i = 0; j <= m; j++) { const want = tot * j / m; while (i < dense.length - 2 && acc[i + 1] < want) i++; const f = clamp((want - acc[i]) / ((acc[i + 1] - acc[i]) || 1), 0, 1); out.push([dense[i][0] + (dense[i + 1][0] - dense[i][0]) * f, dense[i][1] + (dense[i + 1][1] - dense[i][1]) * f]); }
-          return out;
-        };
-        const facetD = f => {
-          let d = "M" + f2(f.pts[0][0]) + "," + f2(f.pts[0][1]);
-          f.pts.forEach((p, i) => { d += chainD(lineOf(p, f.pts[(i + 1) % f.pts.length])); });
-          return d + "Z";
-        };
-        const fillOf = f => Art.mix(f.fill, F.rock.mid, .09);
-        const body0 = g.append("g").attr("clip-path", `url(#${clipId})`);
-        // The solid's far and under sides first, in deep shade: wherever the near faces
-        // leave a gap (under an overhang's lip), you see rock in shadow, not the ground.
-        if (F.back && F.back.length) body0.append("path").attr("class", "r-back").attr("d", F.back.map(pts => "M" + pts.map(p => f2(p[0]) + "," + f2(p[1])).join("L") + "Z").join("")).attr("fill", Art.mix(F.rock.deep, F.rock.shade, .35)).attr("stroke", Art.mix(F.rock.deep, F.rock.shade, .35)).attr("stroke-width", .15);
-        for (const f of F.faces) body0.append("path").attr("class", "r-facet").attr("d", facetD(f)).attr("fill", fillOf(f)).attr("stroke", fillOf(f));
-        // Soft, uneven transitions: along each edge inside the rock, a few stacked feathered bands of the
-        // two faces' blended tone. Each band swells and narrows and drifts to one side or the other, so the
-        // change from light to shade wanders like weathering rather than following a ruled line. The bands
-        // overlap at the corners, which takes the point off the triangles where three planes meet.
-        const smoothClosed = d3.line().curve(d3.curveCatmullRomClosed.alpha(.5));
-        for (const [k, { p, q, faces }] of owners) if (faces.length === 2) {
-          const tone = Art.mix(fillOf(faces[0]), fillOf(faces[1]), .5), h = Art.rand("feather" + k), m = 10;
-          const c = chainAt(lineOf(p, q), m), ph = h() * TAU, drift = .25 + h() * .3, wob = d3.range(m + 1).map(() => .7 + h() * .6);
-          const nrm = c.map((pt, j) => { const a = c[Math.max(0, j - 1)], b = c[Math.min(m, j + 1)], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1; return [-dy / L, dx / L]; });
-          for (const [W, cls] of [[R * .07, "r-feather f0"], [R * .042, "r-feather f1"], [R * .02, "r-feather f2"]]) {
-            const L = [], Rt = [];
-            c.forEach((pt, j) => {
-              const t = j / m, env = .4 + .6 * Math.pow(Math.sin(Math.PI * t), .7), w = W * env * wob[j], s = W * drift * Math.sin(t * TAU * .9 + ph) * Math.sin(Math.PI * t);
-              L.push([pt[0] + nrm[j][0] * (s + w), pt[1] + nrm[j][1] * (s + w)]);
-              Rt.push([pt[0] + nrm[j][0] * (s - w), pt[1] + nrm[j][1] * (s - w)]);
-            });
-            body0.append("path").attr("class", cls).attr("d", smoothClosed([...L, ...Rt.reverse()].map(pt => [+f2(pt[0]), +f2(pt[1])]))).attr("fill", tone);
-          }
-        }
-        // Light, shade, texture, lichen and snow stay on the rock itself (not the open ground under an overhang).
-        defs.append("clipPath").attr("id", clipId + "-f").append("path").attr("d", F.faces.map(facetD).join(""));
-        const body = body0.append("g").attr("clip-path", `url(#${clipId}-f)`);
-        // The clock's light and shade, softly, over the planes.
-        const cy = -F.H * .45, ry = (F.H + R * .6) * .75;
-        for (const [cls, dx, grad] of [["r-light e", .55, "soft-light"], ["r-light w", -.55, "soft-light"], ["r-shade e", .7, "soft-dark"], ["r-shade w", -.7, "soft-dark"]])
-          body.append("ellipse").attr("class", cls + " soft").attr("cx", f2(R * dx)).attr("cy", f2(cy)).attr("rx", f2(R * .95)).attr("ry", f2(ry)).attr("fill", `url(#${grad})`);
-        // A little texture: a few broad weathering blotches, and a faint grain when you're close.
-        const xs = F.hull.map(p => p[0]), ys = F.hull.map(p => p[1]), [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-        for (let i = 0; i < 7; i++) {
-          const light = rr() < .45, x = x0 + (x1 - x0) * (.15 + .7 * rr()), y = y0 + (y1 - y0) * (.15 + .7 * rr());
-          body.append("ellipse").attr("class", "r-blotch " + (light ? "lt" : "dk")).attr("cx", f2(x)).attr("cy", f2(y)).attr("rx", f2(R * (.18 + rr() * .22))).attr("ry", f2(R * (.1 + rr() * .14)))
-            .attr("transform", `rotate(${f2((rr() - .5) * 50)} ${f2(x)} ${f2(y)})`).attr("fill", light ? "url(#soft-light)" : "url(#soft-dark)");
-        }
-        body.append("rect").attr("class", "r-grain").attr("x", f2(x0)).attr("y", f2(y0)).attr("width", f2(x1 - x0)).attr("height", f2(y1 - y0)).attr("fill", "url(#rock-grain)");
-        body.append("path").attr("class", "r-lichen").attr("fill", F.rock.lichen).attr("d", F.lichen.map(l => ell(l.x, l.y, l.r, l.r * .7)).join(""));
-        body.append("path").attr("class", "r-chalk lod-c").attr("d", F.chalk.map(c => ell(c.x, c.y, c.r * 1.3, c.r)).join(""));
-        body.append("path").attr("class", "r-snow").attr("d", F.faces.filter(f => f.up > .55).map(facetD).join(""));
-      }
-      const front = F.base.filter(p => p[1] > -R * .15).sort((a, b) => a[0] - b[0]);
-      g.append("path").attr("class", "r-foot").attr("d", d3.line().curve(d3.curveBasis)(front)).attr("clip-path", `url(#${clipId})`);
+      const R = F.R, { hullD } = boulderArt(g, F, { defs, id: bo.id, seed: bo.b.name });
       // Selection: a ring on the ground (the rocks' outlines aren't convex).
       g.insert("path", ":first-child").attr("class", "r-outline ring").attr("d", ell(0, R * .1, R * 1.35, R * .95));
       drawStory(g, bo, F, st);
@@ -1729,41 +1781,15 @@
 
     // ---- season and light, as variables only
     const rootStyle = wrap.style;
-    const bump = (d, a, b, w) => smooth(a - w, a, d) * (1 - smooth(b, b + w, d));
     function setDate(date) {
-      const P = Illu.paletteAt(date), d = P.day;
-      const v = { "--leaf": P.leaf, "--snow": P.snow, "--flowers": P.flowers, "--fernness": P.ferns, "--berries": P.berries, "--shrooms": P.shrooms,
-        "--floor": P.floor, "--floor2": P.floor2, "--meadow": P.meadow, "--bald-c": P.bald, "--grass-c": P.grass, "--fern-c": P.fern,
-        "--shrub-c": P.shrub, "--bb": P.blueberry, "--litter-0": P.litter[0], "--litter-1": P.litter[1], "--water": P.water,
-        "--shade-c": P.shade, "--canopy": P.canopy, "--trunk": P.trunk, "--season-tint": P.tint };
-      ["maple", "oak", "birch", "ever"].forEach(k => P[k].forEach((c, i) => { v[`--${k}-${i}`] = c; }));
-      P.fl.forEach((c, i) => { v[`--fl-${i}`] = c; });
-      v["--bare-d"] = P.leaf >= .97 ? "none" : "inline";      // bare branches only when the canopy isn't full
-      v["--snow-d"] = P.snow < .01 ? "none" : "inline";       // nor snow when there's none
-      // The calendar's own small events.
-      const blossom = bump(d, 128, 146, 6), apples = bump(d, 246, 300, 10);
-      v["--fruit"] = Math.max(blossom, apples * .95); v["--fruit-c"] = blossom > apples ? "#fbe6ee" : "#c8362b";
-      v["--lilac"] = bump(d, 130, 152, 6);
-      v["--lily"] = bump(d, 160, 262, 18);
-      v["--bales"] = d >= 205 && d <= 340 ? 1 : 0;
-      v["--mown"] = bump(d, 205, 300, 8);
-      v["--ice"] = P.snow > .3 ? Math.min(1, (P.snow - .3) / .4) : 0;
+      const { vars: v, P } = dateVars(date);
       for (const [k, x] of Object.entries(v)) rootStyle.setProperty(k, typeof x === "number" ? x.toFixed(3) : x);
       wrap.classList.toggle("is-hawkWatch", P.hawkWatch); wrap.classList.toggle("is-kettle", P.kettle); wrap.classList.toggle("is-fireflies", P.fireflies);
       wrap.dataset.season = P.key;
       return P;
     }
-    const SUN = { "Morning": "#fff0cf", "Midday": "#fffbea", "Afternoon": "#fff3d0", "Golden hour": "#ffd17a", "Dusk": "#ffb38c", "Night": "#9fb0e0" };
     function setTime(minute, dusk, sky = "Sunny", over = false) {
-      const L = Art.lightAt(minute, dusk, { sky, over });
-      const sunX = -L.shadow[0] / (Math.hypot(...L.shadow) || 1);
-      const cloudy = /overcast|rain|snow/i.test(sky);
-      const sun = L.phase === "Dusk" ? Art.mix("#ffc58c", "#d9a3c8", Math.max(0, Math.min(1, 1 - (dusk - minute) / 90))) : SUN[L.phase];
-      const hlE = cloudy ? .18 : .2 + .65 * Math.max(0, sunX) + .2 * L.alt, hlW = cloudy ? .18 : .2 + .65 * Math.max(0, -sunX) + .2 * L.alt;
-      const v = { "--tint": L.tint, "--tint-op": L.op.toFixed(3), "--veil": L.veil, "--veil-op": L.veilOp.toFixed(3),
-        "--shadow-op": (cloudy ? .14 : .3 + .08 * (1 - L.alt)).toFixed(3), "--sun": sun, "--hl-e": hlE.toFixed(3), "--hl-w": hlW.toFixed(3),
-        "--hle-d": hlE < .3 ? "none" : "inline", "--hlw-d": hlW < .3 ? "none" : "inline",
-        "--tint-d": L.op < .01 ? "none" : "inline" };          // the multiply blend costs a full-map composite: skip it when there's no tint
+      const { vars: v, L } = timeVars(minute, dusk, sky, over);
       for (const [k, x] of Object.entries(v)) rootStyle.setProperty(k, x);
       lastShadow = L.shadow;
       shadows.selectAll("path[data-h]").attr("transform", function () { const h = +this.dataset.h; return `translate(${f2(L.shadow[0] * h)},${f2(-L.shadow[1] * h)})`; });
@@ -1954,5 +1980,5 @@
       tilesPending: () => pending.size + (building ? 1 : 0) };
   }
 
-  root.Paint = { paint };
+  root.Paint = { paint, artDefs, boulderArt, drawTree, dateVars, timeVars, roundPoly, treeGlyph, shrubGlyph, fernGlyph, bake, slot };
 })(window);

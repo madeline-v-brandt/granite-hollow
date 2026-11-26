@@ -28,6 +28,7 @@
   // Every pacing number, in one place, to be tuned by simulation and playtesting.
   // Saves don't store these, so changing them changes future days, never history.
   const PARAMS = {
+    faFrom: "2025-09-07",                 // nobody puts up a problem before this: your first day (Sept 6) is yours (play-test, 2026-11-26)
     calendarWeight: 0.25,                 // development clock: your climbing days + this × calendar days
     target: { max: 0.9, tau: 65 },        // established ≈ problems × max × (1 − e^(−clock/tau)). Tuned (Stage 5,
                                           // scripts/tune_crag.js) so a keen player sees ~70% climbed by the end of 2025
@@ -301,7 +302,7 @@
     }
 
     const wet = ctx.today && ctx.today.date === d ? !!ctx.today.wet : r() >= P.dryDays;
-    if (!wet) {
+    if (!wet && d >= P.faFrom) {
       // First ascents, towards the development target.
       const A = ctx.ability, NB = P.nextBand;
       const lineWeight = (p, gated = true) => {

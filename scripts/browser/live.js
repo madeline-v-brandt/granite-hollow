@@ -3,7 +3,7 @@
 // (keeping a copy of the old save) and welcomed back; an old save file converts
 // the same way; a development-mode save file is refused.
 //   node scripts/browser/live.js
-const { open, ready, click, settle, sleep, GAME_DIR, FIX } = require("./lib");
+const { open, ready, click, settle, sleep, burnIfScene, TRY, GAME_DIR, FIX } = require("./lib");
 const fs = require("fs"), os = require("os"), path = require("path");
 const tmp = n => path.join(os.tmpdir(), n);
 const SLOT = "granite-hollow-save-v1", COPY = "granite-hollow-save-before-reopening";
@@ -13,6 +13,7 @@ const World = require(GAME_DIR + "world.js"), D = require(GAME_DIR + "game-data.
 const levelOld = xp => { let l = 0; for (let need = 100; xp >= need && l < 16; l++) { xp -= need; need *= 1.6; } return l; };
 (async () => {
   const { b, p, errs, url } = await open();
+  await p.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);     // the climbing scene plays each burn at once
   const saved = () => p.evaluate(k => JSON.parse(localStorage.getItem(k)), SLOT);
   const modalH2 = () => p.evaluate(() => (document.querySelector(".modal h2") || {}).textContent || "(no dialog)");
   await p.goto(url); await p.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
@@ -24,8 +25,11 @@ const levelOld = xp => { let l = 0; for (let need = 100; xp >= need && l < 16; l
   await click(p, ".modal [data-close]"); await sleep(200);
   console.log("Tailgate panel:", (await p.evaluate(() => document.querySelector("#tabbody").innerText)).split("\n").filter(Boolean).slice(0, 8).join(" / "));
   await p.evaluate(() => document.querySelectorAll("[data-go-boulder]")[0].click());
-  for (let i = 0; i < 20 && !(await p.$("[data-try]:not([disabled])")); i++) await sleep(250);   // the walk over
-  for (let n = 0; n < 10; n++) { if (!(await click(p, "[data-try]:not([disabled])"))) break; await settle(p); }
+  for (let i = 0; i < 20 && !(await p.$(TRY)); i++) await sleep(250);   // the walk over
+  for (let n = 0; n < 10; n++) { if (!(await click(p, TRY))) break; await burnIfScene(p); await settle(p); }
+  const scene = await p.evaluate(() => { const r = document.querySelector(".scene-root"); return r && !r.hidden ? r.querySelector(".sc-prob h2").textContent + " · " + r.querySelector(".sc-say").textContent.slice(0, 60) : "(not open)"; });
+  console.log("climbing scene:", scene);
+  await click(p, ".scene-root [data-act='leave']"); await sleep(150);
   let g = await saved();
   console.log("new climber: v", g.v, "rules", g.rules, "dev", !!g.dev, "| tried", Object.keys(g.ps).length, "sent", g.ticks.length, "| invariants", World.check(D, g), "| valid", World.validate(D, g));
   // An old climber already saved in this browser: converted on load, with a copy kept.

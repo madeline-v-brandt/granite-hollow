@@ -54,6 +54,31 @@
     highball: "You backed off the committing top-out.", eliminate: "You dabbed an off-route hold.",
     reachy: "The next hold was just out of reach.", bunchy: "You couldn't fit into the cramped start.",
   };
+  // A better way through a crux (Mech.sequence's alt): what you see when you find
+  // it yourself, and how a local tells you.
+  const ALT = {
+    extra: { see: "there's a little intermediate hold, just right for someone your size.", tip: "There's a tiny intermediate at the crux. Shorter folks use it." },
+    skip: { see: "you're tall enough to reach straight past the cramped hold.", tip: "You're tall enough to skip the cramped hold at the crux. Just reach past it." },
+    heel: { see: "a heel hook takes the weight off your arms.", tip: "Heel hook at the crux. It takes all the weight off your arms." },
+    toe: { see: "a toe hook keeps your feet from cutting.", tip: "Toe hook at the crux and your feet won't cut." },
+    knee: { see: "there's a knee bar. You can almost let go.", tip: "There's a knee bar at the crux. You can almost let go." },
+    drop: { see: "a drop-knee turns it into an easy reach.", tip: "Drop-knee at the crux and it turns into a reach." },
+    match: { see: "if you match on the hold first, the next move is easy.", tip: "Match on the crux hold before you go for the next one." },
+    foot: { see: "there's a better foothold, low and left.", tip: "There's a better foot at the crux, low and left." },
+  };
+  const an = w => (/^[aeiou]/.test(w) ? "an " : "a ") + w;
+  // Why you came off: the move you fell on, in climbers' words.
+  function fallText(p, m, k) {
+    if (!m) return "You came off.";
+    if (m.kind === "crux") {
+      const tag = m.reach === "long" ? "reachy" : m.reach === "tight" ? "bunchy" : m.style;
+      return CRUX[tag] || `You came off the crux, a hard move to ${an(m.hold)}.`;
+    }
+    if (m.kind === "top") return CRUX[m.style] || "You couldn't top it out.";
+    if (m.hold === "smear") return m.kind === "start" ? "Your feet skated off the slab on the first move." : "A smear let go under your foot.";
+    if (m.kind === "start") return p.sit ? "You couldn't even get off the ground from the sit start." : `You slipped off ${an(m.hold)} on the first move.`;
+    return [`You came off ${an(m.hold)} on the way up.`, `A foot slipped on an easy move to ${an(m.hold)}.`, `You fumbled the ${m.hold} and dropped.`][k % 3];
+  }
   const BETA_TIP = {
     crimpy: "Thumb-catch the crimp and drive with your feet.", slopey: "Keep your hips tight to the wall on the sloper.",
     pinchy: "Squeeze the pinch with your thumb pad, not the tip.", juggy: "Climb it fast and shake out on the big jug.",
@@ -94,7 +119,7 @@
     D.boulders.forEach((b, i) => { b.id = i; });
     D.problems.forEach((p, i) => {
       p.id = i; p.boulder = D.boulders[p.b]; p.sector = p.boulder.sector;
-      p.tagList = Mech.tagsOf(p); p.moves = Mech.movesIn(p, (i * 7919) % 97);
+      p.tagList = Mech.tagsOf(p); p.seq = Mech.sequence(p); p.moves = p.seq.n;
       D.sectorProblems.get(p.sector).push(i);
     });
     for (const s of D.sectors) {
@@ -177,6 +202,7 @@
     const fc = !first && (G.forecast || []).find(f => f.date === G.date);
     let w = fc ? Mech.realize(fc) : Mech.weather(monthOf(G.date));
     if (first) while (Mech.rainStart(w) === 0) w = Mech.weather(monthOf(G.date));   // day one is always climbable
+    if (first) w = Mech.atLeast(w, 0.2);           // and good: plenty goes on your first day (play-test, 2026-11-26)
     G.forecast = (G.forecast || []).filter(f => f.date > G.date);
     const s = Mech.startOfDay(G.player, rest);
     Object.assign(G.player, s);
@@ -189,9 +215,9 @@
       attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null, bishop: Math.random() < 0.13,
       over: false, warned: false, levelBefore: Mech.levelOf(G.player).level };
     const intro = first && v2()
-      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk's trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot. Everything else is waiting for a first ascent.`
+      ? `You pull into the Granite Hollow lot on ${an(w.sky.toLowerCase())} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk's trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot. Everything else is waiting for a first ascent.`
       : first
-      ? `You pull into the Granite Hollow lot on a ${w.sky.toLowerCase()} September morning, ${w.temp}°F. The boulders at The Tailgate are right beside the car. The trail map (press M) shows the rest of the park: The Schoolhouse is 5 minutes up the trail.`
+      ? `You pull into the Granite Hollow lot on ${an(w.sky.toLowerCase())} September morning, ${w.temp}°F. The boulders at The Tailgate are right beside the car. The trail map (press M) shows the rest of the park: The Schoolhouse is 5 minutes up the trail.`
       : `${w.sky}, ${w.temp}°F. ${w.note}`;
     G.day.last = { kind: "info", title: first ? "Welcome to Granite Hollow" : `Day ${G.dayNo}`, text: intro };
     if (Mech.rainStart(w) === 0) {
@@ -269,25 +295,40 @@
   }
 
   // ================================================================== actions
-  function tryProblem(i) {
-    if (UI.busy || G.day.over) return;
+  // Back after a long break: what you knew of the moves has faded a little. Checked
+  // on the first try (burn or worked move) of a new session; true if it faded.
+  function fadeIfAway(p, st) {
+    const last = Array.isArray(st.log) && st.log[st.log.length - 1];
+    return !st.sent && !!last && last[0] !== G.date && Mech.fade(p, st, Math.round((toDate(G.date) - toDate(String(last[0]))) / 864e5));
+  }
+  // Today's entry in a project's session log ([date, burns, best highpoint, sent]), made
+  // if need be; null once it's sent (the Journal's projects only follow open ones).
+  function sessionOf(st) {
+    if (st.sent) return null;
+    const lg = st.log = st.log || [];
+    let sess = lg[lg.length - 1];
+    if (!sess || sess[0] !== G.date) { sess = [G.date, 0, 0, 0]; lg.push(sess); if (lg.length > 20) lg.shift(); }
+    return sess;
+  }
+  // A burn: from the bottom, under the rules. From the panel (Climb it, Repeat) it
+  // shows its banner and dialogs itself; from the climbing scene (opts.scene), the
+  // scene plays it first and opens the dialogs after (returned as next).
+  // Returns { r, style, fa, next }, or null if nothing happened.
+  function tryProblem(i, opts = {}) {
+    if (UI.busy || G.day.over) return null;
     const p = D.problems[i];
-    if (G.loc.boulder !== p.b) { travel({ sector: p.sector, boulder: p.b }); return; }
+    if (G.loc.boulder !== p.b) { travel({ sector: p.sector, boulder: p.b }); return null; }
     const st = pstate(i);
+    const faded = fadeIfAway(p, st);
     const cost = Mech.attemptCost(G.player, p);
     const r = Mech.attempt(G.player, p, st, G.day.weather);
     G.player.energy = Math.max(0, G.player.energy - cost.energy);
     G.player.skin = Math.max(0, G.player.skin - cost.skin);
     G.day.minute += Math.round(cost.minutes);
     st.att++; G.day.attempts++;
-    // Session log for the Journal's projects: [date, tries, best highpoint, sent], while it's still a project.
-    let sess = null;
-    if (!st.sent) {
-      const lg = st.log = st.log || [];
-      sess = lg[lg.length - 1];
-      if (!sess || sess[0] !== G.date) { sess = [G.date, 0, 0, 0]; lg.push(sess); if (lg.length > 20) lg.shift(); }
-      sess[1]++;
-    }
+    const sess = sessionOf(st);
+    if (sess) sess[1]++;
+    let out = { r, style: null, fa: false, next: [] };
     const gains = Mech.skillGains(G.player, p, r.sent);
     Mech.applySkills(G.player, gains);
     for (const [t, g] of Object.entries(gains)) G.day.gains[t] = (G.day.gains[t] || 0) + g;
@@ -325,24 +366,26 @@
       G.day.last = { kind: "send", title: fa ? `First ascent on ${p.boulder.name}, V${p.grade}` : `${style === "Repeat" ? "Repeat" : "Sent"}: ${titleOf(i)}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
       note(`${fa ? "First ascent:" : style} ${pname(i)}${vg(i) ? ` (${vg(i)})` : ""}, +${fmt(xp)} XP.`);
       if (fa) UI.faNote = G.feed[0];                        // renamed along with the problem
-      showBanner(fa ? "FA" : style, i, xp, fa ? `${p.boulder.name} · V${p.grade}` : null);
+      if (!opts.scene) showBanner(fa ? "FA" : style, i, xp, fa ? `${p.boulder.name} · V${p.grade}` : null);
       // After the banner: name your first ascent, then the level-up, then (if the day's over) the summary.
       const after = levelNow().level, next = [];
       if (fa) next.push(() => nameDialog(i, { first: true, was: openLabel }));
       if (after > before) next.push(() => showLevelUp(after));
-      if (next.length) {
+      out = { r, style, fa: !!fa, xp, next };
+      if (next.length && !opts.scene) {
         UI.levelPending = true;
         setTimeout(() => { UI.levelPending = false; next.forEach(openModal); nextModal(); }, reduceMotion ? 0 : fa ? 1300 : 900);
       }
     } else {
-      const k = Math.max(1, Math.min(p.moves - 1, Math.round(r.progress * p.moves)));
-      const frac = k / p.moves, newHigh = st.att > 1 && frac > st.best + 1e-6;
+      const k = r.fallAt + 1, frac = k / p.moves, newHigh = st.att > 1 && frac > st.best + 1e-6;
       if (frac > st.best) { st.best = frac; if (newHigh) G.day.highpoints++; }
       if (sess) sess[2] = Math.max(sess[2], frac);
-      const before = st.beta; st.beta = Math.min(Mech.BETA_MAX, st.beta + Mech.betaGain(st.beta, sess ? sess[1] : 1));
-      let text = `${CRUX[r.crux] || "You came off."} Fell on move ${k} of ${p.moves}.`;
+      const before = Mech.knowledge(p, st)[r.fallAt], L = Mech.learnBurn(G.player, p, st, r.fallAt, sess ? sess[1] : 1);
+      let text = `${fallText(p, r.move, k)} Fell on move ${k} of ${p.moves}${r.move.kind === "crux" ? ", the crux" : ""}.`;
+      if (faded) text = `It's been a while, and the moves feel unfamiliar again. ${text}`;
       if (newHigh) text += " New highpoint!";
-      if (st.beta - before > 0.03 && st.att <= 6) text += " You worked out a bit more of the beta.";
+      if (L.alt) text += ` Hanging there, you see a better way through: ${ALT[p.seq.alt.kind].see}`;
+      else if (st.mk[r.fallAt] - before > 0.04 && st.att <= 6) text += r.move.kind === "crux" ? " You're starting to work out the crux." : " You worked out a bit more of the beta.";
       if (G.day.weather.cond <= -0.8 && Mech.frictionSensitivity(p) >= 0.6) text += " Everything is wet.";
       G.day.last = { kind: "fall", title: `${titleOf(i)}: attempt ${st.att}`, text, gains, p: i };
     }
@@ -353,6 +396,7 @@
       note("Tore a flapper.");
     }
     afterAction();
+    return out;
   }
   // Your first send of someone else's problem: whose it was, and how many have climbed it.
   function ascentLine(i) {
@@ -361,6 +405,149 @@
     return `${who.charAt(0).toUpperCase() + who.slice(1)} made the first ascent on ${shortDate(e.date)}. Yours is the ${ordinal(e.reps + 1)} documented ascent.`;
   }
   function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+
+  // ======================================================= the climbing scene
+  // Phase 3, Stage 2 (docs/phase3/stage2-scene.md). Try opens a close-up of the
+  // boulder (scene.js): you, your pad, the line, a card for the problem and one for
+  // you, and a short menu (Send burn, Work a move, Rest, Leave). The rules are the
+  // ones above: a burn is tryProblem, saved before the scene plays it. Easy problems
+  // (and repeats) keep a one-tap Climb it in the panel. G.day.climb: { p, view, say }
+  // while it's open, so a reload brings you back to it.
+  let SC = null;
+  const climbing = () => !!(G && G.day && G.day.climb);
+  // Climb it, not Try: a warm-up for you that you haven't fallen off.
+  const easyFor = i => { const st = G.ps[i]; return !(st && st.att > 0 && !st.sent) && chanceFor(i) >= 0.8; };
+  const pc = c => (c >= .1 ? Math.round(c * 100) + "%" : c >= .01 ? (Math.round(c * 1000) / 10) + "%" : c >= .002 ? "under 1%" : "almost none");
+  const shift = (a, b) => (pc(a) === pc(b) ? `send ${pc(a)}, barely changes` : `send ${pc(a)} → ${pc(b)}`);
+  const KNOW = v => (v >= 0.67 ? "well" : v >= 0.34 ? "fairly well" : v > 0.05 ? "a little" : "not yet");
+  function openClimb(i) {
+    if (UI.busy || G.day.over) return;
+    const p = D.problems[i];
+    if (G.loc.boulder !== p.b) { travel({ sector: p.sector, boulder: p.b }); return; }
+    if (!window.Scene || !M || !M.paint || !M.paint.scene) { tryProblem(i); return; }      // no map drawn: climb from the panel
+    G.day.climb = { p: i, view: "main", say: null };
+    save();
+    safely("the climbing scene", showClimb);
+  }
+  function showClimb() {
+    const i = G.day.climb.p, p = D.problems[i], S = M.paint.scene, st = G.ps[i];
+    const host = $("#scene-root");
+    host.hidden = false; document.body.classList.add("climbing");
+    if (!SC) SC = Scene.create(host, { onAction: k => { if (climbing()) climbAction(k); } });
+    const ids = [...p.boulder.problems].sort((a, b) => a - b);
+    // Chalk on the rock from how often its lines have been climbed in this save's world.
+    const probs = p.boulder.problems.map(k => { const e = v2() ? G.world.est[k] : null; return { ...D.problems[k], sends: v2() ? (e && !e.old ? e.reps + 1 : 0) * 25 : D.problems[k].sends }; });
+    SC.show({ park: S, bo: S.boulders[p.b], probs, problem: p, line: { index: ids.indexOf(i), count: ids.length }, seq: p.seq, outfit: outfitFor(),
+      seen: st ? Mech.seenOf(p, st) : 0, known: (st && st.mk) || [] });
+    climbAtmosphere(); refreshClimb();
+    SC.say(G.day.climb.say || climbIntro(i));
+    SC.focusMenu();
+  }
+  function closeClimb() {
+    if (G.day.climb) G.day.climb = null;
+    const host = $("#scene-root"); host.hidden = true; document.body.classList.remove("climbing");
+    save(); renderAll();
+  }
+  function climbAtmosphere() { const w = G.day.weather; SC.setAtmosphere({ date: G.date, minute: Math.min(G.day.minute, w.dusk + 20), dusk: w.dusk, sky: w.sky }); }
+  function climbIntro(i) {
+    const p = D.problems[i], st = G.ps[i];
+    if (st && st.sent) return `You've sent ${pname(i)}. Climb it again, just for fun?`;
+    const f = Mech.feel(chanceFor(i)).label.toLowerCase();
+    if (st && st.att) return `Back under ${pname(i)}. ${st.att} ${st.att === 1 ? "try" : "tries"} so far, and it feels ${f === "not yet" ? "out of reach for now" : f} today.`;
+    return `You drop your pad under ${pname(i)} and look up at it. ${p.moves} moves to the top${p.sit ? ", from a sit start" : ""}. From the ground, it feels ${f === "not yet" ? "out of reach for now" : f}.`;
+  }
+  // The cards, through K (so an unclimbed line has no grade), and the menu with what
+  // each choice would do to your chance of sending.
+  function refreshClimb() {
+    if (!SC || !climbing()) return;
+    const i = G.day.climb.p, p = D.problems[i], st = G.ps[i] || { att: 0, beta: 0 }, w = G.day.weather, L = levelNow(), left = w.dusk - G.day.minute;
+    SC.setCards({
+      prob: { name: pname(i), grade: vg(i), where: `${K.boulderName(p.b) || "Unfamiliar boulder"} · ${p.sector}`, tags: p.tagList, strip: moveStrip(i),
+        hp: st.sent ? (st.flash ? "Flashed" : "Sent") : st.att ? `Highpoint move ${Math.round(st.best * p.moves)} of ${p.moves}` : `${p.moves} moves`,
+        feel: st.sent ? null : Mech.feel(chanceFor(i)).label,
+        beta: st.att && !st.sent ? `Beta ${Math.min(100, Math.round((st.beta || 0) / Mech.BETA_MAX * 100))}% worked out${st.alt ? " · a better way found" : ""}` : null },
+      me: { name: G.player.name, level: L.level, energy: G.player.energy, skin: G.player.skin, clock: clock(Math.min(G.day.minute, w.dusk)),
+        light: left <= 0 ? "dark" : left >= 120 ? `${Math.floor(left / 60)} h ${left % 60} min of light` : `${left} min of light` },
+    });
+    SC.setMenu(climbMenu(i));
+  }
+  function climbMenu(i) {
+    const p = D.problems[i], st = G.ps[i] || { att: 0, beta: 0 }, day = G.day.weather, now = chanceFor(i), worked = (G.day.worked || {})[i] || 0;
+    if (G.day.climb.view === "work") {
+      const mk = Mech.knowledge(p, { ...st }), seen = Math.max(1, Mech.seenOf(p, st));
+      const items = p.seq.moves.slice(0, seen).map((m, j) => ({ key: "work:" + j, label: `Move ${j + 1}${m.kind === "crux" ? ", the crux" : m.kind === "top" ? ", the top-out" : ""}`,
+        sub: `${an(m.hold)}, known ${KNOW(mk[j])} · ${shift(now, Mech.previewWork(G.player, p, st, day, j, worked + 1).kept)}` }));
+      return [...items, { key: "back", label: "Back", wide: items.length % 2 === 0 }];
+    }
+    if (st.sent) return [{ key: "again", label: "Climb it again", sub: "A repeat, for fun", primary: true, disabled: G.day.over }, { key: "leave", label: "Leave", sub: "Back to the map" }];
+    const c = Mech.attemptCost(G.player, p), wc = Mech.workCost(G.player, p), seen = Math.max(1, Mech.seenOf(p, st));
+    const gains = st.att ? Array.from({ length: seen }, (_, j) => Mech.previewWork(G.player, p, st, day, j, worked + 1).kept) : [now];
+    const bestAt = gains.indexOf(Math.max(...gains)), bestName = p.seq.moves[bestAt].kind === "crux" ? "the crux" : `move ${bestAt + 1}`;
+    const full = G.player.energy >= G.day.startEnergy - .5;
+    return [
+      { key: "burn", label: `Send burn · ${pc(now)}`, sub: `Chance to send · ${Math.round(c.energy)} energy · ${Math.round(c.minutes)} min`, primary: true, disabled: G.day.over },
+      { key: "work", label: "Work a move", sub: st.att ? `Best: ${bestName}, ${shift(now, gains[bestAt])} · ${Math.round(wc.energy)} energy` : "Give it a burn first", disabled: G.day.over || !st.att },
+      { key: "rest", label: "Rest", sub: full ? "You're fresh" : `20 min · +${Math.round(Mech.restGain(G.day.rests || 0))} energy · ${shift(now, Mech.previewRest(G.player, p, st, day, G.day.rests || 0, G.day.startEnergy))}`, disabled: G.day.over || full },
+      { key: "leave", label: "Leave", sub: "Back to the map" },
+    ];
+  }
+  async function climbAction(k) {
+    const i = G.day.climb.p;
+    if (k === "leave") { closeClimb(); return; }
+    if (k === "work") { G.day.climb.view = "work"; refreshClimb(); SC.say("Which move? You can pull on partway up and try it on its own."); return; }
+    if (k === "back") { G.day.climb.view = "main"; refreshClimb(); SC.say(G.day.climb.say || climbIntro(i)); return; }
+    if (k === "rest") { rest(); afterClimb([]); return; }
+    if (k === "burn" || k === "again") { await burnInScene(i); return; }
+    if (k.startsWith("work:")) { await workInScene(i, +k.slice(5)); return; }
+  }
+  // After anything in the scene: its words, the cards and menu again; if the day is
+  // over (dusk, rain, out of energy or skin), the scene closes before the dialogs
+  // (naming, level-up, the day's summary) open.
+  function afterClimb(next) {
+    if (!climbing()) return;
+    G.day.climb.say = G.day.last && G.day.last.text;
+    if (G.day.over) closeClimb();
+    else { save(); refreshClimb(); climbAtmosphere(); SC.say(G.day.climb.say); }
+    UI.levelPending = false;
+    next.forEach(openModal); nextModal();
+  }
+  async function burnInScene(i) {
+    if (SC.busy() || G.day.over) return;
+    G.day.climb.view = "main";
+    UI.levelPending = true;                    // the dialogs and the summary wait for the climb to play out
+    const res = tryProblem(i, { scene: true });
+    if (!res) { UI.levelPending = false; return; }
+    const st = G.ps[i];
+    SC.say(st.att === 1 && !res.r.sent ? "You chalk up and pull on." : ["You chalk up and pull on.", "Deep breath. Another go.", "You brush the holds with your thumb and step on."][st.att % 3]);
+    await SC.play("burn", { fallAt: res.r.sent ? -1 : res.r.fallAt });
+    if (res.r.sent) SC.flash(res.fa ? "FIRST ASCENT!" : res.style === "Flash" ? "FLASH!" : res.style === "Repeat" ? "AGAIN!" : "SENT!", res.fa ? "fa" : "");
+    SC.setSeen(Mech.seenOf(D.problems[i], st), st.mk || []);
+    afterClimb(res.next || []);
+  }
+  // Working one move on its own: cheaper than a burn, and it teaches that move a lot.
+  async function workInScene(i, at) {
+    if (SC.busy() || G.day.over) return;
+    const p = D.problems[i], st = pstate(i), m = p.seq.moves[at];
+    G.day.climb.view = "main";
+    const faded = fadeIfAway(p, st);
+    sessionOf(st);
+    const c = Mech.workCost(G.player, p);
+    G.player.energy = Math.max(0, G.player.energy - c.energy); G.player.skin = Math.max(0, G.player.skin - c.skin); G.day.minute += c.minutes;
+    const worked = G.day.worked = G.day.worked || {}, n = worked[i] = (worked[i] || 0) + 1;
+    const w = Mech.workMove(G.player, p, st, G.day.weather, at, n);
+    let text = w.stuck ? `You stick move ${at + 1}${m.kind === "crux" ? ", the crux," : ""} and hang there a moment, learning the body position.` : `You come off move ${at + 1}${m.kind === "crux" ? ", the crux," : ""} again, but it's starting to make sense.`;
+    if (faded) text = `It's been a while, and the moves feel unfamiliar again. ${text}`;
+    if (w.stuck && at + 1 < p.moves && Mech.seenOf(p, st) === at + 2) text += " Now you can see the next move.";
+    if (w.alt) text += ` Working it, you find a better way through: ${ALT[p.seq.alt.kind].see}`;
+    G.day.last = { kind: "work", title: `${titleOf(i)}: working move ${at + 1}`, text, p: i };
+    if (w.alt) note(`Found a better way through the crux of ${pname(i)}.`);
+    UI.levelPending = true;
+    afterAction();
+    SC.say(`You pull on at move ${at + 1} and try it on its own.`);
+    await SC.play("work", { at, stuck: w.stuck });
+    SC.setSeen(Mech.seenOf(p, st), st.mk || []);
+    afterClimb([]);
+  }
 
   function afterAction() {
     checkAchievements();
@@ -435,12 +622,11 @@
   function rest() {
     if (UI.busy || G.day.over) return;
     G.day.minute += 20;
-    const n = G.day.rests || 0;                        // each rest the same day gives back less
+    const n = G.day.rests || 0;
     G.player.energy = Math.min(G.day.startEnergy, G.player.energy + Mech.restGain(n));
     G.day.rests = n + 1;
-    G.day.last = { kind: "info", title: "Twenty minutes on the pad", text: n < 2
-      ? "You eat a snack, retape a finger, and watch someone flail on a warm-up. Energy recovers a little; skin doesn't."
-      : "Another rest. You're stiffening up, and each one gives back less than the last. Skin doesn't recover at all." };
+    G.day.last = { kind: "info", title: "Twenty minutes on the pad", text: ["You eat a snack, retape a finger, and watch someone flail on a warm-up. Energy recovers a little; skin doesn't.",
+      "You lie back on the pad and watch the clouds. Your forearms stop buzzing.", "A drink, a stretch, a look at the holds from below. Energy comes back; skin doesn't."][n % 3] };
     afterAction();
   }
 
@@ -555,6 +741,8 @@
     const projects = D.sectorProblems.get(sector).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && !G.ps[i].tipped);
     if (!projects.length || Math.random() >= 0.7) return null;
     const pi = projects.sort((a, b) => G.ps[b].att - G.ps[a].att)[0], p = D.problems[pi];
+    const a = Mech.altFor(G.player, p);
+    if (a && !G.ps[pi].alt) return { p: pi, text: `Saw you working ${pref(pi)}. ${ALT[a.kind].tip}` };
     const worst = p.tagList.filter(t => BETA_TIP[t]).sort((a, b) => (G.player.skills[a] ?? Mech.morph(G.player, p)) - (G.player.skills[b] ?? Mech.morph(G.player, p)))[0];
     return { p: pi, text: `Saw you working ${pref(pi)}. ${BETA_TIP[worst] || "Try it with more confidence on the first move."}` };
   }
@@ -771,9 +959,9 @@
   }
   function takeBeta() {
     const e = G.day.encounter; if (!e || !e.beta) return;
-    const st = pstate(e.beta.p); st.beta = Math.min(Mech.BETA_MAX, st.beta + 0.25); st.tipped = true; e.betaTaken = true;
+    const st = pstate(e.beta.p), what = Mech.tip(G.player, D.problems[e.beta.p], st); st.tipped = true; e.betaTaken = true;
     note(`Got beta for ${pref(e.beta.p)} from ${whoOf(e.ci ?? e.who)}.`);
-    toast("Beta unlocked", `${pname(e.beta.p)} will feel a bit easier now.`, "info");
+    toast("Beta unlocked", what === "alt" ? `There's a better way through the crux of ${pname(e.beta.p)}.` : `You've a clearer picture of the crux of ${pname(e.beta.p)}.`, "info");
     save(); renderAll();
   }
 
@@ -1057,7 +1245,7 @@
     // Only a text field keeps the keys: anywhere else (a button or a menu in the side
     // panel just clicked), WASD and the arrows walk.
     const typing = t => t && (t.isContentEditable || t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && /^(text|search|email|number|password|url|tel)$/i.test(t.type || "text")));
-    const blockedKeys = () => $("#game").hidden || modalOpen() || (paper && paper.isOpen()) || G.day.over;
+    const blockedKeys = () => $("#game").hidden || modalOpen() || (paper && paper.isOpen()) || G.day.over || climbing();
     document.addEventListener("keydown", e => {
       if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return;
       const k = e.key.toLowerCase(), dir = KEY[k];
@@ -1227,6 +1415,7 @@
   window.addEventListener("unhandledrejection", e => reportError("page", e.reason));
   const safely = (where, fn) => { try { return fn(); } catch (e) { reportError(where, e); } };
   function renderAll() {
+    if (!climbing() && !$("#scene-root").hidden) { $("#scene-root").hidden = true; document.body.classList.remove("climbing"); }
     safely("status bar", renderHud);
     safely("tabs", renderTabs);
     try { renderPanel(); } catch (e) {
@@ -1388,6 +1577,25 @@
     return `<div class="why">About ${c >= 0.1 ? Math.round(c * 100) + "%" : c >= 0.01 ? "1 in " + Math.round(1 / c) : "under 1%"} per try right now.${graded ? "" : " Nobody has climbed it, so nobody knows its grade."}
       <div class="chips">${chips}</div></div>`;
   }
+  // The moves of a problem you've tried: one mark each, a diamond for a crux,
+  // filled as you learn it; moves you haven't reached yet are dashed; a ring marks
+  // your highpoint. Nothing about a move shows until you've reached it.
+  function moveStrip(i) {
+    const p = D.problems[i], st = G.ps[i];
+    if (!st || !st.att) return "";
+    const mk = Mech.knowledge(p, st), seen = Mech.seenOf(p, st), hi = st.sent ? -1 : Math.round((st.best || 0) * p.moves) - 1;
+    const know = v => (v >= 0.67 ? "well" : v >= 0.34 ? "fairly well" : v > 0.05 ? "a little" : "not yet");
+    const cells = p.seq.moves.map((m, j) => {
+      if (j >= seen) return `<i class="mv unseen" title="Move ${j + 1}: you haven't got this far"></i>`;
+      const lvl = mk[j] >= 0.67 ? 3 : mk[j] >= 0.34 ? 2 : mk[j] > 0.05 ? 1 : 0;
+      const what = m.kind === "crux" ? `the crux, ${an(m.hold)}` : m.kind === "top" ? "the top-out" : an(m.hold);
+      const alt = st.alt && p.seq.alt && p.seq.alt.at === j ? ` You've found a better way: ${ALT[p.seq.alt.kind].see}` : "";
+      return `<i class="mv k${lvl}${m.kind === "crux" ? " crux" : ""}${j === hi ? " hi" : ""}${alt ? " alt" : ""}" title="${esc(`Move ${j + 1}: ${what}. You know it ${know(mk[j])}.${alt}`)}"></i>`;
+    }).join("");
+    const cr = p.seq.cruxes.filter(j => j < seen);
+    const label = `${p.moves} moves, ${seen} seen.${cr.length ? ` Crux at move ${cr.map(j => j + 1).join(" and ")}, known ${cr.map(j => know(mk[j])).join(" and ")}.` : ""}${st.alt ? " You've found a better way through." : ""}`;
+    return `<span class="moves" role="img" aria-label="${esc(label)}">${cells}</span>`;
+  }
   function problemRowHtml(i, k = 0, anim = false) {
     const p = D.problems[i], st = G.ps[i], open = UI.expanded.has(i), fresh = !!(UI.fresh && UI.fresh.has(i));
     let status = "";
@@ -1395,14 +1603,15 @@
     else if (st?.att) status = `<span class="status">${st.att} ${st.att === 1 ? "try" : "tries"}</span>`;
     const tip = (G.tips.some(t => t.p === i && !t.done) ? `<span class="chip" style="background:var(--gold-soft);color:var(--gold)">★ tip</span>` : "")
       + (fresh ? `<span class="chip new">just spotted</span>` : "");
-    const hp = st && !st.sent && st.att ? `<div class="hp"><div class="meter"><i style="width:${(st.best * 100).toFixed(0)}%"></i></div>Highpoint move ${Math.round(st.best * p.moves)} of ${p.moves}</div>` : "";
+    const hp = st && !st.sent && st.att ? `<div class="hp">${moveStrip(i)}<span>Highpoint move ${Math.round(st.best * p.moves)} of ${p.moves}${st.alt ? " · found a better way" : ""}</span></div>` : "";
     const disabled = UI.busy || G.day.over ? "disabled" : "";
     return `<div class="prob${fresh && anim ? " fresh" : ""}"${fresh && anim ? ` style="animation-delay:${k * 140}ms"` : ""}><div class="prob-main">
         ${gradeSpan(i)}
         <div><button type="button" class="linklike pname" data-expand="${i}" aria-expanded="${open}">${esc(pname(i))}</button>${status}
           <div class="chips">${tip}${p.tagList.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>${hp}</div>
         ${feelHtml(i)}
-        <button type="button" class="btn small ${st?.sent ? "" : "primary"}" data-try="${i}" ${disabled}>${st?.sent ? "Repeat" : "Try"}</button>
+        ${st?.sent || easyFor(i) ? `<button type="button" class="btn small ${st?.sent ? "" : "primary"}" data-climb="${i}" ${disabled} title="${st?.sent ? "Climb it again" : "One burn, right here"}">${st?.sent ? "Repeat" : "Climb it"}</button>`
+          : `<button type="button" class="btn small primary" data-try="${i}" ${disabled} title="Open the climbing scene">Try</button>`}
       </div>${open ? whyHtml(i) + `<div class="why"><button type="button" class="linklike" data-cl="${i}">See it on CragLog</button></div>` : ""}</div>`;
   }
   function hereHtml() {
@@ -1829,7 +2038,7 @@
       const p = D.problems[i], best = Math.round(Number(st.best) * p.moves) || 0, log = Array.isArray(st.log) ? st.log : [];
       const sessions = log.length, open = !st.sent;
       const fl = open ? Mech.feel(chanceFor(i)) : null;
-      const moves = d3.range(1, p.moves + 1).map(k => `<i class="${k <= best ? "on" : ""}${k === best && open ? " hi" : ""}"></i>`).join("");
+      const moves = moveStrip(i);
       const hist = sessions ? `<div class="pj-hist" aria-label="Highpoint by session">${log.slice(-12).map(e => {
         const h = Math.max(0.06, Math.min(1, Number(e[2]) || 0)), sent = e[3] === 1;
         return `<span title="${esc(shortDate(String(e[0])))}: ${Number(e[1]) || 0} ${Number(e[1]) === 1 ? "try" : "tries"}, ${sent ? "sent!" : `move ${Math.round(h * p.moves)} of ${p.moves}`}"><i class="${sent ? "sent" : ""}" style="height:${(h * 100).toFixed(0)}%"></i></span>`; }).join("")}</div>` : "";
@@ -1841,7 +2050,7 @@
           ${open ? `<button type="button" class="btn small" data-go-problem="${i}">Go</button>` : `<span style="color:var(--plus);font-weight:600">✓</span>`}</div>
         <div class="meta" style="margin:0">${esc(p.boulder.name)} · ${esc(p.sector)} · ${summary}</div>
         <div class="pj-row"><span class="pj-lbl">${open ? `Highpoint: move ${best} of ${p.moves}` : "Topped out"}</span><div class="pj-moves">${moves}</div></div>
-        ${open ? `<div class="pj-row"><span class="pj-lbl">Beta: ${Math.round((Number(st.beta) || 0) / Mech.BETA_MAX * 100)}% worked out</span><span class="pj-lbl">Today: <b>${fl.label}</b></span></div>` : ""}
+        ${open ? `<div class="pj-row"><span class="pj-lbl">Beta: ${Math.min(100, Math.round((Number(st.beta) || 0) / Mech.BETA_MAX * 100))}% worked out${st.alt ? " · a better way found" : ""}</span><span class="pj-lbl">Today: <b>${fl.label}</b></span></div>` : ""}
         ${hist}</li>`;
     };
     const opts = [["recent", "Recently tried"], ["close", v === "sent" ? "Most tries" : "Closest to sending"], ["grade", "Hardest"], ["tries", "Most tries"]].filter((o, k) => !(v === "sent" && k === 3));
@@ -1906,7 +2115,8 @@
 
   function bindPanel(el) {
     const on = (sel, fn) => el.querySelectorAll(sel).forEach(n => { n.onclick = () => fn(n); });
-    on("[data-try]", n => tryProblem(+n.dataset.try));
+    on("[data-try]", n => openClimb(+n.dataset.try));
+    on("[data-climb]", n => tryProblem(+n.dataset.climb));
     on("[data-expand]", n => { const i = +n.dataset.expand; UI.expanded.has(i) ? UI.expanded.delete(i) : UI.expanded.add(i); renderPanel(); });
     on("[data-go-sector]", n => travel({ sector: n.dataset.goSector, boulder: null }));
     on("[data-go-boulder]", n => { const b = D.boulders[+n.dataset.goBoulder]; travel({ sector: b.sector, boulder: b.id }); });
@@ -2528,7 +2738,7 @@
 
   document.addEventListener("keydown", e => {
     if (e.key !== "m" && e.key !== "M") return;
-    if (e.metaKey || e.ctrlKey || e.altKey || !M || !M.togglePaper || $("#game").hidden || $("#modal-root").children.length) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || !M || !M.togglePaper || $("#game").hidden || $("#modal-root").children.length || climbing()) return;
     const t = e.target; if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     e.preventDefault(); safely("trail map", M.togglePaper);
   });
@@ -2543,6 +2753,7 @@
     renderAll();
     if (justMigrated.has(G)) { justMigrated.delete(G); openModal(showWelcomeBack); }
     if (justRegraded.has(G)) { const info = justRegraded.get(G); justRegraded.delete(G); openModal(() => showRegraded(info)); }
+    if (G.day.climb && !G.day.over) safely("the climbing scene", showClimb); else if (G.day.climb) G.day.climb = null;   // reloaded mid-climb
     if (UI.kiosk) { UI.kiosk = false; openModal(showKiosk); }
     if (!G.day.over && rainNow()) endDay(`It's ${G.day.weather.precip === "Snow" ? "snowing" : "raining"}. Wet granite is slick and holds can snap, so you head home.`);
     else if (G.day.over) openModal(showSummary);
@@ -2694,6 +2905,7 @@
     if (!window.World) await loadScript("world.js");
     if (!window.Know) await loadScript("knowledge.js");
     if (!window.Travel) await loadScript("travel.js");
+    if (!window.Scene) await loadScript("scene.js").catch(() => {});        // without it, Try climbs from the panel
     D = await fetch("game-data.json" + ASSET_V).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
     prepData();
     K = Know.make(D, () => G);

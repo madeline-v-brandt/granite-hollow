@@ -4,7 +4,7 @@
 // old climber.   node scripts/browser/v2test.js
 // Visible problems' names are taken out before looking for hidden ones, since
 // sit starts and eliminates are named after their line ("Kiosk Sit", "Kiosk").
-const { open, ready, click, settle, sleep, GAME_DIR: GD, FIX } = require("./lib");
+const { open, ready, click, settle, sleep, GAME_DIR: GD, FIX , burnIfScene } = require("./lib");
 const fs = require("fs");
 global.Mech = require(GD + "mechanics.js"); global.World = require(GD + "world.js");
 const Know = require(GD + "knowledge.js"), D = require(GD + "game-data.json");
@@ -52,6 +52,7 @@ function leaks(g, all) {
 }
 (async () => {
   const { b, p, errs, url } = await open("?dev");
+  await p.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);     // the climbing scene plays each burn at once
   await p.goto(url); await p.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
   await p.goto(url, { waitUntil: "load" }); await p.waitForSelector("[data-str]");
   console.log("creator:", (await p.evaluate(() => document.querySelector("#creator .intro").innerText)).slice(0, 90) + "…");
@@ -90,25 +91,34 @@ function leaks(g, all) {
   await click(p, "[data-inspect]"); await sleep(400);
   console.log("after Inspect:\n  " + (await text(p)).split("\n").slice(0, 14).join("\n  "));
   // Try an unclimbed line until it goes; if this boulder has none, teleport to the next Tailgate boulder and look there.
-  let fa = null;
+  let fa = null, sceneCard = null;
   // The easiest-feeling unclimbed line first (fewest bars), as a player would: a hard one first can use up the day's energy.
-  const tryOpen = () => p.evaluate(() => { const rows = [...document.querySelectorAll(".prob")].filter(r => /^Unclimbed/.test(r.querySelector(".pname").textContent) && r.querySelector("[data-try]:not([disabled])"));
-    if (!rows.length) return false; const bars = r => r.querySelectorAll(".feel .bars i.on").length; rows.sort((a, b) => bars(a) - bars(b)); rows[0].querySelector("[data-try]").click(); return true; });
-  for (const bi of [null, ...tailgate]) {
+  // Lines that feel like a project (four or five bars) are left for later: a beginner on one can spend the whole day.
+  const tryOpen = (maxBars = 3) => p.evaluate(mb => { const bars = r => r.querySelectorAll(".feel .bars i.on").length;
+    const btn = r => r.querySelector("[data-try]:not([disabled]), [data-climb]:not([disabled])");
+    const rows = [...document.querySelectorAll(".prob")].filter(r => /^Unclimbed/.test(r.querySelector(".pname").textContent) && btn(r) && bars(r) <= mb);
+    if (!rows.length) return false; rows.sort((a, b) => bars(a) - bars(b)); btn(rows[0]).click(); return true; }, maxBars);
+  for (const bi of [null, ...tailgate, ...tailgate.map(b => -1 - b)]) {          // then a second pass that will try a project
+    const maxBars = bi != null && bi < 0 ? 5 : 3;
     if (bi != null) {
       await click(p, "#dev-btn"); await sleep(150);
-      await p.evaluate(b => { document.querySelector("#dv-b").value = b; document.querySelector('[data-dv="teleport"]').click(); }, bi); await sleep(300);
+      await p.evaluate(b => { document.querySelector("#dv-b").value = b < 0 ? -1 - b : b; document.querySelector('[data-dv="teleport"]').click(); }, bi); await sleep(300);
       await click(p, "[data-inspect]"); await sleep(250);
       // Wait for the boulder's lines (or "nothing here") rather than a fixed time.
       await p.waitForFunction(() => document.querySelector(".prob") || /Nothing here/.test(document.querySelector("#tabbody").innerText), { timeout: 4000 }).catch(() => {});
     }
     for (let n = 0; n < 25 && !fa; n++) {
-      if (!(await tryOpen())) break;
+      if (!(await tryOpen(maxBars))) break;
+      // The climbing scene for an unclimbed line: no grade on its card, in the words or the menu (your own level is on your card).
+      if (!sceneCard) sceneCard = await p.evaluate(() => { const r = document.querySelector(".scene-root:not([hidden]) .sc"); return r && /^Unclimbed/.test(r.querySelector(".sc-prob h2").textContent) ? [".sc-prob", ".sc-say", ".sc-menu"].map(q => r.querySelector(q).innerText).join("\n") : null; });
+      await burnIfScene(p);
       await sleep(150); await settle(p);
       fa = await p.evaluate(() => { const r = document.querySelector(".result .rt"); return r && /^First ascent/.test(r.textContent) ? r.textContent : null; });
     }
     if (fa) break;
   }
+  console.log("the climbing scene on an unclimbed line:", sceneCard ? sceneCard.split("\n").filter(Boolean).slice(0, 3).join(" / ") : "(not seen: the line was a Climb it)",
+    "| LEAKS (a V-grade in the scene):", sceneCard ? (sceneCard.match(/\bV\d+\b/g) || []) : []);
   console.log("result:", fa, "| banner:", await p.evaluate(() => document.querySelector("#banner").innerText.replace(/\s+/g, " ")));
   // The naming dialog opens after the banner.
   await p.waitForSelector(".modal #fa-name", { timeout: 5000 });

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Granite Hollow · the climbing scene (prototype)</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
+<link rel="stylesheet" href="../game/scene.css">
+<style>
+  /* The page around the scene: the game's own styles are loaded from the game page (see load()). */
+  html, body { height: 100%; margin: 0; }
+  body { overflow: hidden; }
+  #host { position: fixed; inset: 0; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font-family: "Fraunces", serif; font-size: 20px; color: #564d3f; background: #f3ead6; z-index: 50; }
+  .proto { position: fixed; z-index: 40; top: 10px; right: 10px; font: 13px/1.4 "Nunito Sans", system-ui, sans-serif; color: var(--ink, #2a251d); }
+  .proto > button { border: 1px solid var(--rule, #d6c9ad); background: var(--panel, #fbf6ea); color: inherit; border-radius: 999px; padding: 6px 12px; font: inherit; font-weight: 800; cursor: pointer; box-shadow: var(--shadow); }
+  .proto .box { display: none; margin-top: 6px; width: 290px; max-height: calc(100vh - 70px); overflow: auto; background: var(--panel, #fbf6ea); border: 1px solid var(--rule, #d6c9ad); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); }
+  .proto.open .box { display: block; }
+  .proto label { display: grid; grid-template-columns: 82px 1fr; align-items: center; gap: 8px; margin: 6px 0; }
+  .proto label span { color: var(--muted, #8a7f69); font-size: 12px; }
+  .proto select, .proto input { font: inherit; min-width: 0; }
+  .proto .note { font-size: 12px; color: var(--muted, #8a7f69); margin: 8px 0 0; }
+  .proto .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .proto .row button { font: inherit; border: 1px solid var(--rule); background: var(--raised); color: inherit; border-radius: 8px; padding: 4px 8px; cursor: pointer; }
+  @media (max-width: 760px) { .proto { top: 34vh; right: 6px; } .proto > button { padding: 4px 9px; font-size: 12px; opacity: .9; } .proto .box { position: fixed; left: 8px; right: 8px; top: 8px; width: auto; max-height: 60vh; } }
+</style>
+</head>
+<body>
+<div id="loading">Drawing Granite Hollow…</div>
+<div id="host"></div>
+<div class="proto" id="proto">
+  <button type="button" id="proto-toggle" aria-expanded="false">Prototype controls</button>
+  <div class="box" id="proto-box">
+    <label><span>Boulder</span><select id="c-b"></select></label>
+    <label><span>Problem</span><select id="c-p"></select></label>
+    <label><span>Date</span><input id="c-date" type="range" min="0" max="364" step="1"></label>
+    <label><span>Time</span><input id="c-time" type="range" min="420" max="1260" step="5"></label>
+    <label><span>Sky</span><select id="c-sky"><option>Sunny</option><option>Bluebird</option><option>Breezy</option><option>Overcast</option><option>Humid</option></select></label>
+    <label><span>Conditions</span><select id="c-cond"><option value=".35">Prime</option><option value=".1" selected>Good</option><option value="-.2">Meh</option><option value="-.45">Greasy</option></select></label>
+    <label><span>Your level</span><input id="c-level" type="range" min="0" max="13" step="1"></label>
+    <label><span>Height</span><input id="c-h" type="range" min="150" max="195" step="1"></label>
+    <label><span>Ape index</span><input id="c-ape" type="range" min="-5" max="10" step="1"></label>
+    <p class="note" id="c-read"></p>
+    <div class="row"><button type="button" id="c-fresh">Fresh start on it</button><button type="button" id="c-random">Another problem</button><button type="button" id="c-theme">Light / dark</button></div>
+    <p class="note">A prototype of Phase 3's climbing scene with the game's real rules (mechanics.js). Nothing here touches your saved climber. Problems are shown by their real grades and names here; in the game, an unclimbed line shows no grade.</p>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="../game/art.js"></script>
+<script src="../game/illustrate.js"></script>
+<script src="../game/paint.js"></script>
+<script src="../game/mechanics.js"></script>
+<script src="../game/scene.js"></script>
+<script>
+(async function () {
+  // The game's styles (rock, trees, plants, the move strip, tokens) come from the game page itself.
+  const page = await fetch("../game/index.html").then(r => r.text());
+  for (const m of page.matchAll(/<style>([\s\S]*?)<\/style>/g)) { const st = document.createElement("style"); st.textContent = m[1]; document.head.insertBefore(st, document.head.querySelector("link[href$='scene.css']")); }
+  const D = await fetch("../game/game-data.json").then(r => r.json());
+  D.problems.forEach((p, i) => { p.id = i; });
+  await new Promise(r => setTimeout(r, 30));
+  const park = Illu.parkScene(D);
+  document.getElementById("loading").remove();
+
+  const $ = id => document.getElementById(id);
+  const q = new URLSearchParams(location.search);
+  const YEAR = 2025, dateOf = d => { const t = new Date(Date.UTC(YEAR, 0, 1 + +d)); return t.toISOString().slice(0, 10); };
+  const DUSK = [16.75, 17.4, 19.0, 19.6, 20.1, 20.4, 20.3, 19.75, 18.9, 18.1, 16.45, 16.25];
+  const TEMP = [31, 33, 41, 51, 61, 70, 76, 75, 67, 56, 46, 36];
+  const clock = m => { const h = Math.floor(m / 60), mm = String(Math.round(m % 60)).padStart(2, "0"); return `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? "AM" : "PM"}`; };
+  const an = w => (/^[aeiou]/.test(w) ? "an " : "a ") + w;
+  // A chance as people read it, and a change in it ("send 12% → 15%").
+  const pc = c => (c >= .1 ? Math.round(c * 100) + "%" : c >= .01 ? (Math.round(c * 1000) / 10) + "%" : c >= .002 ? "under 1%" : "almost none");
+  const shift = (a, b) => (pc(a) === pc(b) ? `send ${pc(a)}, barely changes` : `send ${pc(a)} → ${pc(b)}`);
+
+  // ---- the state of this little session
+  const st = { b: +(q.get("b") ?? 29), p: q.has("p") ? +q.get("p") : null, day: +(q.get("day") ?? 285), minute: +(q.get("t") ?? 630), sky: q.get("sky") || "Sunny",
+    cond: +(q.get("cond") ?? .1), level: +(q.get("level") ?? 4), h: +(q.get("h") ?? 168), ape: +(q.get("ape") ?? 2) };
+  let player, ps, today, view = "main";   // today: { tries (burns), works (moves worked), rests }
+  const xpFor = L => { let xp = 0; for (let n = 0; n < L; n++) xp += Mech.levelCost(n); return xp + Mech.levelCost(L) * .3; };
+  function freshPlayer() {
+    const skills = Object.fromEntries(Mech.PREF.map(t => [t, 0])); skills.crimpy = .4; skills.technical = .4; skills.compression = -.4;
+    const tops = []; for (let g = 0; g <= st.level; g++) tops[g] = 3;
+    player = { name: "You", height: st.h, ape: st.ape, xp: xpFor(st.level), tops, skills, energy: 100, skin: 100, strengths: ["crimpy", "technical"], weakness: "compression" };
+  }
+  const month = () => +dateOf(st.day).slice(5, 7) - 1;
+  const dusk = () => Math.round(DUSK[month()] * 60);
+  const weather = () => ({ cond: st.cond, sky: st.sky, dusk: dusk(), temp: TEMP[month()] });
+  function outfit() {
+    const t = TEMP[month()];
+    return { shirt: "#3f7fa6", pad: "#c9772b", skin: "#e6bf98", hair: "#4a3426", hatC: "#b5462e", chalk: "#d0a23a",
+      shorts: t >= 72, pants: t >= 72 ? "#6b6457" : "#3f4f63", longSleeves: t < 62, jacket: t < 50 ? "#2e4f6e" : false,
+      hat: t < 45 ? "beanie" : t >= 72 ? "cap" : null, scarf: t < 36 ? "#d9b24c" : false, stripes: null };
+  }
+
+  const sc = Scene.create($("host"), { onAction: act });
+  const bo = () => park.boulders[st.b], P = () => D.problems[st.p];
+  function pickProblem() {
+    const ids = D.boulders[st.b].problems;
+    if (st.p == null || !ids.includes(st.p)) st.p = ids.slice().sort((a, b) => Math.abs(D.problems[a].grade - st.level - 1) - Math.abs(D.problems[b].grade - st.level - 1))[0];
+  }
+  function newSession() { ps = { att: 0, beta: 0, best: 0, sent: false }; today = { tries: 0, works: 0, rests: 0 }; player.energy = 100; player.skin = 100; view = "main"; }
+  function draw() {
+    pickProblem();
+    const ids = [...D.boulders[st.b].problems].sort((a, b) => a - b);
+    sc.show({ park, bo: bo(), probs: D.boulders[st.b].problems.map(i => D.problems[i]), problem: P(), line: { index: ids.indexOf(st.p), count: ids.length }, seq: Mech.sequence(P()), outfit: outfit(), seen: Mech.seenOf(P(), ps), known: ps.mk || [] });
+    atmosphere(); refresh();
+    sc.say(`You drop your pad under ${P().name} and look up at it. ${intro()}`);
+  }
+  function atmosphere() { sc.setAtmosphere({ date: dateOf(st.day), minute: st.minute, dusk: dusk(), sky: st.sky }); }
+  function intro() {
+    const s = Mech.sequence(P()), f = Mech.feel(Mech.chanceOf(player, P(), ps, weather())).label;
+    return `${s.n} moves to the top${P().sit ? ", from a sit start" : ""}. From the ground, it feels like: ${f.toLowerCase()}.`;
+  }
+
+  // ---- the cards
+  const KNOW = v => (v >= 0.67 ? "well" : v >= 0.34 ? "fairly well" : v > 0.05 ? "a little" : "not yet");
+  function strip() {
+    const p = P(), s = Mech.sequence(p);
+    if (!ps.att) return "";
+    const mk = Mech.knowledge(p, ps), seen = Mech.seenOf(p, ps), hi = ps.sent ? -1 : Math.round((ps.best || 0) * s.n) - 1;
+    return `<span class="moves" role="img" aria-label="${s.n} moves, ${seen} seen">${s.moves.map((m, j) => j >= seen ? `<i class="mv unseen"></i>`
+      : `<i class="mv k${mk[j] >= .67 ? 3 : mk[j] >= .34 ? 2 : mk[j] > .05 ? 1 : 0}${m.kind === "crux" ? " crux" : ""}${j === hi ? " hi" : ""}${ps.alt && s.alt && s.alt.at === j ? " alt" : ""}" title="Move ${j + 1}: ${m.kind === "crux" ? "the crux, " : ""}${an(m.hold)}. You know it ${KNOW(mk[j])}."></i>`).join("")}</span>`;
+  }
+  function refresh() {
+    const p = P(), s = Mech.sequence(p), ch = Mech.chanceOf(player, p, ps, weather());
+    const hpN = Math.round((ps.best || 0) * s.n);
+    sc.setCards({
+      prob: { name: p.name, grade: "V" + p.grade, where: `${D.boulders[st.b].name} · ${D.boulders[st.b].sector}`, tags: p.tags.split("|"), strip: strip(),
+        hp: ps.sent ? "Sent!" : ps.att ? `Highpoint move ${hpN} of ${s.n}` : `${s.n} moves`, feel: ps.sent ? null : Mech.feel(ch).label,
+        beta: ps.att ? `Beta ${Math.min(100, Math.round(ps.beta / Mech.BETA_MAX * 100))}% worked out${ps.alt ? " · a better way found" : ""}` : null },
+      me: { name: player.name, level: Mech.levelOf(player).level, energy: player.energy, skin: player.skin, clock: clock(st.minute), light: lightLeft() },
+    });
+    sc.setMenu(menu());
+    $("c-read").textContent = `${dateOf(st.day)} · ${clock(st.minute)} · dusk ${clock(dusk())} · about ${ch >= .1 ? Math.round(ch * 100) + "%" : ch >= .01 ? "1 in " + Math.round(1 / ch) : "under 1%"} a try right now`;
+  }
+  const lightLeft = () => { const l = dusk() - st.minute; return l <= 0 ? "dark" : l >= 120 ? `${Math.floor(l / 60)} h ${Math.round(l % 60)} min of light` : `${Math.round(l)} min of light`; };
+  const over = () => st.minute >= dusk() || player.energy <= 6 || player.skin <= 2;
+  function menu() {
+    const p = P();
+    if (view === "work") {
+      const s = Mech.sequence(p), mk = Mech.knowledge(p, ps), seen = Mech.seenOf(p, ps);
+      const now = Mech.chanceOf(player, p, ps, weather());
+      const items = s.moves.slice(0, Math.max(1, Math.min(s.n, seen))).map((m, j) => ({ key: "work:" + j, label: `Move ${j + 1}${m.kind === "crux" ? ", the crux" : m.kind === "top" ? ", the top-out" : ""}`,
+        sub: `${an(m.hold)}, known ${KNOW(mk[j])} · ${shift(now, Mech.previewWork(player, p, ps, weather(), j, today.works + 1).kept)}` }));
+      return [...items, { key: "back", label: "Back", sub: "" , wide: items.length % 2 === 0 }];
+    }
+    if (ps.sent) return [{ key: "again", label: "Climb it again", sub: "A repeat", primary: true }, { key: "leave", label: "Leave", sub: "Back to the map" }];
+    const c = Mech.attemptCost(player, p), w = Mech.workCost(player, p), dead = over(), day = weather();
+    const now = Mech.chanceOf(player, p, ps, day), seen = Mech.seenOf(p, ps);
+    // Working a move: the most it could do for your next burn, over the moves you've seen.
+    const gains = ps.att ? Array.from({ length: Math.max(1, seen) }, (_, j) => Mech.previewWork(player, p, ps, day, j, today.works + 1).kept) : [now];
+    const bestAt = gains.indexOf(Math.max(...gains)), bestWork = gains[bestAt], bestName = Mech.sequence(p).moves[bestAt].kind === "crux" ? "the crux" : `move ${bestAt + 1}`;
+    return [
+      { key: "burn", label: `Send burn · ${pc(now)}`, sub: `Chance to send · ${Math.round(c.energy)} energy · ${c.minutes} min`, primary: true, disabled: dead },
+      { key: "work", label: "Work a move", sub: ps.att ? `Best: ${bestName}, ${shift(now, bestWork)} · ${Math.round(w.energy)} energy` : "Get on it first", disabled: dead || !ps.att },
+      { key: "rest", label: "Rest", sub: `20 min · +${Math.round(Mech.restGain(today.rests))} energy · ${shift(now, Mech.previewRest(player, p, ps, day, today.rests))}`, disabled: st.minute >= dusk() || player.energy >= 99 },
+      { key: "leave", label: "Leave", sub: "Back to the map" },
+    ];
+  }
+
+  // ---- what you do
+  const CRUX = { crimpy: "Your fingers peeled off the razor crimp.", slopey: "The sloper felt like glass and you slid off.", pinchy: "The pinch spat you off.",
+    juggy: "You pumped out between jugs.", compression: "You couldn't hold the squeeze.", dyno: "You came up an inch short on the dyno.", technical: "Your foot skated off a tiny edge.",
+    powerful: "You couldn't lock off for the big move.", mantle: "You flailed on the mantle.", slab: "Your feet popped on the slab.", overhang: "Your feet cut on the steep section and you dropped.",
+    roof: "You couldn't turn the lip.", traverse: "You pumped out halfway across.", highball: "You backed off the committing top-out.", eliminate: "You dabbed an off-route hold.",
+    reachy: "The next hold was just out of reach.", bunchy: "You couldn't fit into the cramped start." };
+  const ALT = { extra: "there's a little intermediate hold, just right for someone your size.", skip: "you're tall enough to reach straight past the cramped hold.",
+    heel: "a heel hook takes the weight off your arms.", toe: "a toe hook keeps your feet from cutting.", knee: "there's a knee bar. You can almost let go.",
+    drop: "a drop-knee turns it into an easy reach.", match: "if you match on the hold first, the next move is easy.", foot: "there's a better foothold, low and left." };
+  function fallText(m, k) {
+    if (m.kind === "crux") return CRUX[m.reach === "long" ? "reachy" : m.reach === "tight" ? "bunchy" : m.style] || `You came off the crux, a hard move to ${an(m.hold)}.`;
+    if (m.kind === "top") return CRUX[m.style] || "You couldn't top it out.";
+    if (m.hold === "smear") return m.kind === "start" ? "Your feet skated off the slab on the first move." : "A smear let go under your foot.";
+    if (m.kind === "start") return P().sit ? "You couldn't even get off the ground from the sit start." : `You slipped off ${an(m.hold)} on the first move.`;
+    return [`You came off ${an(m.hold)} on the way up.`, `A foot slipped on an easy move to ${an(m.hold)}.`, `You fumbled the ${m.hold} and dropped.`][k % 3];
+  }
+  function spend(c) { player.energy = Math.max(0, player.energy - c.energy); player.skin = Math.max(0, player.skin - c.skin || 0); st.minute += c.minutes; }
+  async function act(key) {
+    const p = P(), s = Mech.sequence(p);
+    if (key === "work") { view = "work"; refresh(); sc.say("Which move? You can pull on partway up and try it on its own."); return; }
+    if (key === "back") { view = "main"; refresh(); return; }
+    if (key === "leave") { sc.say(ps.sent ? "You pack up your pad, still grinning. (In the game, this is back to the map.)" : `You pack up. ${ps.att ? `${ps.att} ${ps.att === 1 ? "try" : "tries"} today; the moves will still be there.` : ""} (In the game, this is back to the map.)`); return; }
+    if (key === "again") { ps.sent = false; ps.best = 0; refresh(); sc.say("Once more, for fun."); return; }
+    if (key === "rest") {
+      player.energy = Math.min(100, player.energy + Mech.restGain(today.rests)); today.rests++; st.minute += 20; atmosphere(); refresh();
+      sc.say(today.rests >= 3 ? "Another rest. You're stiffening up, and each one gives back less." : "Twenty minutes on the pad. Energy recovers a little; skin doesn't.");
+      return;
+    }
+    if (key === "burn") {
+      const c = Mech.attemptCost(player, p), r = Mech.attempt(player, p, ps, weather());
+      spend(c); ps.att++; today.tries++;
+      sc.say(ps.att === 1 ? "You chalk up and pull on." : ["You chalk up and pull on again.", "Deep breath. Another go.", "You brush the holds with your thumb and step on."][ps.att % 3]);
+      await sc.play("burn", { fallAt: r.sent ? -1 : r.fallAt });
+      atmosphere();
+      if (r.sent) {
+        ps.sent = true; ps.best = 1;
+        sc.flash(ps.att === 1 ? "FLASH!" : "SENT!", "");
+        sc.say(ps.att === 1 ? "Flash! You read every move from the ground." : ps.att >= 10 ? `After ${ps.att} tries it finally goes. That's what projecting feels like.` : `You top out ${p.name}. Your ${["", "first", "second", "third", "fourth", "fifth"][ps.att] || ps.att + "th"} try.`);
+      } else {
+        const k = r.fallAt + 1, newHigh = ps.att > 1 && k / s.n > ps.best + 1e-6;
+        ps.best = Math.max(ps.best, k / s.n);
+        const L = Mech.learnBurn(player, p, ps, r.fallAt, today.tries);
+        let text = `${fallText(r.move, k)} Fell on move ${k} of ${s.n}${r.move.kind === "crux" ? ", the crux" : ""}.`;
+        if (newHigh) text += " New highpoint!";
+        if (L.alt) text += ` Hanging there, you see a better way through: ${ALT[s.alt.kind]}`;
+        sc.say(text);
+      }
+      sc.setSeen(Mech.seenOf(p, ps), ps.mk || []);
+      refresh(); endCheck(); return;
+    }
+    if (key.startsWith("work:")) {
+      const at = +key.slice(5), c = Mech.workCost(player, p);
+      spend(c); today.works++; view = "main";
+      const w = Mech.workMove(player, p, ps, weather(), at, today.works);
+      sc.say(`You pull on at move ${at + 1} and try it on its own.`);
+      await sc.play("work", { at, stuck: w.stuck });
+      atmosphere();
+      const m = s.moves[at];
+      let text = w.stuck ? `You stick move ${at + 1}${m.kind === "crux" ? ", the crux," : ""} and hang there a moment, learning the body position.` : `You come off move ${at + 1} again, but it's starting to make sense.`;
+      if (w.stuck && at + 1 < s.n) text += " Now you can see the next move.";
+      if (w.alt) text += ` Working it, you find a better way: ${ALT[s.alt.kind]}`;
+      sc.say(text); sc.setSeen(Mech.seenOf(p, ps), ps.mk || []);
+      refresh(); endCheck(); return;
+    }
+  }
+  function endCheck() {
+    if (st.minute >= dusk()) sc.say("The light's going. Time to pack up.");
+    else if (player.energy <= 6) sc.say("You're cooked. That's it for today.");
+    else if (player.skin <= 2) sc.say("Your skin is done for the day.");
+  }
+
+  // ---- the controls
+  $("proto-toggle").onclick = () => { const o = $("proto").classList.toggle("open"); $("proto-toggle").setAttribute("aria-expanded", o); };
+  const bSel = $("c-b"), pSel = $("c-p");
+  bSel.innerHTML = D.boulders.map((b, i) => `<option value="${i}">${b.name} (${b.sector})</option>`).sort((a, b) => a.localeCompare(b)).join("");
+  const fillProblems = () => { pSel.innerHTML = [...D.boulders[st.b].problems].sort((a, b) => D.problems[a].grade - D.problems[b].grade).map(i => `<option value="${i}">V${D.problems[i].grade} ${D.problems[i].name}</option>`).join(""); pSel.value = st.p; };
+  const sync = () => { bSel.value = st.b; $("c-date").value = st.day; $("c-time").value = st.minute; $("c-sky").value = st.sky; $("c-cond").value = String(st.cond); $("c-level").value = st.level; $("c-h").value = st.h; $("c-ape").value = st.ape; fillProblems(); };
+  bSel.onchange = () => { st.b = +bSel.value; st.p = null; freshPlayer(); newSession(); draw(); sync(); };
+  pSel.onchange = () => { st.p = +pSel.value; newSession(); draw(); };
+  $("c-date").oninput = () => { st.day = +$("c-date").value; atmosphere(); refresh(); };
+  $("c-date").onchange = () => draw();          // the outfit follows the season
+  $("c-time").oninput = () => { st.minute = +$("c-time").value; atmosphere(); refresh(); };
+  $("c-sky").onchange = () => { st.sky = $("c-sky").value; atmosphere(); refresh(); };
+  $("c-cond").onchange = () => { st.cond = +$("c-cond").value; refresh(); };
+  for (const [id, k] of [["c-level", "level"], ["c-h", "h"], ["c-ape", "ape"]]) $(id).onchange = () => { st[k] = +$(id).value; freshPlayer(); newSession(); draw(); };
+  $("c-fresh").onclick = () => { newSession(); draw(); };
+  $("c-random").onclick = () => { st.b = Math.floor(Math.random() * D.boulders.length); st.p = null; freshPlayer(); newSession(); draw(); sync(); };
+  $("c-theme").onclick = () => { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark"; };
+  freshPlayer(); newSession(); pickProblem(); sync(); draw();
+  window.__scene = { sc, st, act, draw, ps: () => ps, player: () => player };
+})();
+</script>
+</body>
+</html>

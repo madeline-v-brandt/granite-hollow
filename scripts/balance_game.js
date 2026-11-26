@@ -25,6 +25,7 @@ const Mech = global.Mech = require(path.resolve(opt("rules", path.join(GAME, "me
 const World = global.World = require(path.join(GAME, "world.js"));
 const Know = require(path.join(GAME, "knowledge.js"));
 const D = JSON.parse(fs.readFileSync(path.join(GAME, "game-data.json"), "utf8"));
+D.problems.forEach((p, i) => { p.id = i; });          // as the game does: a problem's moves come from its index
 // --set '{"levelGrowth":1.3}' tries other numbers in the rules' BAL.
 if (opt("set", null)) Object.assign(Mech.BAL, JSON.parse(opt("set")));
 // The same questions of the old rules (no proof, no grade-aware chance) or the new.
@@ -84,6 +85,8 @@ const STYLES = {
       return c.ch >= 0.6 && c.d <= -1 ? c.ch * c.xp : c.ch >= 0.3 ? 0.1 * c.ch * c.xp : 0;
     },
     rest: (c, p) => p === c.day.project && c.pl.energy < 50 && c.pl.energy + 6 <= c.day.startEnergy && (c.day.rests || 0) < 6,
+    // Working the move that keeps spitting you off, before burning again (--work).
+    work: (c, p, st) => !!opt("work", false) && p === c.day.project && st.lastFall != null && st.lastFallCrux && (st.mk || [])[st.lastFall] < 0.6 && (c.day.worked[p] || 0) < 3,
   },
 };
 
@@ -108,8 +111,10 @@ function play(styleName, seed, build) {
   const K = Know.make(D, () => g), pl = g.player;
   K.visitArea(START_AREA);
   if (OPEN) for (const s of D.sectors) g.know.areas[s.name] = 2;
-  const out = { style: styleName, build, levelDay: {}, checks: {}, attempts: [], sends: [], fa2025: null, faEnd: null, climbDays: 0, outOfLines: 0 };
+  const out = { style: styleName, build, levelDay: {}, checks: {}, attempts: [], sends: [], fa2025: null, faEnd: null, climbDays: 0, outOfLines: 0,
+    works: 0, workMin: 0, altsByWork: 0, falls: { crux: 0, other: 0 } };
   const daysOn = {};                    // problem -> set of climbing days it was tried
+  const lastOn = {};                    // problem -> calendar day it was last tried (for fading)
   let rest = 0, climbDays = 0, project = null, projectSince = 0;
 
   const knownAreas = () => D.sectors.map(s => s.name).filter(s => K.area(s) >= 1);
@@ -161,6 +166,8 @@ function play(styleName, seed, build) {
   function attempt(p, day) {
     const pr = D.problems[p], st = g.ps[p] = g.ps[p] || { att: 0, beta: 0, sent: false, best: 0, sends: 0 };
     const info = levelOf(pl), d = pr.grade - info.level;
+    if (Mech.fade && lastOn[p] != null && lastOn[p] !== day.cal) Mech.fade(pr, st, day.cal - lastOn[p]);
+    lastOn[p] = day.cal;
     const cost = Mech.attemptCost(pl, pr), r = Mech.attempt(pl, pr, st, day.w, rng);
     pl.energy = Math.max(0, pl.energy - cost.energy); pl.skin = Math.max(0, pl.skin - cost.skin);
     day.minute += Math.round(cost.minutes);
@@ -176,14 +183,18 @@ function play(styleName, seed, build) {
       st.sent = true; st.sends = 1; st.best = 1; st.flash = flash; st.sentOn = g.date;
       g.bestGrade = Math.max(g.bestGrade, pr.grade);
       g.ticks.push({ p, date: g.date, day: climbDays, style: flash ? "Flash" : "Send", att: st.att, stars: null });
-      out.sends.push({ d, grade: pr.grade, level: info.level, att: st.att, days: daysOn[p].size, fa: wasOpen, xp, parts: r.parts });
+      out.sends.push({ d, grade: pr.grade, level: info.level, att: st.att, days: daysOn[p].size, fa: wasOpen, xp, parts: r.parts, alt: !!st.alt });
       if (p === project) project = null;
     } else {
-      st.beta = Math.min(Mech.BETA_MAX, st.beta + Mech.betaGain(st.beta, day.tried[p]));
+      if (Mech.learnBurn) {
+        Mech.learnBurn(pl, pr, st, r.fallAt, (day.tried[p] || 0) + (day.worked[p] || 0), rng);
+        st.lastFall = r.fallAt; st.lastFallCrux = r.move && r.move.kind === "crux";
+      } else st.beta = Math.min(Mech.BETA_MAX, st.beta + Mech.betaGain(st.beta, day.tried[p]));
       st.best = Math.max(st.best || 0, r.progress);
     }
     if (pl.skin < 30 && Mech.frictionSensitivity(pr) >= 0.6 && rng() < 0.07) { pl.skin = Math.max(0, pl.skin - 12); pl.energy = Math.max(0, pl.energy - 8); }
     out.attempts.push([d, r.sent ? 1 : 0, Math.round(cost.minutes), xp]);
+    if (!r.sent && r.move) out.falls[r.move.kind === "crux" ? "crux" : "other"]++;
     const L = levelOf(pl).level;
     for (let m = 1; m <= L; m++) if (out.levelDay[m] == null) out.levelDay[m] = climbDays;
   }
@@ -196,7 +207,7 @@ function play(styleName, seed, build) {
     if (wet || (pl.consecutive >= 2 && rest === 0)) { rest++; continue; }
     Object.assign(pl, Mech.startOfDay(pl, rest)); rest = 0;
     climbDays++; g.dayNo = climbDays;
-    const day = { w, minute: 9 * 60 + Math.floor(rng() * 40), end: Mech.dayEnds(w), tried: {}, startEnergy: pl.energy, warm: 0, project: null };
+    const day = { w, minute: 9 * 60 + Math.floor(rng() * 40), end: Mech.dayEnds(w), tried: {}, worked: {}, startEnergy: pl.energy, warm: 0, project: null, cal };
 
     // Hearing of, or finding, a new area now and then.
     if (S.areaEvery && climbDays % S.areaEvery === 0) {
@@ -236,6 +247,14 @@ function play(styleName, seed, build) {
       if ((S.rest && S.rest({ pl, day }, p)) || tired) {
         const gain = Mech.restGain ? Mech.restGain(day.rests || 0) : 12;
         day.minute += 20; pl.energy = Math.min(day.startEnergy, pl.energy + gain); day.rests = (day.rests || 0) + 1; continue;
+      }
+      const stw = g.ps[p];
+      if (S.work && stw && S.work({ pl, day }, p, stw)) {
+        const pr = D.problems[p], c = Mech.workCost(pl, pr), w = Mech.workMove(pl, pr, stw, day.w, stw.lastFall, (day.worked[p] || 0) + 1, rng);
+        pl.energy = Math.max(0, pl.energy - c.energy); pl.skin = Math.max(0, pl.skin - c.skin); day.minute += c.minutes;
+        day.worked[p] = (day.worked[p] || 0) + 1; out.works++; out.workMin += c.minutes; if (w.alt) out.altsByWork++;
+        lastOn[p] = cal; (daysOn[p] = daysOn[p] || new Set()).add(climbDays); stw.lastFall = null;
+        continue;
       }
       attempt(p, day);
       if (D.problems[p].grade <= levelOf(pl).level - 1) day.warm++;
@@ -325,6 +344,10 @@ function report(name, runs) {
     say(`\nWhat lifted sends 2+ grades above your level (${far.length} sends, medians, in grades):`);
     say(`  style ${m("style")}, reach ${m("morph")}, beta ${m("beta")}, conditions ${m("conditions")}, fatigue ${m("fatigue")}`);
   }
+  const fc = runs.reduce((a, r) => a + r.falls.crux, 0), fo = runs.reduce((a, r) => a + r.falls.other, 0);
+  const hard = runs.flatMap(r => r.sends.filter(s => s.d >= 1));
+  say(`\nMoves: ${pct(fc / Math.max(1, fc + fo))} of falls were on a crux. Sends at least a grade up that used a better way through: ${pct(hard.filter(s => s.alt).length / Math.max(1, hard.length))}.` +
+    (runs.some(r => r.works) ? ` Worked moves: ${fx(med(runs.map(r => r.works)))} per climber (${fx(med(runs.map(r => r.workMin / 60)), 0)} hours), ${fx(med(runs.map(r => r.altsByWork)))} better ways found that way.` : ""));
   const fa25 = runs.map(r => r.fa2025).filter(v => v != null);
   say(`\nYour share of first ascents: ${pct(med(fa25))} by the end of 2025 (target about 30% for a keen player), ${pct(med(runs.map(r => r.faEnd)))} at the end.`);
   say(`At the end: median level V${fx(med(runs.map(r => r.endLevel)))}, hardest send V${fx(med(runs.map(r => r.endBest)))}, ` +

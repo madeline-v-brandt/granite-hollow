@@ -16,6 +16,17 @@ async function open(query = "") {
 }
 const ready = p => p.waitForFunction("(document.querySelector('#map .far') && window.__tilesPending === 0) || !document.querySelector('#creator').hidden", { timeout: 90000 });
 async function click(p, sel) { return p.evaluate(s => { const b = document.querySelector(s); if (!b || b.disabled) return false; b.click(); return true; }, sel); }
+// Try opens the climbing scene (Phase 3, Stage 2): send a burn there and wait for it
+// to play out (run the page with reduced motion and it plays at once). Climb it and
+// Repeat burn straight from the panel. Returns true if it sent a burn in the scene.
+async function burnIfScene(p) {
+  if (!(await p.$(".scene-root:not([hidden]) .sc"))) return false;
+  const ok = await click(p, ".scene-root [data-act='burn']:not([disabled]), .scene-root [data-act='again']:not([disabled])");
+  if (ok) await p.waitForFunction(() => !document.querySelector(".sc.busy"), { timeout: 20000 }).catch(() => {});
+  return ok;
+}
+// The panel's button for a problem: Try (the scene) or Climb it.
+const TRY = "[data-try]:not([disabled]), [data-climb]:not([disabled])";
 // Close a level-up modal if one is open; returns true if the day summary is showing.
 async function settle(p) {
   await sleep(150);
@@ -26,4 +37,4 @@ async function settle(p) {
 }
 const GAME_DIR = require("path").join(__dirname, "..", "..", "site", "game") + "/";
 const FIX = require("path").join(__dirname, "fixtures") + "/";
-module.exports = { open, ready, click, settle, sleep, BASE, GAME_DIR, FIX };
+module.exports = { open, ready, click, settle, sleep, burnIfScene, TRY, BASE, GAME_DIR, FIX };

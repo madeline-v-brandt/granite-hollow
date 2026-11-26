@@ -41,9 +41,19 @@
     styleWorth: 0.7, morphMax: 0.6,
     // ---- learning
     skillSend: 0.05, skillFail: 0.003,
-    betaMax: 0.7, betaPerTry: 0.08, betaDay: 0.7,   // each try teaches less than the last, the same day
+    betaMax: 0.7,                     // beta from knowing every move: worth up to this many grades
+    // ---- moves (Stage 1): what a burn teaches the move you fell on and the moves you
+    // passed, and working a move on its own; each try on a problem the same day teaches
+    // learnDay as much as the last
+    learnFall: 0.15, learnPass: 0.06, learnWork: 0.3, learnDay: 0.7,
+    knownShift: 0.6,                  // a move you know well carries this much less of the risk (where you fall)
+    altBeta: 0.2,                     // the better way through a crux, once found, on top of betaMax
+    altAt: 0.4, altOnFall: 0.12, altOnWork: 0.3,   // found by falling on (or working) a crux you know this well
+    isolation: 0.6,                   // a move on its own is this many grades easier than on a burn
+    fadeAfter: 14, fadeDays: 60,      // after two weeks away, knowledge fades, to half over two months
     // ---- resting
-    rest: 12, restDay: 0.7,           // a 20-minute rest gives back 12 energy, and less each time the same day
+    rest: 12, restDay: 1,             // a 20-minute rest gives back 12 energy, every time (play-test, 2026-11-26: rest
+                                      // and climb all day; restDay < 1 would give back less each time the same day)
   };
   const BETA_MAX = BAL.betaMax;
   const sigmoid = x => 1 / (1 + Math.exp(-x));
@@ -111,7 +121,7 @@
       ability: ability(player) + BAL.lift,
       style: styleBonus(player, p),
       morph: morph(player, p),
-      beta: ps ? Math.min(BAL.betaMax, ps.beta || 0) : 0,
+      beta: ps ? clamp(ps.beta || 0, 0, BAL.betaMax + BAL.altBeta) : 0,
       conditions: day.cond * fric,
       vibes: day.vibes || 0,
       fatigue: -0.9 * Math.pow(1 - player.energy / 100, 1.5),
@@ -165,10 +175,6 @@
   }
   // Energy back from a 20-minute rest, when you've already rested `before` times today.
   const restGain = (before = 0) => BAL.rest * Math.pow(BAL.restDay, Math.max(0, before));
-  // Beta from a fall: less as you know more, and less with each try the same day
-  // (today: tries on this problem today, counting this one), so a hard project
-  // takes more than one session to learn.
-  const betaGain = (beta, today = 1) => BAL.betaPerTry * Math.max(0, 1 - beta / BAL.betaMax) * Math.pow(BAL.betaDay, Math.max(0, today - 1));
   // XP for a send. first: your first send of it; flash: first try; tip: a local
   // told you the beta; newMax: your hardest yet; sessions: days you tried it.
   function sendXp(player, p, { first, flash, tip, newMax, sessions = 1 } = {}) {
@@ -235,30 +241,217 @@
     return tops;
   }
 
-  // ---- one attempt -----------------------------------------------------------
-  function movesIn(p, seed) {
-    const ts = tagsOf(p);
-    return 4 + (seed % 5) + (ts.includes("traverse") ? 6 : 0) + (ts.includes("highball") ? 2 : 0);
+  // ---- moves (Phase 3, Stage 1) ----------------------------------------------
+  // Every problem has a sequence of moves, generated from its own data (its index,
+  // tags, grade, height and sit start), so it's the same in every save and is
+  // never stored. Most moves are well within the grade; one crux (two on hard or
+  // long problems) carries it. The send chance above still decides each burn; the
+  // moves decide where you fall. What you've learned is kept per move (ps.mk,
+  // 0..1), and the problem's beta (ps.beta, which the send chance reads) is worked
+  // out from it, mostly from the cruxes. Some cruxes hide a better way through
+  // (ps.alt once you've found it): a heel hook, a drop-knee, an intermediate hold
+  // for shorter people, a cramped hold taller people can skip.
+  const CRUX_ORDER = ["dyno", "compression", "powerful", "crimpy", "slopey", "pinchy", "roof", "technical", "overhang", "slab",
+    "mantle", "traverse", "eliminate", "highball", "juggy"];
+  const HOLD_FOR = { crimpy: ["crimp"], slopey: ["sloper"], pinchy: ["pinch"], juggy: ["jug"], compression: ["squeeze"], dyno: ["jug"],
+    technical: ["edge", "sidepull"], slab: ["smear"], mantle: ["ledge"], roof: ["lip"], overhang: ["jug", "pinch", "undercling"],
+    powerful: ["undercling", "crimp", "pinch"], highball: ["edge", "jug"], traverse: ["edge", "jug", "crimp"], eliminate: ["crimp", "edge"] };
+  const FILLER = ["edge", "jug", "crimp", "sidepull", "pinch"];
+  const ALT_KINDS = { steep: ["heel", "toe", "knee"], friction: ["drop", "toe", "heel"], feet: ["foot", "match"], any: ["heel", "drop", "match", "foot"] };
+  function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rngOf(seed) {
+    return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   }
+  const r2 = x => Math.round(x * 100) / 100;
+  const seqCache = new Map();
+  // A problem's sequence: { n, moves: [{ i, kind: "start" | "move" | "crux" | "top",
+  // style (a tag or null), hold, reach ("long" | "tight" | null), w (its share of
+  // the risk; they add up to 1) }], cruxes: [indices], alt: { at, kind, body } | null }.
+  function sequence(p) {
+    const key = `${p.id ?? ""}|${p.tags}|${p.grade}|${p.height_ft}|${p.sit ? 1 : 0}`;
+    const hit = seqCache.get(key); if (hit) return hit;
+    const r = rngOf(hashStr(key)), ts = tagsOf(p), has = t => ts.includes(t), pick = a => a[Math.floor(r() * a.length)];
+    const n = clamp(3 + Math.round((p.height_ft || 12) / 5) + (p.sit ? 1 : 0) + (has("traverse") ? 4 + Math.floor(r() * 3) : 0) + (r() < 0.3 ? 1 : 0), 3, 12);
+    const top = has("mantle") || has("highball") || (has("slab") && r() < 0.5);
+    const want = p.grade >= 9 || (has("traverse") && p.grade >= 4) ? 2 : p.grade >= 5 && r() < 0.35 ? 2 : 1;
+    // Cruxes go anywhere but the last move; a sit start's first move can be one.
+    const slots = []; for (let i = p.sit ? 0 : 1; i < n - 1; i++) slots.push(i);
+    const cruxAt = new Set();
+    while (cruxAt.size < Math.min(want, slots.length)) cruxAt.add(slots[Math.floor(r() * slots.length)]);
+    const styles = CRUX_ORDER.filter(has);
+    const plain = ts.filter(t => PREF.includes(t) && !["dyno", "mantle", "highball", "traverse", "eliminate"].includes(t));
+    const hands = ts.filter(t => ["crimpy", "slopey", "pinchy", "juggy"].includes(t)).flatMap(t => HOLD_FOR[t]);
+    const nCrux = cruxAt.size, moves = [];
+    let c = 0;
+    for (let i = 0; i < n; i++) {
+      const crux = cruxAt.has(i), kind = crux ? "crux" : i === n - 1 && top ? "top" : i === 0 ? "start" : "move";
+      let style = null;
+      if (crux) style = styles.length ? styles[Math.min(c++, styles.length - 1)] : null;
+      else if (kind === "top") style = has("mantle") ? "mantle" : has("highball") ? "highball" : "slab";
+      else if (plain.length && r() < 0.5) style = pick(plain);
+      const hold = style && HOLD_FOR[style] ? pick(HOLD_FOR[style]) : hands.length && r() < 0.6 ? pick(hands) : pick(FILLER);
+      const reach = crux && has("reachy") ? "long" : crux && has("bunchy") ? "tight" : null;
+      const w = crux ? (0.7 + 0.2 * r()) / nCrux : kind === "top" ? 0.06 + (has("highball") ? 0.08 : 0) : 0.02 + 0.03 * r();
+      moves.push({ i, kind, style, hold, reach, w });
+    }
+    const tot = moves.reduce((a, m) => a + m.w, 0);
+    for (const m of moves) m.w /= tot;
+    const cruxes = moves.filter(m => m.kind === "crux");
+    let alt = null;
+    if (cruxes.length && r() < 0.25 + 0.03 * p.grade) {
+      const m = pick(cruxes);
+      const kind = m.reach === "long" ? "extra" : m.reach === "tight" ? "skip"
+        : pick(["roof", "overhang"].includes(m.style) ? ALT_KINDS.steep : ["slopey", "compression"].includes(m.style) ? ALT_KINDS.friction
+          : ["slab", "technical"].includes(m.style) ? ALT_KINDS.feet : ALT_KINDS.any);
+      alt = { at: m.i, kind, body: kind === "extra" ? "short" : kind === "skip" ? "tall" : null };
+    }
+    const s = { n, moves, cruxes: cruxes.map(m => m.i), alt };
+    seqCache.set(key, s);
+    return s;
+  }
+  // The better way through, if this problem has one this climber can use: an
+  // intermediate hold only helps shorter people, skipping a hold only taller ones.
+  function altFor(player, p) {
+    const a = sequence(p).alt;
+    if (!a) return null;
+    const reach = (player.height || 170) + (player.ape || 0);
+    if ((a.body === "short" && reach > 174) || (a.body === "tall" && reach < 178)) return null;
+    return a;
+  }
+  // What you know of each move. A save from before moves spreads its beta evenly
+  // over them, so its send chances don't change.
+  function knowledge(p, ps) {
+    const s = sequence(p);
+    if (!Array.isArray(ps.mk) || ps.mk.length !== s.n || !ps.mk.every(v => typeof v === "number" && isFinite(v))) {
+      const k = clamp((ps.beta || 0) / BAL.betaMax, 0, 1);
+      ps.mk = Array(s.n).fill(k);
+    }
+    return ps.mk;
+  }
+  function betaFrom(p, ps) {
+    const s = sequence(p), mk = knowledge(p, ps);
+    let b = 0; s.moves.forEach((m, i) => { b += m.w * clamp(mk[i], 0, 1); });
+    return BAL.betaMax * b + (ps.alt ? BAL.altBeta : 0);
+  }
+  // Moves you've seen (a count): as far as you've got, or worked.
+  const seenOf = (p, ps) => { const n = sequence(p).n; return ps && ps.sent ? n : Math.min(n, Math.max(Math.round((ps && ps.best || 0) * n), (ps && ps.seen) || 0)); };
+  // Where a burn that didn't send ended: each move takes a share of the risk (its
+  // weight, less for moves you know), and the shares multiply back to the chance.
+  function fallMove(p, ps, chance, rng) {
+    const s = sequence(p), mk = ps ? knowledge(p, ps) : null;
+    const w = s.moves.map((m, i) => m.w * (1 - BAL.knownShift * (mk ? clamp(mk[i], 0, 1) : 0)));
+    const tot = w.reduce((a, b) => a + b, 0), P = clamp(chance, 1e-4, 0.9999);
+    let alive = 1;
+    const q = w.map(x => { const f = 1 - Math.pow(P, x / tot), v = alive * f; alive *= 1 - f; return v; });
+    let u = rng() * q.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < q.length; i++) { u -= q[i]; if (u <= 0) return i; }
+    return q.length - 1;
+  }
+  const dayFactor = today => Math.pow(BAL.learnDay, Math.max(0, today - 1));
+  // What a burn teaches: most about the move you fell on, a little about the moves
+  // you passed, and less with each try on this problem the same day (today counts
+  // this one). A fall on a crux you know fairly well can show you its better way
+  // through. fallAt: the move fallen on (-1: sent). Returns { alt: found it now }.
+  function learnBurn(player, p, ps, fallAt, today = 1, rng = Math.random) {
+    const s = sequence(p), mk = knowledge(p, ps), f = dayFactor(today), upto = fallAt < 0 ? s.n : fallAt;
+    for (let i = 0; i < upto; i++) mk[i] += BAL.learnPass * (1 - mk[i]) * f;
+    if (fallAt >= 0) mk[fallAt] += BAL.learnFall * (1 - mk[fallAt]) * f;
+    let alt = false;
+    const a = altFor(player, p);
+    if (a && !ps.alt && fallAt === a.at && mk[fallAt] >= BAL.altAt && rng() < BAL.altOnFall) { ps.alt = true; alt = true; }
+    ps.mk = mk.map(r2);
+    if (fallAt >= 0) ps.seen = Math.max(ps.seen || 0, fallAt + 1);
+    ps.beta = betaFrom(p, ps);
+    return { alt };
+  }
+  // Working one move on its own (Stage 2's "Work a move"; today: moves worked on this
+  // problem today, counting this one; burns don't tire it): fresher than on a burn,
+  // so it sticks more often; it teaches that move a lot and can show the better way
+  // through. Sticking it shows you the next move. Returns { stuck, chance, alt }.
+  function workMove(player, p, ps, day, at, today = 1, rng = Math.random) {
+    const s = sequence(p), mk = knowledge(p, ps), f = dayFactor(today);
+    const m = margin({ ...player, energy: Math.max(player.energy, 70) }, p, ps, day) + BAL.isolation;
+    const chance = Math.pow(sendChance(m, p.grade), s.moves[at].w * (1 - BAL.knownShift * clamp(mk[at], 0, 1)));
+    const stuck = rng() < chance;
+    mk[at] = Math.min(1, mk[at] + BAL.learnWork * (1 - mk[at]) * f * (stuck ? 1.3 : 1));
+    let alt = false;
+    const a = altFor(player, p);
+    if (a && !ps.alt && at === a.at && mk[at] >= BAL.altAt * 0.75 && rng() < BAL.altOnWork) { ps.alt = true; alt = true; }
+    ps.mk = mk.map(r2);
+    ps.seen = Math.min(s.n, Math.max(ps.seen || 0, at + (stuck ? 2 : 1)));
+    ps.beta = betaFrom(p, ps);
+    return { stuck, chance, alt };
+  }
+  // Working a move costs less than a burn, but sharp holds still take skin.
+  function workCost(player, p) {
+    const c = attemptCost(player, p);
+    return { energy: c.energy * 0.6, skin: c.skin * 0.8, minutes: 8 };
+  }
+  // A long break: after BAL.fadeAfter days away, what you knew of the moves fades,
+  // to half over BAL.fadeDays and never further. A better way through, once found,
+  // you remember.
+  function fade(p, ps, daysAway) {
+    if (!(daysAway > BAL.fadeAfter) || !Array.isArray(ps.mk)) return false;
+    const k = Math.max(0.5, 1 - (daysAway - BAL.fadeAfter) / BAL.fadeDays);
+    ps.mk = knowledge(p, ps).map(v => r2(v * k));
+    ps.beta = betaFrom(p, ps);
+    return true;
+  }
+  // A local's beta: the better way through if there is one for you, otherwise a
+  // good look at the crux you know least. Returns "alt" or "crux".
+  function tip(player, p, ps) {
+    const s = sequence(p), mk = knowledge(p, ps), a = altFor(player, p);
+    let what = "crux";
+    if (a && !ps.alt) { ps.alt = true; what = "alt"; }
+    else {
+      const c = s.cruxes.length ? s.cruxes.reduce((x, y) => (mk[y] < mk[x] ? y : x)) : 0;
+      mk[c] += 0.5 * (1 - mk[c]);
+      ps.seen = Math.max(ps.seen || 0, c + 1);
+    }
+    ps.mk = mk.map(r2);
+    ps.beta = betaFrom(p, ps);
+    return what;
+  }
+
+  // ---- previews for the climbing scene's menu --------------------------------------
+  // What a rest or working a move would do to your next burn's chance, counting
+  // everything: the energy (and skin) it costs or gives back and what you'd learn.
+  // Nothing is changed. A rest: you've rested `before` times today, and can get
+  // back up to maxEnergy (the day's start).
+  function previewRest(player, p, ps, day, before = 0, maxEnergy = 100) {
+    const pl = { ...player, energy: Math.min(maxEnergy, player.energy + restGain(before)) };
+    return chanceOf(pl, p, ps, day);
+  }
+  // Working move `at` once (today: moves worked on this problem today, counting it):
+  // what you'd expect to know after it, whether you stick it or not (a better way
+  // through, if you'd find one, isn't counted). Returns { kept: your chance as you
+  // are now with that knowledge (what the work is worth, for good), next: your next
+  // burn's, after the energy and skin it costs }.
+  function previewWork(player, p, ps, day, at, today = 1) {
+    const s = sequence(p), mk = knowledge(p, { ...ps }).slice(), f = dayFactor(today);
+    const m = margin({ ...player, energy: Math.max(player.energy, 70) }, p, ps, day) + BAL.isolation;
+    const stick = Math.pow(sendChance(m, p.grade), s.moves[at].w * (1 - BAL.knownShift * clamp(mk[at], 0, 1)));
+    mk[at] = Math.min(1, mk[at] + BAL.learnWork * (1 - mk[at]) * f * (stick * 1.3 + (1 - stick)));
+    const ps2 = { ...ps, mk }, c = workCost(player, p);
+    ps2.beta = betaFrom(p, ps2);
+    const pl = { ...player, energy: Math.max(0, player.energy - c.energy), skin: Math.max(0, player.skin - c.skin) };
+    return { kept: chanceOf(player, p, ps2, day), next: chanceOf(pl, p, ps2, day) };
+  }
+
+  // ---- one attempt -----------------------------------------------------------
+  // A burn from the start. The chance decides whether it goes; if it doesn't, the
+  // moves decide where you came off (fallAt, 0-based, and the move itself).
+  // progress is how far you got as a share of the moves; crux, the tag that beat
+  // you (for older callers).
   function attempt(player, p, ps, day, rng = Math.random) {
     const parts = breakdown(player, p, ps, day);
     const m = Object.values(parts).reduce((a, b) => a + b, 0);
     const chance = sendChance(m, p.grade);
     const sent = rng() < chance;
-    // How far you got if you fell: further when the problem is closer to your level.
-    const noise = (rng() + rng() + rng() - 1.5) * 1.2;
-    const progress = sent ? 1 : clamp(sigmoid(1.4 * (m + 1.2) + noise), 0.04, 0.97);
-    // The crux is wherever you're weakest: lowest style skill, or bad reach.
-    let crux = null, worst = Infinity;
-    for (const t of tagsOf(p)) {
-      let v;
-      if (t === "reachy" || t === "bunchy") v = morph(player, p) * 1.5;
-      else if (PREF.includes(t)) v = player.skills[t] || 0;
-      else continue;
-      v += rng() * 0.4;
-      if (v < worst) { worst = v; crux = t; }
-    }
-    return { sent, chance, margin: m, parts, progress, crux };
+    const s = sequence(p), fallAt = sent ? -1 : fallMove(p, ps, chance, rng), move = fallAt >= 0 ? s.moves[fallAt] : null;
+    const crux = move ? (move.reach === "long" ? "reachy" : move.reach === "tight" ? "bunchy" : move.style) : null;
+    return { sent, chance, margin: m, parts, fallAt, move, progress: sent ? 1 : (fallAt + 1) / s.n, crux };
   }
 
   // ---- days, weather, conditions -------------------------------------------------
@@ -287,10 +480,21 @@
     let cond = temp < 30 ? 0.05 : temp <= 55 ? 0.35 : temp <= 65 ? 0.1 : temp <= 75 ? -0.2 : -0.45;
     if (humid) cond -= 0.25;
     if (sky === "Breezy" || sky === "Bluebird") cond += 0.1;
+    return { temp, sky, cond: Math.round(cond * 100) / 100, ...describeCond(cond), dusk, precip, pop, rainWhen, rainAt };
+  }
+  // Conditions in words: a label and a note.
+  function describeCond(cond) {
     const note = cond >= 0.3 ? "Crisp air. Friction is excellent." : cond >= 0.05 ? "Decent friction."
       : cond > -0.3 ? "A bit warm. Slopers and slabs will feel greasy." : "Greasy. Hard sends are unlikely on friction problems.";
     const label = cond >= 0.3 ? "Prime" : cond >= 0.05 ? "Good" : cond > -0.3 ? "Meh" : "Greasy";
-    return { temp, sky, cond: Math.round(cond * 100) / 100, label, note, dusk, precip, pop, rainWhen, rainAt };
+    return { label, note };
+  }
+  // A day made at least this good (a climber's first day, so there's plenty that
+  // goes). Keeps the rest of its forecast; a humid sky clears.
+  function atLeast(w, cond) {
+    if (!(w.cond < cond) || w.cond <= -0.8) return w;
+    const was = describeCond(w.cond), now = describeCond(cond);
+    return { ...w, cond, label: now.label, note: String(w.note || "").replace(was.note, now.note) || now.note, sky: w.sky === "Humid" ? "Sunny" : w.sky };
   }
   // "30% chance of rain in the morning", or "" for a dry forecast.
   function rainChance(f) {
@@ -323,8 +527,8 @@
   }
 
   const Mech = { PREF, BAL, levelInfo, levelOf, levelCost, proofCap, proofLeft, ability, baseXp, relFactor, styleBonus, morph, reachDependence,
-    frictionSensitivity, breakdown, margin, sendChance, chanceOf, feel, canSpot, attemptCost, restGain, betaGain, sendXp, skillGains, applySkills,
-    convertSkills, replay, topsOf, movesIn, attempt, weather, forecastDay, realize, rainChance, rainStart, dayEnds, hm, startOfDay,
+    frictionSensitivity, breakdown, margin, sendChance, chanceOf, feel, canSpot, attemptCost, restGain, sendXp, skillGains, applySkills,
+    convertSkills, replay, topsOf, sequence, altFor, knowledge, betaFrom, seenOf, fallMove, learnBurn, workMove, workCost, fade, tip, previewRest, previewWork, attempt, weather, forecastDay, realize, rainChance, rainStart, dayEnds, hm, startOfDay, describeCond, atLeast,
     tagsOf, BETA_MAX, clamp };
   if (typeof module !== "undefined") module.exports = Mech; else root.Mech = Mech;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1,0 +1,52 @@
+Granite Hollow balance: 40 climbers per playstyle, up to 200 climbing days, rules site/game/mechanics.js, lines found as you go.
+
+=== projector: 40 climbers, 200 climbing days each ===
+
+Level pace (climbing day a level is reached)
+  level  target   median   10–90%      reached
+  V3         6        5        5–8       100%
+  V5        15       19      16–21       100%
+  V7        30       36      33–40       100%
+  V9        55       69      62–76       100%
+  V11      100      115    106–126       100%
+  V13      180      185    175–197        73%
+
+Level against hardest send (target: hardest send usually 1 above, sometimes 2, never 4)
+  day   level   hardest   gap   gap≥3   held back   skills: avg × 0.7 / best   XP headroom to V13
+   15       4        V5     1      0%          0%               0.02 / 0.40                2.62×
+   30       6        V7     1      0%          0%               0.02 / 0.39                2.40×
+   55       8        V9     1      0%          0%               0.02 / 0.50                2.10×
+  100      10       V11     1      0%          0%               0.02 / 0.48                1.65×
+  180      12       V13     1      0%          0%               0.02 / 0.59                1.97×
+  (held back: XP enough for the next level, waiting for proof sends. skills: the average skill × 0.7, a bonus on nearly every problem, and the best skill.
+   XP headroom: XP from sending every unsent problem now ÷ XP still needed for V13; under 1 means V13 is out of reach.)
+
+By grade relative to your level (all climbers pooled)
+  rel.   tries   send/try   sends   share   flashed   median tries   90% tries   XP per hour
+   ≤−4   23750        95%   22546     58%       95%              1           1           104
+    −3    2819        95%    2680      7%       95%              1           1           261
+    −2    2675        95%    2531      6%       94%              1           1           378
+    −1    5660        70%    3967     10%       76%              1           2           455
+     0   14720        17%    2566      7%       35%              2          13           187
+    +1   75598         6%    4543     12%        8%             11          39           173
+    +2    8092         3%     254      1%        3%             18          55           134
+    +3      48         0%       0      0%        0%              –           –             0
+  Targets: 3+ below ≤95% a try; at your level 1–4 tries; 1 above a session (low grades) to 2–4 days (V12–13);
+  2 above rare (~10% a try at best); 3+ above almost never. XP an hour should not reward falling on lines far above you.
+
+Days to send a project (sends that took more than one try): median days (sends)
+  rel.     V0–4          V5–8          V9+
+     0    1 (564)       1 (373)      2 (727)
+    +1    2 (780)      2 (1545)     3 (1873)
+    +2     2 (54)       3 (143)       4 (50)
+
+What lifted sends 2+ grades above your level (254 sends, medians, in grades):
+  style 0.11, reach 0.43, beta 0.29, conditions 0.18, fatigue -0.26
+
+Moves: 77% of falls were on a crux. Sends at least a grade up that used a better way through: 15%. Worked moves: 306 per climber (41 hours), 11 better ways found that way.
+
+Your share of first ascents: 24% by the end of 2025 (target about 30% for a keen player), 37% at the end.
+At the end: median level V13, hardest send V13, 998 sends, 29% of tries sent, days with nothing left to try: 5.
+Level at day 100 by build: average V10 (hardest V11), tall V10 (hardest V11), short V10 (hardest V11).
+
+(27 s)
