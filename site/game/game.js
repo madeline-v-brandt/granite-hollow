@@ -240,8 +240,8 @@
         note(`${who} made the first ascent of ${pname(it.p)}, a line you'd spotted.`);
       }
     });
-    // Pickles is sometimes waiting by the car.
-    if (v2() && !first && !G.day.over && isAround("n:pickles") && Math.random() < 0.35) { G.day.met.push("n:pickles"); G.day.encounter = buildRegular("n:pickles", START_AREA); }
+    // (Pickles used to be "waiting by the car" here while the map drew him asleep at
+    // his rock. He's only ever where he's drawn now: go and find him. Phase 4, Stage 0.)
   }
   function note(text) { G.feed.unshift({ text, date: G.date, minute: G.day ? G.day.minute : 540 }); G.feed.length = Math.min(G.feed.length, 60); }
   function save() {
@@ -377,6 +377,7 @@
       const style = first ? (flash ? "Flash" : "Send") : "Repeat";
       const pal = partnerNow();
       G.ticks.push({ p: i, date: G.date, day: G.dayNo, style, att: st.att, stars: null, ...(pal ? { with: pal } : {}) });
+      if (pal) Social.moment(G, pal, "sendWith", G.date, i);
       G.day.sends.push({ p: i, style, xp, ...(fa ? { fa: true } : {}) });
       let text;
       if (flash) text = "Flash! You read every move from the ground.";
@@ -692,6 +693,7 @@
     const ls = LESSONS.find(l => !G.learned[l.key] && l.when(i, L, st));
     if (!ls) return null;
     G.learned[ls.key] = G.date;
+    if (isAround(ls.who)) Social.moment(G, ls.who, "lesson", G.date);
     note(`Learned: ${ls.name.toLowerCase()}.`);
     return ls.say(isAround(ls.who), i);
   }
@@ -946,18 +948,88 @@
   let peopleCache = { key: "", list: [] };
   function peopleToday() {
     if (!v2()) return [];
-    const key = G.date + "|" + !!G.day.bishop + "|" + Object.keys(G.world.npc).length;
+    const key = G.date + "|" + !!G.day.bishop + "|" + Object.keys(G.world.npc).length + "|" + G.world.simDate;
     if (peopleCache.key === key) return peopleCache.list;
+    // The regulars who climb are where today's session has them (World.sessionOn:
+    // their routine, their project; Phase 4, Stage 0). The Bishop only on his days.
     const r = World.stream(G.world.seed, "people|" + G.date), list = [];
     for (const w of [...World.CLIMBING_REGULARS, "n:gus", "n:bishop"]) {
       const key2 = w.slice(2), n = World.NAMED[key2], out = r(), pa = r(), pb = r(), ps = r();     // drawn whatever happens, so one person doesn't move another
-      if (!isAround(w) || (key2 === "bishop" ? !G.day.bishop : out > (key2 === "gus" ? .55 : .45))) continue;
-      const area = n.home[Math.floor(pa * n.home.length)], bs = D.boulders.filter(b => b.sector === area);
-      if (!bs.length) continue;
-      list.push({ who: w, name: n.name.replace(/^the /, "The "), b: bs[Math.floor(pb * bs.length)].id, side: ps < .5 ? -1 : 1, look: LOOKS[key2] || {} });
+      if (!isAround(w)) continue;
+      let b, s = null, t = [570, 990];                                  // the Bishop: mid-morning to the afternoon
+      if (key2 === "bishop") {
+        if (!G.day.bishop) continue;
+        const area = n.home[Math.floor(pa * n.home.length)], bs = D.boulders.filter(x => x.sector === area);
+        if (!bs.length) continue;
+        b = bs[Math.floor(pb * bs.length)].id;
+      } else { s = World.sessionOn(G, w, G.date); if (!s) continue; b = s.b; t = World.ROUTINES[key2] ? World.ROUTINES[key2](G.date).t : s.t; }   // their hours as the routine has them now
+      list.push({ who: w, name: n.name.replace(/^the /, "The "), b, side: ps < .5 ? -1 : 1, look: LOOKS[key2] || {}, from: t[0], to: Math.min(t[1], G.day.weather.dusk), s });
     }
     peopleCache = { key, list };
     return list;
+  }
+  // Who's around right now (Phase 4, Stage 1): out today, and within their hours.
+  // Your partner is with you whatever the hour.
+  function peopleNow() {
+    const m = G.day.minute, pal = partnerNow();
+    return peopleToday().filter(x => x.who === pal || (m >= x.from && m < x.to));
+  }
+  // What someone's doing, in a few words (never names a place or a line).
+  const ACT = {
+    gus: { proj: "Trying a problem by the lot, between patrols", mileage: "On patrol, more or less", wet: "Checking the trails after the rain" },
+    hollis: { proj: "Working a project, binder open on the pad", mileage: "Climbing, and taking notes", wet: "Writing up notes under a tarp" },
+    otis: { proj: "On a project, in perfect sending weather", mileage: "Climbing, cheerfully", wet: "Insisting it's nearly dry" },
+    rowan: { proj: "Working a project, sketchbook on the pad", mileage: "Sketching the boulders between burns", wet: "Sketching in the rain" },
+    bea: { proj: "Throwing for a project, over and over", mileage: "Jumping for things", wet: "Practising dynos on a log while the rock dries" },
+    dez: { proj: "Quietly working something hard", mileage: "Climbing, quietly", wet: "Sitting under the trees, waiting it out" },
+  };
+  function activity(p) {
+    if (p.who === "n:bishop") return "Telling anyone who'll listen about 1977";
+    const a = ACT[p.who.slice(2)] || {}, s = p.s;
+    return !s ? "Climbing" : s.out === "wet" ? a.wet : s.p != null ? a.proj : a.mileage;
+  }
+  // "11 AM", "3:30 PM": to the nearest half hour.
+  const about = m => clock(Math.round(m / 30) * 30).replace(":00", "");
+  const isKnown = w => !!(v2() && K.met(w));
+  const callName = w => World.whoName(D, w).replace(/^the /, "The ");
+  // The card when you hover over (or tap) someone on the map.
+  function personTipHtml(who) {
+    if (!v2()) return "";
+    if (who === "n:pickles") return isKnown(who) ? `<strong>Pickles</strong><div class="sub">Napping in the shade of his rock</div>${G.day.met.includes(who) ? "You've said hello today." : "Walk over and say hello."}`
+      : `<strong>A scruffy dog</strong><div class="sub">Napping in the shade of a boulder</div>Walk over and say hello.`;
+    const p = peopleToday().find(x => x.who === who); if (!p) return "";
+    const pal = partnerNow() === who, met = isKnown(who);
+    const when = pal ? `Climbing with you${G.day.partner.allDay ? " today" : ` until about ${about(G.day.partner.until)}`}` : `Around until about ${about(p.to)}`;
+    return `<strong>${esc(met ? callName(who) : "Someone you haven't met")}</strong><div class="sub">${esc(activity(p))}</div>${when}${pal ? "" : `<br>${G.day.met.includes(who) ? "You've talked today." : "Walk over to say hello."}`}`;
+  }
+  // Where someone is, as you know it: a boulder you know, an area you know, or word of where.
+  function whereIs(b) {
+    const sec = D.boulders[b].sector;
+    if (K.area(sec) < 1) return { text: (World.AREAS[sec] && World.AREAS[sec].hint) || "somewhere in the woods", go: false };
+    return { text: K.boulder(b) >= 1 ? `at ${D.boulders[b].name}, ${sec}` : `somewhere at ${sec}`, go: true };
+  }
+  // Out today (Phase 4, Stage 1): the regulars you know who are out, where, and when.
+  function outTodayHtml() {
+    if (!v2() || G.day.over) return "";
+    const m = G.day.minute, pal = partnerNow();
+    const mine = peopleToday().filter(x => isKnown(x.who));
+    const strangers = peopleNow().filter(x => !isKnown(x.who)).length;
+    const dog = isAround("n:pickles") && isKnown("n:pickles");
+    if (!mine.length && !dog && !strangers) return "";
+    const rows = mine.map(p => {
+      const w = whereIs(p.b), now = p.who === pal || (m >= p.from && m < p.to), later = m < p.from;
+      const sub = p.who === pal ? "Climbing with you" : now ? `${w.text} · until about ${about(p.to)}` : later ? `${w.text}, from about ${about(p.from)}` : `Was out ${p.to <= 780 ? "this morning" : "earlier"}, ${w.text}`;
+      const find = now && w.go && p.who !== pal;
+      return `<li><${find ? `button type="button" class="rowbtn" data-find="${esc(p.who)}"` : `div class="rowbtn" style="cursor:default"`}><span><span class="t">${esc(callName(p.who))}</span>
+        <span class="s">${esc(sub)}${now && p.who !== pal ? ` · ${esc(activity(p).toLowerCase())}` : ""}</span></span><span class="v">${find ? "Find" : now ? "" : later ? "Later" : "Gone"}</span></${find ? "button" : "div"}></li>`;
+    });
+    if (dog) {
+      const rock = D.boulders.find(b => b.name === "Pickles' Rock");
+      const by = rock && K.boulder(rock.id) >= 1 ? `by ${rock.name}` : "by his rock";
+      rows.push(`<li><button type="button" class="rowbtn" data-find="n:pickles"><span><span class="t">Pickles</span><span class="s">Napping ${esc(by)}, ${esc(START_AREA)}</span></span><span class="v">Find</span></button></li>`);
+    }
+    const others = strangers ? `<p class="meta">${strangers === 1 ? "Someone you haven't met is" : `${strangers} people you haven't met are`} out too. Look for them on the map.</p>` : "";
+    return `<h3 class="out-h">Out today</h3>${rows.length ? `<ul class="rowlist out-today">${rows.join("")}</ul>` : ""}${others}`;
   }
   // Walking up to someone (within a few metres of them) starts a conversation, once a day each.
   function meetNearby(pos) {
@@ -967,7 +1039,7 @@
     if (dog && isAround("n:pickles") && !G.day.met.includes("n:pickles") && Math.hypot(pos[0] - dog.x, pos[1] - dog.y) < 6) {
       G.day.met.push("n:pickles"); G.day.encounter = buildRegular("n:pickles", "The Tailgate", { napping: true }); return true;
     }
-    for (const p of peopleToday()) {
+    for (const p of peopleNow()) {
       if (G.day.met.includes(p.who)) continue;
       const at = M.paint && M.paint.personAt(p.who); if (!at) continue;
       if (Math.hypot(pos[0] - at.x, pos[1] - at.y) < 7) { G.day.met.push(p.who); G.day.encounter = buildRegular(p.who, D.boulders[p.b].sector); return true; }
@@ -1023,13 +1095,17 @@
   }
   function buildRegular(w, sector, ctx = {}) {
     const key = w.slice(2), n = World.NAMED[key], r = K.meet(w, G.date), first = r.n === 1;
+    Social.moment(G, w, "met", G.date);
+    // They know what you're working on: your project with the most tries from the last week (for later conversations).
+    const proj = key === "pickles" ? null : Object.keys(G.ps).map(Number).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && K.visible(i) && (G.ps[i].log || []).some(x => Array.isArray(x) && String(x[0]) >= addDays(G.date, -7))).sort((a, b) => G.ps[b].att - G.ps[a].att)[0];
+    if (proj != null) Social.moment(G, w, "proj", G.date, proj);
     const e = { who: w, sector, line: "", rec: null, recLine: "", beta: null, accepted: false, betaTaken: false };
     if (key === "pickles") {
       e.line = ctx.napping
         ? pick(first ? ["A scruffy dog is napping in the shade of the boulder. His tag says PICKLES. His tail thumps when he sees you."]
           : ["Pickles is napping in the shade of his rock. His tail thumps twice when he sees you.", "Pickles opens one eye, decides you're a friend, and rolls over for a belly rub.", "Pickles is guarding a very important stick beside his rock."])
-        : pick(first ? ["A scruffy dog trots over from the lot, tail going. His tag says PICKLES."] : ["Pickles trots over from the lot, tail going.",
-          "Pickles has found a stick and would like you to admire it.", "Pickles is supervising the parking lot. He wags when he sees you."]);
+        : pick(first ? ["A scruffy dog is lying by the boulder, tail going. His tag says PICKLES."] : ["Pickles thumps his tail at you from the shade of his rock.",
+          "Pickles has found a stick and would like you to admire it.", "Pickles lifts his head from his paws and wags when he sees you."]);
       e.pet = true; return e;
     }
     if (key === "bishop") {
@@ -1100,6 +1176,7 @@
   function sitChat() {
     const e = G.day.encounter; if (!e || !e.who || !e.who.startsWith("n:") || e.pet || e.chatted || UI.busy || G.day.over) return;
     const key = e.who.slice(2), r = K.chat(e.who, G.date), lines = CHATS[key] || ["You sit and talk for a while."];
+    Social.moment(G, e.who, "chat", G.date);
     e.chatted = lines[(r.chats - 1) % lines.length];
     G.day.minute += 20;
     G.player.energy = Math.min(G.day.startEnergy, G.player.energy + 15);
@@ -1109,7 +1186,10 @@
   function petDog() {
     const e = G.day.encounter; if (!e || !e.pet || e.petted) return;
     const n = K.pet(e.who, G.date);
-    e.petted = n < 3 ? "He leans into your hand." : n < 10 ? "He leans his whole weight against your leg and sighs." : "He follows you a few steps toward the trail before Gus whistles him back.";
+    const gusOut = peopleNow().some(x => x.who === "n:gus");
+    e.petted = n < 3 ? "He leans into your hand." : n < 10 ? "He leans his whole weight against your leg and sighs."
+      : gusOut ? "He follows you a few steps toward the trail before Gus whistles him back." : "He follows you a few steps toward the trail, then thinks better of it and flops back down in the shade.";
+    Social.moment(G, e.who, "pet", G.date);
     save(); renderAll();
   }
   function acceptTip() {
@@ -1154,6 +1234,7 @@
     const w = G.day.weather, allDay = Math.random() < (e.who === "n:rowan" ? 0.35 : 0.2), stay = 120 + 10 * Math.floor(Math.random() * 13);
     G.day.partner = { who: e.who, until: allDay ? w.dusk : Math.min(w.dusk, G.day.minute + stay), ...(allDay ? { allDay: true } : {}), ...(G.loc.boulder != null ? { b: G.loc.boulder } : {}) };
     e.partnered = PARTNER[e.who.slice(2)].yes + (allDay ? ` ${PARTNER[e.who.slice(2)].allDay}` : "");
+    Social.moment(G, e.who, "climb", G.date);
     note(`Climbing with ${World.whoName(D, e.who).replace(/^the /, "the ")}.`);
     save(); renderAll();
   }
@@ -1173,6 +1254,7 @@
     const p = D.problems[i], st = pstate(i);
     if (st.tipped || !partnerKnows(w, i)) return "";
     const what = Mech.tip(G.player, p, st); st.tipped = true;
+    Social.moment(G, w, "beta", G.date, i);
     const tag = p.tagList.find(t => BETA_TIP[t]);
     note(`Got beta for ${pref(i)} from ${firstName(w)}.`);
     return ` ${firstName(w)} calls up from the pad: “${what === "alt" ? ALT[p.seq.alt.kind].tip : BETA_TIP[tag] || "Commit to the crux! You had it."}”`;
@@ -1183,7 +1265,7 @@
     if (!v2() || !G.day) return { v: 0 };
     const key = [G.date, G.day.minute, G.loc.sector, partnerNow(), G.ticks.length, G.world.est ? Object.keys(G.world.est).length : 0].join("|");
     if (vibeMemo.key === key) return vibeMemo.v;
-    const w = G.day.weather, out = peopleToday(), partner = partnerNow(), since = addDays(G.date, -2);
+    const w = G.day.weather, out = peopleNow(), partner = partnerNow(), since = addDays(G.date, -2);
     const crowd = out.filter(x => x.who !== partner && D.boulders[x.b].sector === G.loc.sector);
     // Your breakthrough: a hardest-yet send, or a project that took four tries or more.
     let best = -1; const high = G.ticks.some(t => { const g = D.problems[t.p].grade, nb = t.style !== "Repeat" && g > best; if (t.style !== "Repeat") best = Math.max(best, g); return t.date >= since && t.style !== "Repeat" && (nb || (t.att || 0) >= 4); });
@@ -1214,6 +1296,7 @@
   function takeBeta() {
     const e = G.day.encounter; if (!e || !e.beta) return;
     const st = pstate(e.beta.p), what = Mech.tip(G.player, D.problems[e.beta.p], st); st.tipped = true; e.betaTaken = true;
+    if (typeof e.who === "string" && e.who.startsWith("n:")) Social.moment(G, e.who, "beta", G.date, e.beta.p);
     note(`Got beta for ${pref(e.beta.p)} from ${whoOf(e.ci ?? e.who)}.`);
     toast("Beta unlocked", what === "alt" ? `There's a better way through the crux of ${pname(e.beta.p)}.` : `You've a clearer picture of the crux of ${pname(e.beta.p)}.`, "info");
     save(); renderAll();
@@ -1242,6 +1325,7 @@
       onGround: (x, y) => goToPoint([x, y]),
       // Clicking someone walks you over to them (and you say hello when you get there).
       onPerson: who => { const p = personSpot(who); if (p) goToPoint(p); },
+      personTipHtml,
       onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
         const mins0 = minutesTo({ sector: b.sector, boulder: b.id }, true);
@@ -1544,7 +1628,13 @@
         return { name: s.name, state: K.area(s.name), minutes: mins, sub: `${told ? `${World.whoName(D, told.from).replace(/^the /, "The ")} told you the way` : range} · ${G.loc.sector === s.name ? "you're here" : mins + " min walk"}` };
       });
       const hidden = D.sectors.some(s => K.area(s.name) < 1);
-      paper.open({ areas, here: G.loc.sector, me: G.pos, view: P.viewBox(),
+      // The regulars you know who are out now, where you know the area (never a place you haven't found).
+      const people = G.day.over ? [] : [...peopleNow(), ...(isAround("n:pickles") ? [{ who: "n:pickles", b: (D.boulders.find(x => x.name === "Pickles' Rock") || {}).id }] : [])]
+        .filter(x => isKnown(x.who) && x.b != null && K.area(D.boulders[x.b].sector) >= 1).map(x => {
+          const at = P.personAt(x.who) || { x: D.boulders[x.b].x, y: D.boulders[x.b].y }, key = x.who.slice(2);
+          return { who: x.who, name: x.who === "n:pickles" ? "Pickles" : firstName(x.who), x: at.x, y: at.y, color: key === "pickles" ? "#c9a46a" : (LOOKS[key] || {}).shirt, where: x.who === partnerNow() ? "with you" : whereIs(x.b).text.replace(/^at /, "") };
+        });
+      paper.open({ areas, here: G.loc.sector, me: G.pos, view: P.viewBox(), people,
         footnote: hidden ? "Locals say there's more climbing deeper in the woods than the kiosk map shows." : "",
         onPick: w => { P.setFollow(false); $("#map-me").classList.add("lost"); (w.sector ? P.flyTo(w.sector, 9, 800) : P.centerOn(w.x, w.y, P.view().k, 700)); },
         onGo: G.day.over ? null : name => { if (K.canGo({ sector: name })) travel({ sector: name, boulder: null }); } });
@@ -1562,11 +1652,14 @@
       // Your partner comes along: at the boulder you're at (or the last one you were at).
       const pal = partnerNow();
       const palB = pal ? (G.loc.boulder != null ? G.loc.boulder : G.day.partner.b) : null;
-      const pk = G.date + "|" + !!G.day.bishop + "|" + peopleToday().length + "|" + !!G.day.over + "|" + pal + "|" + palB;
+      // Who's around at this hour (they come and go: Phase 4, Stage 1), with a name tag
+      // over anyone you've met.
+      const now = G.day.over ? [] : peopleNow(), dog = v2() && !G.day.over && isAround("n:pickles");
+      const pk = [G.date, ...now.map(x => x.who + (isKnown(x.who) ? "+" : "")), dog && isKnown("n:pickles"), pal, palB].join("|");
       if (pk !== peopleKey) {
         peopleKey = pk;
-        const list = peopleToday().map(x => (x.who === pal && palB != null ? { ...x, b: palB, side: 1 } : x));
-        P.setPeople(G.day.over ? [] : [...list, ...(v2() && isAround("n:pickles") ? [{ who: "n:pickles", name: "Pickles", dog: true }] : [])]);
+        const list = now.map(x => ({ ...x, ...(x.who === pal && palB != null ? { b: palB, side: 1 } : {}), name: isKnown(x.who) ? x.name : "Someone you haven't met", tag: isKnown(x.who) ? firstName(x.who) : null }));
+        P.setPeople([...list, ...(dog ? [{ who: "n:pickles", name: isKnown("n:pickles") ? "Pickles" : "A dog", dog: true, tag: isKnown("n:pickles") ? "Pickles" : null }] : [])]);
       }
       if (!walk && !keys.size) P.setMe(G.pos, pose(false));
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
@@ -1581,7 +1674,9 @@
     P.setMe(G.pos, pose(false));
     P.setFollow(true, 0);
     UI.recenter = false;
-    return { update, paint: P, togglePaper, lookAtMe, goTo, minutesTo, minutesToLot, toLot, walking: () => !!walk, locAt: p => locAt(p, G.loc), approach,
+    // Walk over to someone (Out today's Find): the map follows you there.
+    const findPerson = who => { const p = personSpot(who); if (!p) return; lookAtMe(400); goToPoint(p); };
+    return { update, paint: P, togglePaper, lookAtMe, goTo, minutesTo, findPerson, minutesToLot, toLot, walking: () => !!walk, locAt: p => locAt(p, G.loc), approach,
       teleport: to => { stop(); G.pos = pointOf(to); G.loc = { sector: to.sector, boulder: to.boulder }; P.setMe(G.pos, pose(false)); P.setFollow(true, 0); } };
   }
   const validPos = p => Array.isArray(p) && p.length === 2 && p.every(v => typeof v === "number" && isFinite(v) && Math.abs(v) < 5000);
@@ -1794,7 +1889,7 @@
 
   function renderPanel() {
     const el = $("#tabbody");
-    el.innerHTML = { here: hereHtml, climber: climberHtml, logbook: logbookHtml, craglog: cragHtml, journal: journalHtml }[UI.tab]();
+    el.innerHTML = { here: () => hereHtml() + outTodayHtml(), climber: climberHtml, logbook: logbookHtml, craglog: cragHtml, journal: journalHtml }[UI.tab]();
     bindPanel(el);
   }
 
@@ -1817,7 +1912,8 @@
     if (e.who && e.who.startsWith("n:")) {
       const i = World.whoInfo(D, e.who), r = K.met(e.who);
       name = i.name.replace(/^the /, "The "); initials = i.type === "dog" ? "🐾" : name.replace(/^The /, "").split(" ").map(x => x[0]).join("").slice(0, 2).toUpperCase();
-      sub = [i.blurb.replace(/^is /, ""), i.type !== "dog" && !i.old ? `climbs around V${Math.round(i.level)}` : "", r && r.n > 1 ? `met ${r.n} times` : "first meeting"].filter(Boolean).join(" · ");
+      const lvl = World.REG.includes(e.who) ? World.levelOn(e.who, G.date) : i.level;
+      sub = [i.blurb.replace(/^is /, ""), i.type !== "dog" && !i.old ? `climbs around V${Math.round(lvl)}` : "", r && r.n > 1 ? `met ${r.n} times` : "first meeting"].filter(Boolean).join(" · ");
     } else {
       const [nm, h, type, lvl] = D.climbers[e.ci];
       name = nm; initials = nm.slice(0, 2).toUpperCase();
@@ -2467,6 +2563,7 @@
     on("[data-expand]", n => { const i = +n.dataset.expand; UI.expanded.has(i) ? UI.expanded.delete(i) : UI.expanded.add(i); renderPanel(); });
     on("[data-go-sector]", n => travel({ sector: n.dataset.goSector, boulder: null }));
     on("[data-go-boulder]", n => { const b = D.boulders[+n.dataset.goBoulder]; travel({ sector: b.sector, boulder: b.id }); });
+    on("[data-find]", n => { if (!UI.busy && M.findPerson) M.findPerson(n.dataset.find); });
     on("[data-go-problem]", n => {
       const p = D.problems[+n.dataset.goProblem];
       if (!K.canGo({ sector: p.sector, boulder: p.b })) { toast("You don't know the way", "Nobody has told you where it is yet.", "info"); return; }
@@ -3125,6 +3222,12 @@
       ["Community", `${Object.keys(W.npc).length} climbers have arrived; they know ${W.found.length} of ${D.boulders.length} boulders`],
       ["You know", `${Object.keys(kn.areas).length} areas, ${Object.keys(kn.boulders).length} boulders, ${Object.keys(kn.lines).length} lines`],
       ["Invariants", World.check(D, G).slice(0, 3).join("; ") || "all hold"],
+      // The regulars' lives (Phase 4, Stage 0): level, project, today's session, how well you know them.
+      ...World.REG.filter(w => W.reg && W.reg[w]).map(w => {
+        const R = W.reg[w], s = World.sessionOn(G, w, G.date), t = Social.tier(G, w), P = R.proj;
+        return [firstName(w), `V${World.levelOn(w, G.date).toFixed(1)} · ${R.sent.length} sent · ${P ? `project ${D.problems[P.p].name} (V${D.problems[P.p].grade}, ${P.n} sessions, ${Math.round(P.best * 100)}% up)` : "no project"}`
+          + ` · today: ${s ? `${s.out} at ${D.boulders[s.b].name}` : "not out"}${t ? ` · ${t.words.toLowerCase()} (${t.bond})` : ""}`];
+      }),
     ] : [["Rules", "old (v1): the whole crag is documented"]];
     const here = G.loc.boulder != null ? D.boulders[G.loc.boulder].problems[0] : 0;
     modal(`<span class="label-sm">Development mode</span><h2>Dev tools</h2>
@@ -3227,6 +3330,7 @@
   }
   function migrateSave(g) {
     learnedFor(g);
+    if (g.v === 2 && g.world) { World.ensureReg(D, g, { date: g.date, wet: !!(g.day && g.day.rainedOut) }); Social.ensure(g, D.problems.length); }
     // A partner only for today, someone who climbs; sends together only with them (Stage 4).
     if (g.day && g.day.partner != null && !(g.day.partner && CLIMB_WITH.includes(g.day.partner.who) && typeof g.day.partner.until === "number" && isFinite(g.day.partner.until))) g.day.partner = null;
     if (g.day && g.day.partner && g.day.partner.b != null && !(Number.isInteger(g.day.partner.b) && g.day.partner.b >= 0 && g.day.partner.b < D.boulders.length)) delete g.day.partner.b;
@@ -3278,6 +3382,7 @@
     if (!window.Art) await loadScript("art.js");
     if (!window.World) await loadScript("world.js");
     if (!window.Know) await loadScript("knowledge.js");
+    if (!window.Social) await loadScript("social.js");
     if (!window.Travel) await loadScript("travel.js");
     if (!window.Scene) await loadScript("scene.js").catch(() => {});        // without it, Try climbs from the panel
     D = await fetch("game-data.json" + ASSET_V).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });

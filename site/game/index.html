@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=45">
+<link rel="stylesheet" href="scene.css?v=46">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -472,6 +472,10 @@ svg#map:active { cursor: grabbing; }
 .me-layer { position: absolute; left: 0; top: 0; overflow: hidden; pointer-events: none; will-change: transform; }
 .me-ghost { opacity: .4; }
 .people .person { cursor: pointer; }
+/* a name over the head of someone you've met, on hover or after a tap (Phase 4, Stage 1) */
+.people .person-tag-g { display: none; }
+.people .person:hover .person-tag-g, .people .person.tagged .person-tag-g { display: inline; }
+.people .person-tag { font: 800 11.5px var(--body); letter-spacing: .02em; text-anchor: middle; fill: #3b3226; paint-order: stroke; stroke: #fbf4e2; stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
 .lm-dog { display: none; }                 /* Pickles is drawn with the people instead */
 .dog-tail { fill: none; stroke: #34322e; stroke-width: .6px; vector-effect: non-scaling-stroke; }
 .people .person-pad, .people .person-pad-side { stroke: #2a2420; stroke-width: .5px; vector-effect: non-scaling-stroke; }
@@ -991,6 +995,9 @@ tr.lb-me td { background: var(--gold-soft); }
   .paper-svg .pp-area .pp-area-sub { font: 600 13px var(--hand); text-anchor: middle; fill: #8a3b26; paint-order: stroke; stroke: #f3e9cf; stroke-width: 3px; stroke-linejoin: round; }
   .pp-area.here .pp-area-name { fill: #a9442c; }
   .pp-view rect { fill: none; stroke: #3b3226; stroke-width: 1.1; stroke-dasharray: 5 3; stroke-opacity: .7; }
+  .pp-person { cursor: pointer; }
+  .paper-svg .pp-name { font: 700 15px var(--hand); fill: #3b3226; paint-order: stroke; stroke: #f3e9cf; stroke-width: 3px; stroke-linejoin: round; }
+  .pp-person:hover circle + circle, .pp-person:focus-visible circle + circle { stroke: #a9442c; stroke-width: 2px; }
   .paper-svg .pp-you { font: 700 17px var(--hand); fill: #a9442c; paint-order: stroke; stroke: #f3e9cf; stroke-width: 3px; }
   @media (max-width: 760px) { .paper-sheet { grid-template-columns: 1fr; } .paper-side { border-left: 0; border-top: 1px solid rgba(74,63,48,.25); max-height: 40vh; } .paper-map { height: auto; width: calc(100vw - 36px); max-width: none; } }
 </style>
@@ -1055,13 +1062,14 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=45"></script>
-<script src="art.js?v=45"></script>
-<script src="world.js?v=45"></script>
-<script src="knowledge.js?v=45"></script>
-<script src="illustrate.js?v=45"></script>
-<script src="paint.js?v=45"></script>
-<script src="paper.js?v=45"></script>
-<script src="travel.js?v=45"></script>
-<script src="scene.js?v=45"></script>
-<script src="game.js?v=45"></script>
+<script src="mechanics.js?v=46"></script>
+<script src="art.js?v=46"></script>
+<script src="world.js?v=46"></script>
+<script src="knowledge.js?v=46"></script>
+<script src="social.js?v=46"></script>
+<script src="illustrate.js?v=46"></script>
+<script src="paint.js?v=46"></script>
+<script src="paper.js?v=46"></script>
+<script src="travel.js?v=46"></script>
+<script src="scene.js?v=46"></script>
+<script src="game.js?v=46"></script>

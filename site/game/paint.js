@@ -1506,7 +1506,29 @@
       far.selectAll("g.far-rock").classed("hot", function () { return +this.dataset.id === ui.hover; }).classed("picked", function () { return +this.dataset.id === ui.picked; });
     }
     const rockAt = e => { const el = e.target.closest && e.target.closest("g.boulder, g.far-rock"); return el ? +el.dataset.id : null; };
+    const personOf = e => (e.target.closest && e.target.closest("g.person")) || null;
+    let tipTimer = null;
+    function placeTip(e) {
+      const r = wrap.getBoundingClientRect();
+      let x = e.clientX - r.left + 14, y = e.clientY - r.top + 14;
+      if (x + tip.offsetWidth > r.width - 8) x -= tip.offsetWidth + 28;
+      if (y + tip.offsetHeight > r.height - 8) y -= tip.offsetHeight + 28;
+      x = Math.max(8, Math.min(x, r.width - tip.offsetWidth - 8)); y = Math.max(8, y);
+      tip.style.left = x + "px"; tip.style.top = y + "px";
+    }
+    function personTip(e, who) {
+      const html = opts.personTipHtml && opts.personTipHtml(who);
+      if (!tip || !html) return false;
+      clearTimeout(tipTimer);
+      tip.innerHTML = html; tip.hidden = false; placeTip(e);
+      return true;
+    }
     svg.on("pointermove.rock", e => {
+      const per = personOf(e);
+      if (per && e.pointerType !== "touch" && personTip(e, per.dataset.who)) {
+        if (ui.hover != null) { ui.hover = null; markBoulders(); placeLabels(); }
+        return;
+      }
       const id = rockAt(e);
       if (id !== ui.hover) { ui.hover = id; markBoulders(); placeLabels(); }
       // Which area you're over: its label shows its grades and walk.
@@ -1521,15 +1543,20 @@
       tip.innerHTML = opts.tipHtml ? opts.tipHtml(b) : `<strong>${esc(b.name)}</strong><div class="sub">${esc(b.sector)} · ${b.height_ft} ft · ${esc(b.angle)}</div>
         ${b.desc ? `<div class="tip-desc">${esc(b.desc)}</div>` : ""}${b.problems.length} problems, V${g[0]}${g[1] > g[0] ? "–V" + g[1] : ""}`;
       tip.hidden = false;
-      const r = wrap.getBoundingClientRect();
-      let x = e.clientX - r.left + 14, y = e.clientY - r.top + 14;
-      if (x + tip.offsetWidth > r.width - 8) x -= tip.offsetWidth + 28;
-      if (y + tip.offsetHeight > r.height - 8) y -= tip.offsetHeight + 28;
-      tip.style.left = x + "px"; tip.style.top = y + "px";
+      placeTip(e);
     }).on("pointerleave.rock", () => { ui.hover = null; ui.hotSector = null; markBoulders(); labelSel.classed("zone-hot", false); placeLabels(); if (tip) tip.hidden = true; })
       .on("click.rock", e => {
         const who = e.target.closest && e.target.closest("g.person");
-        if (who && opts.onPerson) { if (tip) tip.hidden = true; return opts.onPerson(who.dataset.who); }
+        if (who && opts.onPerson) {
+          // On a touch screen there's no hover: a tap shows who it is for a moment, and walks you over.
+          if (e.pointerType === "touch" || e.pointerType === "pen") {
+            people.selectAll("g.person").classed("tagged", false); who.classList.add("tagged");
+            personTip(e, who.dataset.who);
+            tipTimer = setTimeout(() => { tip.hidden = true; who.classList.remove("tagged"); }, 2600);
+          }
+          else if (tip) tip.hidden = true;
+          return opts.onPerson(who.dataset.who);
+        }
         const id = rockAt(e);
         if (id == null) {
           const [gx, gy] = d3.pointer(e);
@@ -1875,6 +1902,9 @@
       people.selectAll("g.person").each(function () {
         const n = this, z = k * (+n.dataset.size || 1), f = +n.dataset.facing;
         d3.select(n).select(".person-fig").attr("transform", `scale(${f2(z * (f > 0 ? -1 : 1))},${f2(z)})`);
+        // The name tag: above their head, at the same size on screen on any device (11.5px).
+        const tg = d3.select(n).select(".person-tag-g");
+        if (!tg.empty()) tg.attr("transform", `translate(0,${f2(-(+tg.attr("data-ty")) * z)}) scale(${f2(1 / T.k)})`);
         d3.select(n).select(".me-shadow").attr("rx", f2(z * 7.5)).attr("ry", f2(z * 2.4));
         d3.select(n).select(".person-pads").attr("transform", `translate(${f2(-f * z * 5)},0)`);
       });
@@ -1917,8 +1947,15 @@
         g.append("ellipse").attr("class", "me-shadow");
         const fig = g.append("g").attr("class", "person-fig");
         poseStill(drawSide(fig, { skin: "#e6bf98", hair: "#4a3426", pants: "#3f4f63", pad: "#2f6b8f", ...p.look }));
+        nameTag(g, p.tag, -38);
       }
       peopleK = null; sizePeople();
+    }
+    // A name over the head of someone you know (Phase 4, Stage 1), shown on hover or for
+    // a moment after a tap; the same size on screen at any zoom (sizePeople scales it).
+    function nameTag(g, tag, y) {
+      if (!tag) return;
+      g.append("g").attr("class", "person-tag-g").attr("data-ty", -y).append("text").attr("class", "person-tag").attr("y", -3).text(tag);
     }
     // Pickles, curled up asleep by Pickles' Rock: the landmark's drawing, but drawn
     // with the people so he's dog-sized beside you at any zoom (about half your
@@ -1929,6 +1966,7 @@
       const g = people.append("g").attr("class", "person person-dog").attr("data-who", p.who).attr("data-facing", -1).attr("data-size", 1).attr("transform", `translate(${f2(lm.x)},${f2(-lm.y)})`);
       g.append("title").text(p.name);
       const d = g.append("g").attr("class", "person-fig").append("g").attr("transform", "scale(11)");
+      nameTag(g, p.tag, -11);
       d.append("path").attr("class", "dog-shadow").attr("d", ell(.1, .05, .8, .24));
       d.append("path").attr("class", "dog").attr("d", "M-.7,0C-.75,-.35 -.4,-.55 0,-.55C.42,-.55 .7,-.4 .72,-.15C.74,0 .55,.05 .4,.05H-.5C-.62,.05 -.7,.03 -.7,0Z");
       d.append("path").attr("class", "dog").attr("d", "M.45,-.12C.45,-.38 .62,-.48 .82,-.45C1,-.42 1.05,-.25 1,-.1C.95,0 .6,.02 .45,-.12Z");

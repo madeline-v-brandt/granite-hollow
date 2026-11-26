@@ -9,6 +9,8 @@
 //   map.open({ areas, me, view, onPick, onGo, onClose });   map.close();   map.isOpen()
 //     areas  the climbing areas to mark: [{ name, state: 1 known | 2 visited, sub }]
 //     me     where you are [x, y]; view: the world view's box [x0, y0, x1, y1]
+//     people the regulars you know who are out now, in areas you know (Phase 4,
+//            Stage 1): [{ who, name, x, y, color, where }], pencilled onto the map
 //     onPick({ x, y, sector })   called when an area or a spot is picked
 //
 // It's drawn once, the first time it opens (a static SVG, so it costs nothing
@@ -149,6 +151,7 @@
       // What changes with each opening sits on top.
       svg.append("g").attr("class", "pp-areas");
       svg.append("g").attr("class", "pp-view").attr("pointer-events", "none");
+      svg.append("g").attr("class", "pp-people");
       svg.append("g").attr("class", "pp-me").attr("pointer-events", "none");
       // A click on the map (not on an area) looks at that spot.
       svg.on("click", e => {
@@ -197,6 +200,41 @@
         const [a0, b0] = px(s.view[0], s.view[3]), [a1, b1] = px(s.view[2], s.view[1]);
         vg.append("rect").attr("x", a0).attr("y", b0).attr("width", Math.max(4, a1 - a0)).attr("height", Math.max(4, b1 - b0)).attr("rx", 3);
       }
+      // The regulars you know who are out: a dot in their colours and their name, pencilled in.
+      const pg = svg.select(".pp-people"); pg.selectAll("*").remove();
+      // People close together on the sheet share one label ("Bea, Gus, Otis"); each
+      // label goes where it covers no printed name, no dot and not "You are here".
+      const placed = [];
+      svg.selectAll("text").each(function () { if (this.closest(".pp-people")) return; const b = this.getBBox(); if (b.width) placed.push([b.x, b.y, b.x + b.width, b.y + b.height]); });
+      if (s.me) { const [u, v] = px(s.me[0], s.me[1]); placed.push([u - 9, v - 9, u + 9, v + 9]); }
+      const groups = [];
+      for (const p of s.people || []) {
+        let [u, v] = px(p.x, p.y);
+        const near = groups.find(gr => gr.some(q => Math.hypot(q.u - u, q.v - v) < 18));
+        const all = groups.flat();
+        for (let k = 0; k < 8 && all.some(q => Math.hypot(u - q.u, v - q.v) < 8); k++) { u += 7 * Math.cos(k * 2.1); v += 7 * Math.sin(k * 2.1); }
+        const it = { p, u, v };
+        if (near) near.push(it); else groups.push([it]);
+      }
+      for (const it of groups.flat()) placed.push([it.u - 5, it.v - 5, it.u + 5, it.v + 5]);
+      for (const gr of groups) {
+        for (const { p, u, v } of gr) {
+          const g = pg.append("g").attr("class", "pp-person").attr("transform", `translate(${f1(u)},${f1(v)})`)
+            .attr("tabindex", 0).attr("role", "button").attr("aria-label", `${p.name}, ${p.where}. Look there in the world.`);
+          g.append("circle").attr("r", 7).attr("fill", "#fff8e6").attr("fill-opacity", .8);
+          g.append("circle").attr("r", 4).attr("fill", p.color || "#6b5a45").attr("stroke", "#4a3f30").attr("stroke-width", 1);
+          const go = () => pick({ x: p.x, y: p.y });
+          g.on("click", e => { e.stopPropagation(); go(); }).on("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+        }
+        const text = gr.map(x => x.p.name).join(", "), w = 6.4 * text.length + 4;
+        const cu = d3.mean(gr, x => x.u), cv = d3.mean(gr, x => x.v), r = d3.max(gr, x => Math.hypot(x.u - cu, x.v - cv)) + 7;
+        const spots = [[r, 4, "start"], [-r, 4, "end"], [0, -r - 2, "middle"], [0, r + 12, "middle"], [r, -r, "start"], [r, r + 10, "start"], [-r, -r, "end"], [-r, r + 10, "end"],
+          [r + 14, -r - 14, "start"], [-r - 14, -r - 14, "end"], [r + 14, r + 22, "start"], [-r - 14, r + 22, "end"]];
+        const box = sp => { const x0 = sp[2] === "end" ? cu + sp[0] - w : sp[2] === "middle" ? cu - w / 2 : cu + sp[0]; return [x0, cv + sp[1] - 12, x0 + w, cv + sp[1] + 3]; };
+        const at = spots.find(sp => { const b = box(sp); return !placed.some(q => b[0] < q[2] && b[2] > q[0] && b[1] < q[3] && b[3] > q[1]); }) || spots[0];
+        placed.push(box(at));
+        pg.append("text").attr("class", "pp-name").attr("x", f1(cu + at[0])).attr("y", f1(cv + at[1])).attr("text-anchor", at[2]).attr("pointer-events", "none").text(text);
+      }
       const me = svg.select(".pp-me"); me.selectAll("*").remove();
       if (s.me) {
         const [u, v] = px(s.me[0], s.me[1]);
@@ -219,6 +257,7 @@
           <span><svg width="26" height="14"><ellipse cx="13" cy="7" rx="11" ry="6" fill="url(#pp-climb)" stroke="#b5462e" stroke-dasharray="2 2"/></svg>Climbing area</span>
           <span><svg width="26" height="14"><circle cx="13" cy="7" r="4.5" fill="#c0392b" stroke="#4a3f30"/></svg>You are here</span>
         </div>
+        ${(s.people || []).length ? `<h3>Out now</h3><ul class="pp-list">${s.people.map((p, k) => `<li><button type="button" data-pp-person="${k}"><b>${esc(p.name)}</b><span>${esc(p.where)}</span></button></li>`).join("")}</ul>` : ""}
         <h3>Climbing areas</h3>
         <ul class="pp-list">${known.map(a => `<li><button type="button" data-pp-area="${esc(a.name)}" class="${s.here === a.name ? "here" : ""}"><b>${esc(a.name)}</b><span>${esc(a.sub || "")}</span></button>${s.onGo && s.here !== a.name ? `<button type="button" class="pp-go" data-pp-go="${esc(a.name)}" aria-label="Walk to ${esc(a.name)}">Walk</button>` : ""}</li>`).join("") || `<li class="pp-none">None yet.</li>`}</ul>
         ${s.footnote ? `<p class="pp-foot">${esc(s.footnote)}</p>` : ""}
@@ -226,6 +265,7 @@
         <button type="button" class="pp-x" data-pp-close aria-label="Fold up the trail map (M or Esc)" title="Fold it up (M)">×</button>`);
       side.selectAll("[data-pp-area]").on("click", function () { const sec = D.sectors.find(x => x.name === this.dataset.ppArea); pick({ x: sec.x, y: sec.y, sector: sec.name }); });
       side.selectAll("[data-pp-close]").on("click", close);
+      side.selectAll("[data-pp-person]").on("click", function () { const p = s.people[+this.dataset.ppPerson]; if (p) pick({ x: p.x, y: p.y }); });
       side.selectAll("[data-pp-go]").on("click", function () { const cb = state && state.onGo, name = this.dataset.ppGo; close(); if (cb) cb(name); });
     }
     function pick(where) { const cb = state && state.onPick; close(); if (cb) cb(where); }
@@ -233,9 +273,9 @@
     function open(s) {
       state = s;
       if (!built) build();
+      back.attr("hidden", null); isOpen = true;              // visible first: drawState measures the printed names
       drawState();
       lastFocus = document.activeElement;
-      back.attr("hidden", null); isOpen = true;
       document.addEventListener("keydown", onKey);
       const first = side.select("[data-pp-area]").node() || side.select("[data-pp-close]").node(); if (first) first.focus();
     }

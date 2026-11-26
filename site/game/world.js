@@ -184,7 +184,9 @@
     const notebook = NOTEBOOK.map(n => ({ ...n, p: find(n.boulder, n.name) })).filter(n => n.p != null);
     const legends = new Map();
     for (const l of LEGENDS) { const p = find(l.boulder, l.name); if (p != null) legends.set(p, l.text); }
-    c = { sectorOf, notebook, notebookSet: new Set(notebook.map(n => n.p)), legends, tags: D.problems.map(tagsOf),
+    const boulderIdsOf = new Map();
+    D.boulders.forEach((b, i) => { if (!boulderIdsOf.has(b.sector)) boulderIdsOf.set(b.sector, []); boulderIdsOf.get(b.sector).push(i); });
+    c = { sectorOf, notebook, notebookSet: new Set(notebook.map(n => n.p)), legends, tags: D.problems.map(tagsOf), boulderIdsOf,
       walkOf: D.boulders.map(b => (sectorOf.get(b.sector) || { walk_min: 30 }).walk_min) };
     dataCache.set(D, c);
     return c;
@@ -209,7 +211,7 @@
     return { by: "you", date: REOPENED, grade: D.problems[p].grade, reps: 0, rs: 0, rn: 0, logs: [], ...extra };
   }
   function create(D, seed, simDate = BEFORE) {
-    const W = { seed, simDate, est: {}, found: [], npc: {}, hold: {}, news: [], snipe: { last: null } };
+    const W = { seed, simDate, est: {}, found: [], npc: {}, hold: {}, news: [], snipe: { last: null }, reg: {} };
     for (const n of dataOf(D).notebook) W.est[n.p] = blankEst(D, n.p, { by: n.by, date: REOPENED, old: n.year });
     W.found = D.boulders.map((b, i) => [b, i]).filter(([b]) => b.sector === "The Tailgate").map(([, i]) => i);
     return W;
@@ -247,7 +249,207 @@
     if (W.est[p]) return false;
     W.est[p] = blankEst(D, p, { by: who, date, ...extra });
     if (W.npc[who]) W.npc[who].fas++;
+    regSent(W, who, p);
     return true;
+  }
+
+  // ---- the regulars' lives (Phase 4, Stage 0) ---------------------------------------
+  // The regulars who climb have a routine (which days they come, and when), a
+  // project they work over several sessions until they send it or move on, and a
+  // session on each day they're out: where they were, what they warmed up on, how
+  // the project went. Simulated a day at a time with the rest of the community, from
+  // each regular's own stream (reg|who|date), so nobody's day moves anyone else's
+  // and the community's first ascents keep their pace (a project that's an
+  // unclimbed line goes up out of the day's first-ascent budget).
+  //   G.world.reg[who] = { proj, sent, recent, done }
+  //     proj    { p, since, n (sessions on it), best (how far up, 0–1) }, or null
+  //     sent    every line they've climbed: their first ascents and repeats
+  //     recent  their latest sessions, newest first: { d, b, out, p, hi, w, t }
+  //             out "send" | "close" | "fell" | "mileage" | "wet"; p the project tried
+  //             (or null); hi how far up it they got; w the lines they warmed up on;
+  //             t [from, to] the minutes of the day they're around
+  //     done    finished projects, newest first: [p, since, date, sessions, "sent" | "left"]
+  // Written only here. Old saves get it filled in from the ledger on load (ensureReg).
+  const REG = ["n:gus", ...CLIMBING_REGULARS];
+  const dow = d => toDate(d).getUTCDay();                                 // 0 Sunday … 6 Saturday
+  const schoolDay = d => { const md = d.slice(5); return md < "06-20" || md > "09-01"; };
+  const weekend = d => dow(d) % 6 === 0;
+  // Who comes when: the chance they're out that day, and the hours they're around.
+  const ROUTINES = {
+    gus: () => ({ p: 0.6, t: [450, 1140] }),                                           // the ranger: most days, near the lot, till the gate shuts
+    hollis: d => ({ p: [0.3, 0.2, 0.5, 0.6, 0.5, 0.3, 0.6][dow(d)], t: [540, 1080] }),  // midweek and Saturdays, binder in hand
+    otis: () => ({ p: 0.5, t: [510, 1140], rain: true }),                              // every day is perfect sending weather, even wet ones
+    rowan: d => (dow(d) <= 1 ? { p: 0.85, t: [510, 1140] }                             // the library's shut Sunday and Monday
+      : dow(d) % 2 === 0 ? { p: 0.65, t: [780, 1170] } : { p: 0.65, t: [420, 780] }),  // other days, before or after a half-day shift
+    bea: d => (!schoolDay(d) ? { p: 0.75, t: [570, 1170] } : weekend(d) ? { p: 0.8, t: [540, 1170] } : { p: 0.3, t: [900, 1170] }),   // weekends and after school; all summer
+    dez: d => (weekend(d) ? { p: 0.55, t: [390, 1110] } : { p: 0.5, t: [360, 810] }),  // early mornings; longer at weekends
+  };
+  // Grades a year they get stronger by (for two years), on top of NAMED's level.
+  const GROWTH = { gus: 0.2, hollis: 0.4, otis: 0.3, rowan: 1.2, bea: 1.5, dez: 0.4 };
+  const RP = {
+    window: [-0.8, 1.0],      // a project is within this many grades of their level
+    sendAt: 0.12,             // the chance of sending a project at their level, per session…
+    perGrade: 1.1,            // …falling by e^-1.1 a grade harder…
+    learn: 0.15, learnMax: 12, // …and rising 15% a session they've spent on it (up to 12)
+    giveUp: 20, giveUpStuck: 12,   // sessions before they move on (sooner if they can't have it: a line you've found)
+    wetOut: 0.5,              // on a wet day, fewer come (they walk, talk, don't climb)
+    recent: 30, done: 30, warmMax: 3,
+  };
+  const levelOn = (w, d) => { const k = w.slice(2), n = NAMED[k]; return (n.level || 0) + (GROWTH[k] || 0) * Math.min(2, Math.max(0, daysBetween(REOPENED, d)) / 365); };
+  function regSent(W, who, p) {
+    const R = W.reg && W.reg[who];
+    if (R && !R.sent.includes(p)) R.sent.push(+p);
+  }
+  // A regular's record, from the ledger (their first ascents and logged repeats).
+  function regFromLedger(W, who) {
+    const sent = [];
+    for (const [p, e] of Object.entries(W.est)) if (e.by === who || e.logs.some(l => l[0] === who)) sent.push(+p);
+    return { proj: null, sent, recent: [], done: [] };
+  }
+  const regOf = (G, w) => (G.world && G.world.reg && G.world.reg[w]) || null;
+  // Their session on a day (it's among the latest few), or null if they weren't out.
+  const sessionOn = (G, w, d) => { const R = regOf(G, w); return (R && R.recent.find(s => s.d === d)) || null; };
+  // A repeat by a regular: the ledger's repeat, logged once per climber.
+  function regRepeat(D, W, p, who, d, r) {
+    const e = W.est[p], pr = D.problems[p];
+    if (!e || e.by === who || e.date > d) return;
+    const R = W.reg[who], first = !R.sent.includes(p);
+    regSent(W, who, p);
+    if (!first) return;
+    e.reps++;
+    let stars = null;
+    if (r() < PARAMS.repeats.rateChance) { stars = Math.max(0, Math.min(4, Math.round((pr.stars ?? 2.3) + (r() - 0.5) * 1.6))); e.rs += stars; e.rn++; }
+    const sugg = r() < 0.25 ? Math.max(0, pr.grade + (r() < 0.5 ? -1 : 1)) : null;
+    e.logs.unshift([who, d, levelOn(who, d) - pr.grade > 2 && r() < 0.5 ? "F" : "S", stars, sugg]);
+    if (e.logs.length > PARAMS.logsCap) e.logs.length = PARAMS.logsCap;
+    const C = PARAMS.classic;
+    if (!e.classic && e.reps >= C.reps && e.rn && e.rs / e.rn >= C.stars) { e.classic = d; news(W, { date: d, kind: "classic", p }); }
+  }
+  // Lines on boulders the community knows, in one area.
+  function linesIn(D, W, area, foundSet) {
+    const out = [];
+    for (const b of dataOf(D).boulderIdsOf.get(area) || []) if (foundSet.has(b)) for (const p of D.boulders[b].problems) out.push(p);
+    return out;
+  }
+  // Pick a project: a line near their limit, in their style, in one of their areas.
+  // An unclimbed line only if you haven't found it (it's yours to find otherwise).
+  function pickProject(D, G, w, d, r, ctx, foundSet, taken) {
+    const W = G.world, n = NAMED[w.slice(2)], L = levelOn(w, d), R = W.reg[w], tags = dataOf(D).tags;
+    const ok = (p, lo) => { const g = D.problems[p].grade, e = W.est[p];
+      if (g < L + lo || g > L + RP.window[1] || R.sent.includes(p) || taken.has(p)) return false;
+      return e ? e.date <= d && e.by !== w : !protectedLine(G, p, ctx); };
+    // Their own areas first; once they've done everything there, anywhere the community climbs.
+    const home = n.home.filter(a => dataOf(D).boulderIdsOf.has(a)), anywhere = [...dataOf(D).boulderIdsOf.keys()];
+    for (const [areas, lo] of [[home, RP.window[0]], [home, -2], [anywhere, RP.window[0]]]) {
+      const cand = areas.flatMap(a => linesIn(D, W, a, foundSet)).filter(p => ok(p, lo));
+      const k = pickWeighted(r, cand, p => { const q = quality(D.problems[p]), shared = tags[p].filter(t => n.likes.includes(t)).length; return q * q * (1 + 0.4 * shared) * (W.est[p] ? 1 : 1.5); });
+      if (k >= 0) return { p: cand[k], since: d, n: 0, best: 0 };
+    }
+    return null;
+  }
+  // One day of the regulars' lives. Sends of unclimbed projects are returned as
+  // wishes; stepDay grants them out of the day's first-ascent budget.
+  function regDay(D, G, d, ctx, wet) {
+    const W = G.world, foundSet = new Set(W.found), wishes = [], events = [];
+    const taken = new Set(REG.map(w => W.reg[w] && W.reg[w].proj && W.reg[w].proj.p).filter(p => p != null));
+    for (const w of REG) {
+      if (!W.npc[w]) continue;
+      const R = W.reg[w] || (W.reg[w] = regFromLedger(W, w));
+      if (R.recent.some(s => s.d === d)) continue;                       // already simulated (on load)
+      const key = w.slice(2), r = stream(W.seed, "reg|" + w + "|" + d), rt = ROUTINES[key](d), n = NAMED[key];
+      const out = r(), pa = r(), pb = r();                                // always drawn, in this order
+      if (out >= rt.p * (wet && !rt.rain ? RP.wetOut : 1)) continue;
+      const L = levelOn(w, d);
+      // A project they've finished some other way (a repeat), or one someone else climbed first: either is fine.
+      if (R.proj && R.sent.includes(R.proj.p)) { R.done.unshift([R.proj.p, R.proj.since, d, R.proj.n, "sent"]); R.proj = null; }
+      const area = n.home[Math.floor(pa * n.home.length)];
+      const homeB = (dataOf(D).boulderIdsOf.get(area) || []).filter(b => foundSet.has(b));
+      const anyB = homeB.length ? homeB : dataOf(D).boulderIdsOf.get(area) || [0];
+      const s = { d, b: anyB[Math.floor(pb * anyB.length)], out: "mileage", p: null, hi: 0, w: [], t: rt.t };
+      if (wet) s.out = "wet";
+      else {
+        if (!R.proj && d >= REOPENED) { R.proj = pickProject(D, G, w, d, r, ctx, foundSet, taken); if (R.proj) taken.add(R.proj.p); }
+        const projArea = R.proj ? D.boulders[D.problems[R.proj.p].b].sector : area;
+        // Warm-ups: established lines well within them, in the area they're climbing in.
+        const easy = linesIn(D, W, projArea, foundSet).filter(p => W.est[p] && W.est[p].date <= d && W.est[p].by !== w && D.problems[p].grade <= L - 1);
+        for (let k = 0, nW = 1 + Math.floor(r() * RP.warmMax); k < nW && easy.length; k++) {
+          const j = pickWeighted(r, easy, p => quality(D.problems[p]) * (R.sent.includes(p) ? 1 : 4));
+          if (j < 0) break;
+          const p = easy.splice(j, 1)[0]; s.w.push(p); regRepeat(D, W, p, w, d, r);
+        }
+        if (R.proj) {
+          const P = R.proj, pr = D.problems[P.p], gap = pr.grade - L;
+          P.n++; s.p = P.p; s.b = pr.b;
+          const chance = Math.min(0.6, RP.sendAt * Math.exp(-RP.perGrade * gap) * (1 + RP.learn * Math.min(RP.learnMax, P.n - 1)));
+          const go = r() < chance, how = r();
+          const open = !W.est[P.p], stuck = open && protectedLine(G, P.p, ctx);
+          if (go && !stuck) {
+            if (open) wishes.push({ w, s, P });                              // stepDay decides whether it goes today
+            else { regRepeat(D, W, P.p, w, d, r); finishProject(W, w, P, d, events); s.out = "send"; s.hi = 1; }
+          } else {
+            P.best = Math.min(0.95, Math.max(P.best, P.best + how * 0.25, how * 0.6));
+            s.hi = Math.round(P.best * 100) / 100; s.out = P.best >= 0.85 ? "close" : "fell";
+            if (P.n >= (stuck ? RP.giveUpStuck : RP.giveUp)) { R.done.unshift([P.p, P.since, d, P.n, "left"]); R.proj = null; }
+          }
+        }
+      }
+      R.recent.unshift(s); if (R.recent.length > RP.recent) R.recent.length = RP.recent;
+      if (R.done.length > RP.done) R.done.length = RP.done;
+    }
+    return { wishes, events };
+  }
+  function finishProject(W, w, P, d, events) {
+    const R = W.reg[w];
+    R.done.unshift([P.p, P.since, d, P.n, "sent"]); R.proj = null;
+    if (P.n >= 3) { const it = { date: d, kind: "proj", p: P.p, by: w, n: P.n, since: P.since }; news(W, it); events.push(it); }
+  }
+  // Grant the day's project first ascents, at most `budget` of them. Returns how many went.
+  function grantWishes(D, G, d, wishes, budget, events, ctx) {
+    let used = 0;
+    for (const { w, s, P } of wishes) {
+      if (used < budget && !G.world.est[P.p] && !protectedLine(G, P.p, ctx)) {
+        establish(D, G.world, P.p, w, d);
+        const it = { date: d, kind: "fa", p: P.p, by: w, ...(P.n >= 2 ? { proj: P.n, since: P.since } : {}) }; news(G.world, it); events.push(it);
+        G.world.reg[w].done.unshift([P.p, P.since, d, P.n, "sent"]); G.world.reg[w].proj = null;
+        s.out = "send"; s.hi = 1; used++;
+      } else {                                                           // so close
+        P.best = Math.max(P.best, 0.9); s.hi = P.best; s.out = "close";
+        const R = G.world.reg[w], stuck = protectedLine(G, P.p, ctx);
+        if (R.proj === P && P.n >= (stuck ? RP.giveUpStuck : RP.giveUp)) { R.done.unshift([P.p, P.since, d, P.n, "left"]); R.proj = null; }
+      }
+    }
+    return used;
+  }
+  // Old saves: the regulars' records from the ledger, and today's sessions (no first
+  // ascents in them: today's community day has already been simulated). A record
+  // that doesn't check out is rebuilt.
+  function ensureReg(D, G, today) {
+    const W = G.world;
+    if (!W || !W.est) return;
+    if (W.reg != null && validateReg(D, W.reg)) delete W.reg;
+    const fresh = !W.reg;
+    W.reg = W.reg || {};
+    for (const w of REG) if (W.npc[w] && !W.reg[w]) W.reg[w] = regFromLedger(W, w);
+    if (fresh && isDay(W.simDate) && W.simDate >= REOPENED) {
+      const wet = !!(today && today.date === W.simDate && today.wet);
+      const { wishes } = regDay(D, G, W.simDate, { protect: null }, wet);
+      grantWishes(D, G, W.simDate, wishes, 0, [], {});
+    }
+  }
+  function validateReg(D, reg) {
+    const nP = D.problems.length, nB = D.boulders.length, num = x => typeof x === "number" && isFinite(x);
+    const P = x => Number.isInteger(x) && x >= 0 && x < nP;
+    if (!reg || typeof reg !== "object" || Array.isArray(reg)) return "bad regulars";
+    for (const [w, R] of Object.entries(reg)) {
+      if (!REG.includes(w) || !R || typeof R !== "object") return "bad regular";
+      if (R.proj != null && !(typeof R.proj === "object" && P(R.proj.p) && isDay(R.proj.since) && num(R.proj.n) && num(R.proj.best))) return "bad project";
+      if (!Array.isArray(R.sent) || R.sent.length > 5000 || !R.sent.every(P)) return "bad sends";
+      if (!Array.isArray(R.recent) || R.recent.length > 60 || !R.recent.every(s => s && isDay(s.d) && Number.isInteger(s.b) && s.b >= 0 && s.b < nB
+        && ["send", "close", "fell", "mileage", "wet"].includes(s.out) && (s.p == null || P(s.p)) && num(s.hi) && Array.isArray(s.w) && s.w.length <= 6 && s.w.every(P)
+        && Array.isArray(s.t) && s.t.length === 2 && s.t.every(num))) return "bad sessions";
+      if (!Array.isArray(R.done) || R.done.length > 60 || !R.done.every(x => Array.isArray(x) && x.length === 5 && P(x[0]) && isDay(x[1]) && isDay(x[2]) && num(x[3]) && ["sent", "left"].includes(x[4]))) return "bad projects";
+    }
+    return null;
   }
 
   function stepDay(D, G, d, ctx) {
@@ -302,6 +504,11 @@
     }
 
     const wet = ctx.today && ctx.today.date === d ? !!ctx.today.wet : r() >= P.dryDays;
+    // The regulars' day (their own streams): sessions, warm-ups, projects.
+    const reg = regDay(D, G, d, ctx, wet);
+    events.push(...reg.events);
+    const regProj = new Set(REG.map(w => W.reg[w] && W.reg[w].proj && W.reg[w].proj.p).filter(p => p != null));
+    if (wet || d < P.faFrom) grantWishes(D, G, d, reg.wishes, 0, events, ctx);
     if (!wet && d >= P.faFrom) {
       // First ascents, towards the development target.
       const A = ctx.ability, NB = P.nextBand;
@@ -314,11 +521,14 @@
         return w;
       };
       const open = [], climbedIn = new Set(Object.keys(W.est).map(k => D.boulders[D.problems[k].b].sector));
-      for (const b of found) for (const p of D.boulders[b].problems) if (!W.est[p] && !protectedLine(G, p, ctx)) open.push(p);
+      for (const b of found) for (const p of D.boulders[b].problems) if (!W.est[p] && !protectedLine(G, p, ctx) && !regProj.has(p)) open.push(p);
       const target = D.problems.length * P.target.max * (1 - Math.exp(-clock / P.target.tau));
       let nFa = Math.min(P.maxFasPerDay, active.length * P.fasPerNpc, Math.max(0, target - estN) * P.closeRate);
       if (open.length) nFa = Math.max(nFa, P.trickle);
       nFa = Math.floor(nFa) + (r() < nFa % 1 ? 1 : 0);
+      // A regular's project, finally: out of the day's budget, or one beyond it (late in
+      // the season, when the budget's a trickle, projects still go down).
+      nFa = Math.max(0, nFa - grantWishes(D, G, d, reg.wishes, nFa + 1, events, ctx));
       for (let tries = 0; nFa > 0 && open.length && tries < nFa * 4; tries++) {
         const k = pickWeighted(r, open, p => lineWeight(p));
         if (k < 0) break;
@@ -368,6 +578,7 @@
           if (r() < RP.rateChance) { stars = Math.max(0, Math.min(4, Math.round((pr.stars ?? 2.3) + (r() - 0.5) * 1.6))); e.rs += stars; e.rn++; }
           const sugg = r() < 0.25 ? Math.max(0, pr.grade + (r() < 0.5 ? -1 : 1)) : null;
           e.logs.unshift([who, d, info.level - pr.grade > 2 && r() < 0.5 ? "F" : "S", stars, sugg]);
+          regSent(W, who, p);
           if (e.logs.length > P.logsCap) e.logs.length = P.logsCap;
           if (!e.classic && e.reps >= P.classic.reps && e.rn && e.rs / e.rn >= P.classic.stars) { e.classic = d; const it = { date: d, kind: "classic", p }; news(W, it); events.push(it); }
         }
@@ -380,6 +591,7 @@
   function step(D, G, upTo, opts = {}) {
     const W = G.world;
     if (!W || !isDay(upTo)) return [];
+    W.reg = W.reg || {};
     const ctx = {
       dayNoAt: opts.dayNoAt || (() => G.dayNo || 0),
       ability: Mech ? (Mech.levelOf ? Mech.ability(G.player) : Mech.ability(G.player.xp)) : 0,
@@ -493,6 +705,7 @@
     if (!Array.isArray(W.news) || W.news.length > 400) return "bad news";
     if (!W.snipe || !(W.snipe.last == null || num(W.snipe.last))) return "bad snipe";
     if (!W.hold || typeof W.hold !== "object") return "bad hold";
+    if (W.reg != null && validateReg(D, W.reg)) return validateReg(D, W.reg);
     if (W.areas != null && (typeof W.areas !== "object" || !Object.values(W.areas).every(a => Array.isArray(a) && isDay(a[0]) && num(a[1])))) return "bad areas found";
     const lv = v => v === 1 || v === 2;
     if (!k.areas || !Object.entries(k.areas).every(([s, v]) => typeof s === "string" && lv(v))) return "bad areas";
@@ -521,6 +734,10 @@
     for (const p of Object.keys(k.lines)) { const b = D.problems[p].b; if (!k.boulders[b]) out.push(`line #${p} is known but its boulder isn't`); }
     for (const b of Object.keys(k.boulders)) { const s = D.boulders[b].sector; if (!k.areas[s]) out.push(`boulder #${b} is known but its area isn't`); }
     if (W.simDate > G.date) out.push("the simulation has run past today");
+    for (const [w, R] of Object.entries(W.reg || {})) {
+      for (const p of R.sent) if (!W.est[p]) out.push(`${w} has sent #${p}, which nobody has climbed`);
+      if (R.proj && R.sent.includes(R.proj.p)) out.push(`${w}'s project #${R.proj.p} is already sent`);
+    }
     for (const [p, l] of Object.entries(k.lines)) { const e = W.est[p]; if (e && e.by !== "you" && !dd.notebookSet.has(+p) && e.date > l.date && !e.snipe) out.push(`#${p} was taken by ${e.by} after you'd found it`); }
     return out;
   }
@@ -547,7 +764,8 @@
     return true;
   }
 
-  const World = { REOPENED, BEFORE, PARAMS, NAMED, CLIMBING_REGULARS, NOTEBOOK, LEGENDS, AREAS, KIOSK_AREAS,
+  const World = { REOPENED, BEFORE, PARAMS, NAMED, CLIMBING_REGULARS, NOTEBOOK, LEGENDS, AREAS, KIOSK_AREAS, REG, ROUTINES, GROWTH, RP,
+    ensureReg, regOf, sessionOn, levelOn, validateReg,
     create, initialKnow, step, recordSend, migrate, validate, check, cleanName, isMine, nameFa, faCount, isWho, whoInfo, whoName,
     faText, legendOf, devRevealAll, devEstablish, seedFrom, newSeed, stream, addDays, daysBetween, notebook: D => dataOf(D).notebook };
   if (typeof module !== "undefined") module.exports = World; else root.World = World;

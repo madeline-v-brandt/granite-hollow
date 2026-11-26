@@ -1,0 +1,44 @@
+
+real: date        climb  you   est    %   by you  share  found  NPCs  hardestNPC
+        2025-10-01    18  V5     99   10%     23    23%    15    25   V9
+        2025-11-01    39  V7    321   32%     63    20%    33    49   V13
+        2025-12-01    59  V9    602   60%     91    15%    47    75   V13
+        2025-12-31    79  V9    723   72%    102    14%    58    87   V13
+        2026-03-01   119  V11   848   85%    189    22%    75   104   V13
+        2026-05-01   159  V13   887   89%    227    26%    75   110   V13
+        2026-12-31   322  V13  1000  100%    338    34%    75   125   V13
+  community's first FA per area: Tailgate 25-09-07, Schoolhouse 25-09-09, Hawkwatch 25-09-11, Millrace Caves 25-10-27, Spillway 25-11-27, Bracken Gully 25-11-20, Cellar Holes 25-12-11, Hemlock Hollow 25-12-23, Grout Piles 26-01-15, Back Forty 26-03-24
+  every boulder known to the community: 2026-02-17
+
+keen: date        climb  you   est    %   by you  share  found  NPCs  hardestNPC
+        2025-10-01    18  V5    149   15%     57    38%    18    34   V9
+        2025-11-01    39  V7    448   45%    108    24%    35    64   V13
+        2025-12-01    59  V9    565   57%    165    29%    59    79   V13
+        2025-12-31    79  V9    639   64%    230    36%    75    90   V13
+        2026-03-01   119  V11   755   76%    345    46%    75   106   V13
+        2026-05-01   159  V13   866   87%    455    53%    75   120   V13
+        2026-12-31   322  V13  1000  100%    588    59%    75   137   V13
+  community's first FA per area: Tailgate 25-09-08, Schoolhouse 25-09-22, Hawkwatch 25-09-07, Millrace Caves 25-10-04, Spillway 25-11-06, Bracken Gully 25-11-11, Cellar Holes 25-11-17, Hemlock Hollow 25-11-23, Grout Piles 25-11-29, Back Forty 25-12-13
+  every boulder known to the community: 2025-12-17
+
+casual: date        climb  you   est    %   by you  share  found  NPCs  hardestNPC
+        2025-10-01    10  V3     66    7%     11    17%    17    18   V6
+        2025-11-01    20  V5    218   22%     22    10%    31    35   V9
+        2025-12-01    30  V6    448   45%     34     8%    47    55   V13
+        2025-12-31    40  V7    588   59%     42     7%    58    68   V13
+        2026-03-01    60  V9    718   72%     66     9%    75    82   V13
+        2026-05-01    80  V10   795   80%     90    11%    75    91   V13
+        2026-12-31   162  V13   921   92%    175    19%    75   108   V13
+  community's first FA per area: Tailgate 25-09-07, Schoolhouse 25-09-11, Hawkwatch 25-09-17, Millrace Caves 25-09-24, Spillway 25-11-19, Bracken Gully 25-11-18, Cellar Holes 25-12-10, Hemlock Hollow 25-12-22, Grout Piles 26-01-13, Back Forty 26-02-20
+  every boulder known to the community: 2026-02-20
+
+homebody: date        climb  you   est    %   by you  share  found  NPCs  hardestNPC
+        2025-10-01    18  V5     40    4%      0     0%    10    11   V13
+        2025-11-01    39  V7    110   11%      0     0%    21    17   V13
+        2025-12-01    59  V9    221   22%      0     0%    31    26   V13
+        2025-12-31    79  V9    348   35%      0     0%    44    36   V13
+        2026-03-01   119  V11   808   81%      0     0%    75    73   V13
+        2026-05-01   159  V13   869   87%      0     0%    75    78   V13
+        2026-12-31   322  V13   922   92%      0     0%    75    82   V13
+  community's first FA per area: Tailgate 25-09-07, Schoolhouse 25-09-27, Hawkwatch 25-10-21, Millrace Caves 25-09-16, Spillway 26-01-23, Bracken Gully 25-12-24, Cellar Holes 25-12-20, Hemlock Hollow 25-12-27, Grout Piles 26-01-14, Back Forty 26-02-15
+  every boulder known to the community: 2026-02-20

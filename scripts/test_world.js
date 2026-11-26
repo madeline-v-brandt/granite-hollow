@@ -386,6 +386,83 @@ test("Local Buzz is precise about what you know and vague about the rest", () =>
   }
 });
 
+console.log("the regulars' lives (Phase 4, Stage 0)");
+{
+  // A season with a player who climbs, finds boulders and spots lines (so some lines are theirs to find).
+  const g = newSave("lives1"), K = Know.make(D, () => g);
+  playDays(g, K, 200);
+  const W = g.world;
+  test("the regulars who climb have records: routines, projects, sessions", () => {
+    for (const w of World.REG) {
+      const R = W.reg[w];
+      assert(R, `${w} has a record`);
+      assert(R.recent.length > 5, `${w} has been out`);
+      assert(R.done.length >= 3, `${w} has finished some projects (${R.done.length})`);
+    }
+    assert.strictEqual(World.validate(D, g), null);
+  });
+  test("what they've sent is in the ledger, and nobody took a line you'd found", () => {
+    assert.deepStrictEqual(World.check(D, g), []);
+    for (const w of World.REG) for (const p of W.reg[w].sent) assert(W.est[p], `${w} sent an unclimbed #${p}`);
+  });
+  test("projects take a while: several sessions, over days or weeks", () => {
+    const sent = World.REG.flatMap(w => W.reg[w].done.filter(x => x[4] === "sent"));
+    const avg = sent.reduce((a, x) => a + x[3], 0) / sent.length;
+    assert(avg >= 3 && avg <= 10, `average sessions ${avg.toFixed(1)}`);
+    assert(sent.some(x => World.daysBetween(x[1], x[2]) >= 14), "some take two weeks or more");
+  });
+  test("routines: Bea climbs at weekends in term time; Rowan on the library's days off", () => {
+    const out = (w, f) => { const days = Array.from({ length: 40 }, (_, i) => World.addDays("2025-10-01", i)).filter(f);
+      return days.filter(d => World.ROUTINES[w](d).p >= 0.5).length / days.length; };
+    const dow = d => new Date(d + "T12:00:00Z").getUTCDay();
+    assert(out("bea", d => dow(d) % 6 === 0) === 1 && out("bea", d => dow(d) % 6 !== 0) === 0, "Bea: weekends");
+    assert(World.ROUTINES.bea("2026-07-15").p >= 0.7, "Bea: all summer");
+    assert(World.ROUTINES.rowan("2025-10-05").p > World.ROUTINES.rowan("2025-10-08").p, "Rowan: Sundays");
+  });
+  test("the regulars get stronger over the seasons (Rowan and Bea most), for two years", () => {
+    assert(World.levelOn("n:rowan", "2026-09-01") - World.levelOn("n:rowan", "2025-09-01") > 1);
+    assert(World.levelOn("n:bea", "2027-09-01") === World.levelOn("n:bea", "2029-09-01"), "levels off");
+    assert(World.levelOn("n:dez", "2027-09-01") < 14.5);
+  });
+  test("deterministic: simulating in pieces or all at once gives the same lives", () => {
+    const a = newSave("lives2"), b = newSave("lives2");
+    World.step(D, a, "2025-12-01");
+    World.step(D, b, "2025-10-15"); World.step(D, b, "2025-11-20"); World.step(D, b, "2025-12-01");
+    assert.deepStrictEqual(a.world.reg, b.world.reg);
+    assert.deepStrictEqual(a.world.est, b.world.est);
+  });
+  test("an old save gets its regulars' records from the ledger, and today's sessions, without new first ascents", () => {
+    const old = clone(g); delete old.world.reg;
+    const before = Object.keys(old.world.est).length;
+    World.ensureReg(D, old, { date: old.date, wet: false });
+    assert.strictEqual(Object.keys(old.world.est).length, before, "no first ascents");
+    for (const w of World.REG) {
+      const fas = Object.entries(old.world.est).filter(([, e]) => e.by === w).map(([p]) => +p);
+      assert(fas.every(p => old.world.reg[w].sent.includes(p)), `${w}'s first ascents are among their sends`);
+    }
+    assert(World.REG.some(w => World.sessionOn(old, w, old.date)), "someone's out today");
+    assert.strictEqual(World.validate(D, old), null);
+    assert.deepStrictEqual(World.check(D, old), []);
+  });
+  test("a damaged record is refused by validate and rebuilt on load", () => {
+    const bad = clone(g); bad.world.reg["n:bea"].sent.push(99999);
+    assert(World.validate(D, bad), "refused");
+    World.ensureReg(D, bad, null);
+    assert.strictEqual(World.validate(D, bad), null);
+    const odd = clone(g); odd.world.reg["n:pickles"] = { proj: null, sent: [], recent: [], done: [] };
+    assert(World.validate(D, odd), "Pickles doesn't climb");
+  });
+  test("Local Buzz: a regular's long project, and never more than one classic", () => {
+    const items = K.buzz({ days: 120, max: 12 });
+    assert(items.filter(x => x.kind === "classic").length <= 1, "one classic");
+    const proj = W.news.find(n => n.kind === "proj");
+    assert(proj, "a project went down");
+    const g2 = clone(g); g2.world.news = [{ ...proj, date: g2.date }]; const K2 = Know.make(D, () => g2);
+    const it = K2.buzz()[0];
+    assert(it && /finally sent/.test(it.text) && /(sessions|weeks) on it/.test(it.text), it && it.text);
+  });
+}
+
 if (process.argv.includes("--curve")) {
   console.log("\nhow the crag develops with a player climbing 2 days in 3 at the current pacing (seed 'curve')");
   const g = newSave("curve"), K = Know.make(D, () => g);

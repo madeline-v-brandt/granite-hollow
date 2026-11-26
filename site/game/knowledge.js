@@ -171,9 +171,24 @@
     }
     const goFor = (s, b) => (area(s) >= 1 ? { sector: s, boulder: b != null && boulder(b) >= 1 ? b : null } : null);
     function buzzItem(n) { const it = buzzText(n); if (it && n.by) it.by = n.by; return it; }
+    // How long a regular's project took: "after three weeks on it", "after six sessions".
+    const WORDS = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+    const num = k => WORDS[k] || String(k);
+    function took(sessions, since, date) {
+      const wk = since ? Math.round(World.daysBetween(since, date) / 7) : 0;
+      return wk >= 2 ? `after ${num(wk)} weeks on it` : `after ${num(sessions)} sessions on it`;
+    }
     function buzzText(n) {
       const W = G().world, who = n.by ? World.whoName(D, n.by) : "";
       const info = n.by ? World.whoInfo(D, n.by) : {};
+      // A regular finally sends their project (an established line).
+      if (n.kind === "proj") {
+        if (!info.regular || n.p == null || !D.problems[n.p] || !W.est[n.p]) return null;
+        const pr = D.problems[n.p], s = D.boulders[pr.b].sector, seen = line(n.p) === "est" && boulder(pr.b) >= 1, g = W.est[n.p].grade;
+        return { date: n.date, kind: n.kind, p: seen ? n.p : null, go: goFor(s, pr.b),
+          text: seen ? `${cap(who)} finally sent ${name(n.p)} (V${g}) on ${D.boulders[pr.b].name}, ${took(n.n, n.since, n.date)}.`
+            : `${cap(who)} finally sent ${stiff(g)} project ${where(s, pr.b)}, ${took(n.n, n.since, n.date)}.` };
+      }
       if (n.kind === "fa" || n.kind === "snipe") {
         if (n.by === "you" || n.p == null || !D.problems[n.p]) return null;
         const pr = D.problems[n.p], s = D.boulders[pr.b].sector, e = W.est[n.p];
@@ -182,7 +197,8 @@
         const known = area(s) >= 1, hint = (World.AREAS[s] || {}).hint || "out in the woods";
         const named = info.regular || known ? who : "someone";
         let text;
-        if (seen) text = `${cap(who)} put up ${name(n.p)} (V${g}) on ${D.boulders[pr.b].name} at ${s}${n.first ? ", the first problem there" : ""}.`;
+        const after = n.proj >= 3 && info.regular ? `, ${took(n.proj, n.since, n.date)}` : "";
+        if (seen) text = `${cap(who)} put up ${name(n.p)} (V${g}) on ${D.boulders[pr.b].name} at ${s}${n.first ? ", the first problem there" : ""}${after}.`;
         else if (n.first) text = `Word is ${named} put up the first problem ${known ? "at " + s : hint}, ${stiff(g)}.`;
         else text = `Word is ${named} put up ${stiff(g)} ${where(s, pr.b)}.`;
         return { date: n.date, kind: n.kind, p: seen ? n.p : null, go: goFor(s, pr.b), text };
@@ -211,6 +227,7 @@
       if (n.kind === "named" || n.kind === "found") return 7;
       const reg = n.by && World.whoInfo(D, n.by).regular;
       if (n.kind === "arrival") return reg ? 6 : 4;
+      if (n.kind === "proj") return 6;
       if (n.kind === "fa") { const g = G().world.est[n.p] ? G().world.est[n.p].grade : 0; return (reg ? 5 : 0) + (g >= 8 ? 3 : g >= 6 ? 1 : 0) + (it.p != null ? 1 : 0); }
       if (n.kind === "classic") return 2;
       return 1;
@@ -225,10 +242,13 @@
       }
       cand.sort((a, b) => b[0] - a[0] || (a[1].date < b[1].date ? 1 : a[1].date > b[1].date ? -1 : 0));
       const out = [], perDate = {}, perWho = {};
+      let classics = 0;
       for (const [, it] of cand) {
+        if (it.kind === "classic" && classics >= 1) continue;          // one "becoming a classic" at a time
         if (it.by && (perWho[it.by] || 0) >= 2) continue;          // a mix of people, not one person's week
         if ((perDate[it.date] || 0) >= (opts.perDay ?? 2)) continue;
         perDate[it.date] = (perDate[it.date] || 0) + 1; if (it.by) perWho[it.by] = (perWho[it.by] || 0) + 1;
+        if (it.kind === "classic") classics++;
         out.push(it);
         if (out.length >= (opts.max ?? 6)) break;
       }
