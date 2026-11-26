@@ -259,7 +259,7 @@
   function here(i, later = 0) {
     const w = G.day.weather, p = D.problems[i];
     return { ...w, cond: Mech.condAt(w, Math.min(G.day.minute + later, w.dusk), shadeAt(p.b)),
-      dirty: isDirty(i), brushed: !!(G.day.brushed && G.day.brushed[i]), tape: !!G.day.tape };
+      dirty: isDirty(i), brushed: !!(G.day.brushed && G.day.brushed[i]), tape: !!G.day.tape, vibes: vibesNow().v };
   }
   const chanceFor = i => Mech.chanceOf(G.player, D.problems[i], G.ps[i], here(i));
   // What you've learned to do at the boulder (Stage 3; G.learned: { key: date }).
@@ -370,7 +370,8 @@
       if (tip && first) tip.done = true;
       G.todo = G.todo.filter(t => t !== i || !first);
       const style = first ? (flash ? "Flash" : "Send") : "Repeat";
-      G.ticks.push({ p: i, date: G.date, day: G.dayNo, style, att: st.att, stars: null });
+      const pal = partnerNow();
+      G.ticks.push({ p: i, date: G.date, day: G.dayNo, style, att: st.att, stars: null, ...(pal ? { with: pal } : {}) });
       G.day.sends.push({ p: i, style, xp, ...(fa ? { fa: true } : {}) });
       let text;
       if (flash) text = "Flash! You read every move from the ground.";
@@ -382,6 +383,7 @@
       if (fa) text += " Nobody had documented an ascent of it. It's your first ascent, and it's yours to name.";
       else if (first && v2() && G.world.est[i] && G.world.est[i].by !== "you") text += " " + ascentLine(i);
       if (tip && first) text += ` Good beta from ${whoOf(tip.from)}.`;
+      if (pal) text += " " + pick(PARTNER[pal.slice(2)].cheer);
       G.day.last = { kind: "send", title: fa ? `First ascent on ${p.boulder.name}, V${p.grade}` : `${style === "Repeat" ? "Repeat" : "Sent"}: ${titleOf(i)}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
       note(`${fa ? "First ascent:" : style} ${pname(i)}${vg(i) ? ` (${vg(i)})` : ""}, +${fmt(xp)} XP.`);
       if (fa) UI.faNote = G.feed[0];                        // renamed along with the problem
@@ -399,15 +401,18 @@
       const k = r.fallAt + 1, frac = k / p.moves, newHigh = st.att > 1 && frac > st.best + 1e-6;
       if (frac > st.best) { st.best = frac; if (newHigh) G.day.highpoints++; }
       if (sess) sess[2] = Math.max(sess[2], frac);
-      const before = Mech.knowledge(p, st)[r.fallAt], L = Mech.learnBurn(G.player, p, st, r.fallAt, sess ? sess[1] : 1);
+      const before = Mech.knowledge(p, st)[r.fallAt], L = Mech.learnBurn(G.player, p, st, r.fallAt, sess ? sess[1] : 1, Math.random, !!partnerNow());
       let text = `${fallText(p, r.move, k)} Fell on move ${k} of ${p.moves}${r.move.kind === "crux" ? ", the crux" : ""}.`;
       if (faded) text = `It's been a while, and the moves feel unfamiliar again. ${text}`;
       if (newHigh) text += " New highpoint!";
+      const pb = partnerNow() && !L.alt ? partnerBeta(partnerNow(), i) : "";
       if (L.alt) text += ` Hanging there, you see a better way through: ${ALT[p.seq.alt.kind].see}`;
       else if (st.mk[r.fallAt] - before > 0.04 && st.att <= 6) text += r.move.kind === "crux" ? " You're starting to work out the crux." : " You worked out a bit more of the beta.";
       if (G.day.weather.cond <= -0.8 && Mech.frictionSensitivity(p) >= 0.6) text += " Everything is wet.";
       else if (day.dirty && !L.alt && Math.random() < 0.5) text += " The holds are gritty with lichen.";
       else if (day.cond < -0.15 && Mech.frictionSensitivity(p) >= 0.6 && !L.alt && Math.random() < 0.5) text += ` The holds feel greasy${day.cond < G.day.weather.cond - 0.05 ? " in the warmth of the day" : ""}.`;
+      if (pb) text += pb;
+      else if (partnerNow() && st.mk[r.fallAt] - before > 0.06 && Math.random() < 0.4) text += ` ${firstName(partnerNow())} saw what happened from the ground and tells you.`;
       G.day.last = { kind: "fall", title: `${titleOf(i)}: attempt ${st.att}`, text, gains, p: i };
     }
     if (brushed) G.day.last.text = `You brush the grit and lichen off the holds first. ${G.day.last.text}`;
@@ -477,6 +482,7 @@
     const probs = p.boulder.problems.map(k => { const e = v2() ? G.world.est[k] : null; return { ...D.problems[k], sends: v2() ? (e && !e.old ? e.reps + 1 : 0) * 25 : D.problems[k].sends }; });
     SC.show({ park: S, bo: S.boulders[p.b], probs, problem: p, line: { index: ids.indexOf(i), count: ids.length }, seq: p.seq, outfit: outfitFor(),
       seen: st ? Mech.seenOf(p, st) : 0, known: (st && st.mk) || [] });
+    scenePal = undefined;
     const ls = lessonAt(i);                    // a regular teaches you something new
     if (ls) { G.day.climb.say = `${G.day.climb.say || climbIntro(i)}\n\n${ls}`; save(); }
     climbAtmosphere(); refreshClimb();
@@ -492,14 +498,16 @@
   function climbIntro(i) {
     const p = D.problems[i], st = G.ps[i];
     if (st && st.sent) return `You've sent ${pname(i)}. Climb it again, just for fun?`;
-    const f = Mech.feel(chanceFor(i)).label.toLowerCase();
-    if (st && st.att) return `Back under ${pname(i)}. ${st.att} ${st.att === 1 ? "try" : "tries"} so far, and it feels ${f === "not yet" ? "out of reach for now" : f} today.`;
-    return `You drop your pad under ${pname(i)} and look up at it. ${p.moves} moves to the top${p.sit ? ", from a sit start" : ""}. From the ground, it feels ${f === "not yet" ? "out of reach for now" : f}.`;
+    const f = Mech.feel(chanceFor(i)).label.toLowerCase(), vw = vibesWords(i);
+    if (st && st.att) return `Back under ${pname(i)}. ${st.att} ${st.att === 1 ? "try" : "tries"} so far, and it feels ${f === "not yet" ? "out of reach for now" : f} today.${vw ? " " + vw : ""}`;
+    return `You drop your pad under ${pname(i)} and look up at it. ${p.moves} moves to the top${p.sit ? ", from a sit start" : ""}. From the ground, it feels ${f === "not yet" ? "out of reach for now" : f}.${vw ? " " + vw : ""}`;
   }
   // The cards, through K (so an unclimbed line has no grade), and the menu with what
   // each choice would do to your chance of sending.
+  let scenePal;                                        // who's drawn by your pad in the scene
   function refreshClimb() {
     if (!SC || !climbing()) return;
+    if (scenePal !== partnerNow()) { scenePal = partnerNow(); SC.setPartner(scenePal ? LOOKS[scenePal.slice(2)] || {} : null); }
     const i = G.day.climb.p, p = D.problems[i], st = G.ps[i] || { att: 0, beta: 0 }, w = G.day.weather, L = levelNow(), left = w.dusk - G.day.minute;
     SC.setCards({
       prob: { name: pname(i), grade: vg(i), where: `${K.boulderName(p.b) || "Unfamiliar boulder"} · ${p.sector}`, tags: p.tagList, strip: moveStrip(i),
@@ -649,7 +657,7 @@
       when: (i, L) => ((isDirty(i) || Mech.frictionSensitivity(D.problems[i]) >= 0.6) && G.dayNo >= 2) || L >= 2,
       say: (here, i) => `Ranger Gus wanders over with a soft nylon brush. ${isDirty(i)
         ? `"I scrubbed the lines by the lot for the reopening, but out here nobody's touched the holds since '87. Give them a scrub before you pull on. Gently, mind: nylon, never wire."`
-        : `"Slopers like these want a fresh brushing. Gets the old chalk and grease off. Gently, mind: nylon, never wire."`} You can brush a line now. A line nobody has climbed comes clean for good, and on sloping, frictiony holds a fresh brushing helps all day.` },
+        : `"Holds like these want a fresh brushing. Gets the old chalk and grease off. Gently, mind: nylon, never wire."`} You can brush a line now. A line nobody has climbed comes clean for good, and on sloping, frictiony holds a fresh brushing helps all day.` },
     { key: "work", who: "n:hollis", name: "Working a move",
       when: (i, L, st) => (st && st.att >= 4 && !st.sent && (st.log || []).length >= 2) || L >= 3,     // a line you keep coming back to
       say: here => `${here ? `Hollis Pruitt looks up from a notebook. "You keep coming off the same bit. You don't have to start from the bottom every time: pull on right there and try that move on its own. Cheaper, and you learn more. I have a whole page on it."`
@@ -689,6 +697,7 @@
   function timeChecks() {
     const w = G.day.weather, d = G.day;
     if (d.over) return;
+    if (partnerNow() && d.minute >= d.partner.until) partWays(PARTNER[partnerNow().slice(2)].bye);
     if (rainNow()) { endDay(`It started ${w.precip === "Snow" ? "snowing" : "raining"} at ${clock(Mech.rainStart(w))}. Wet granite is slick and holds can snap, so you pack up and head home.`); return; }
     if (d.minute >= w.dusk) { duskOut(); return; }
     if (Mech.rainStart(w) != null && !d.rainWarned && d.minute >= Mech.rainStart(w) - 45) {
@@ -752,6 +761,10 @@
     G.day.rests = n + 1;
     G.day.last = { kind: "info", title: "Twenty minutes on the pad", text: ["You eat a snack, retape a finger, and watch someone flail on a warm-up. Energy recovers a little; skin doesn't.",
       "You lie back on the pad and watch the clouds. Your forearms stop buzzing.", "A drink, a stretch, a look at the holds from below. Energy comes back; skin doesn't."][n % 3] };
+    const pal = partnerNow();
+    if (pal) G.day.last.text = pick([`${firstName(pal)} takes a turn while you rest, and comes off the same move you did. “Okay, it's hard.”`,
+      `You and ${firstName(pal)} share a snack on the pad and talk through the moves.`, `${firstName(pal)} tries it a different way, and you both learn something from watching.`,
+      `You trade stories with ${firstName(pal)} while your forearms recover.`]) + " Energy comes back; skin doesn't.";
     afterAction();
   }
 
@@ -769,6 +782,7 @@
   // boulder you're at, what that reveals, and who's around.
   function arrive(prev, now, opts = {}) {
     G.loc = now;
+    if (partnerNow() && now.boulder != null) G.day.partner.b = now.boulder;      // your partner comes along
     if (v2()) {
       if (now.sector && K.visitArea(now.sector)) toast(`New area: ${now.sector}`, "You've found a climbing area that isn't on the kiosk map.", "find");
       if (now.boulder != null && K.boulder(now.boulder) >= 1) K.visitBoulder(now.boulder);
@@ -963,6 +977,8 @@
   // Something of yours or theirs worth mentioning: your latest first ascent, or theirs.
   function remarkFor(w) {
     const W = G.world, since = addDays(G.date, -3);
+    const together = [...G.ticks].reverse().find(t => t.with === w && t.style !== "Repeat" && t.date >= addDays(G.date, -30));
+    if (together && Math.random() < 0.4) return pick([`Still thinking about your send of ${pname(together.p)}. What a day.`, `We should climb again soon. That day on ${pname(together.p)} was great.`]);
     const mine = Object.entries(W.est).filter(([p, e]) => e.by === "you" && e.date >= since && e.date < G.date).sort((a, b) => (a[1].date < b[1].date ? 1 : -1))[0];
     if (mine && Math.random() < 0.6) return pick([`Saw your name in CragLog. ${pname(+mine[0])}! Nice.`, `I heard you got the first ascent of ${pname(+mine[0])}. What's it like?`]);
     const theirs = Object.entries(W.est).filter(([p, e]) => e.by === w && e.date >= addDays(G.date, -10)).sort((a, b) => (a[1].date < b[1].date ? 1 : -1))[0];
@@ -1081,6 +1097,98 @@
     if (!G.tips.some(t => t.p === e.rec && !t.done)) G.tips.push({ p: e.rec, from: e.ci ?? e.who, date: G.date, why: whyFor(e.rec), done: false });
     note(`${whoOf(e.ci ?? e.who)} recommended ${pname(e.rec)}.`);
     save(); renderAll();
+  }
+  // ---- partners and good vibes (Phase 3, Stage 4; docs/phase3/stage4-partners.md) ----------
+  // A regular you're talking to can climb with you for a few hours (G.day.partner:
+  // { who, until }): they come along to each boulder, stand by your pad in the
+  // climbing scene, see what you can't from the ground (your falls teach you more),
+  // call up beta once on a line they know, and cheer your sends, which your logbook
+  // remembers (tick.with). Never required, never XP: climbing alone loses nothing.
+  // Good vibes: a small, hidden lift to the send chance (Mech.vibes), only ever
+  // put in words.
+  const CLIMB_WITH = ["n:gus", "n:hollis", "n:otis", "n:rowan", "n:bea", "n:dez"];
+  const partnerNow = () => (v2() && G.day && !G.day.over && G.day.partner && G.day.partner.who) || null;
+  const firstName = w => World.whoName(D, w).replace(/^Ranger /, "").split(" ")[0];
+  const PARTNER = {
+    gus: { yes: "“I've got a couple of hours before I check the gate. Let's see what you've got.”", allDay: "“Actually, the gate can wait. Pickles will let me know.”", bye: "Ranger Gus has to go and lock up the quarry road. “Good climbing today.”",
+      cheer: ["Gus whoops from the pad.", "“Now that's climbing!” Gus says."] },
+    hollis: { yes: "“Yes! I'll bring the binder. I want to see how your beta compares with my notes.”", allDay: "“I've cleared my whole afternoon. The notes can wait.”", bye: "Hollis heads off to write up the day. “That's going in the notes.”",
+      cheer: ["Hollis claps, then writes something down.", "“That's going in the binder,” Hollis says, delighted."] },
+    otis: { yes: "“Perfect partner weather! I'll spot.”", allDay: "“I've got sandwiches for the whole day.”", bye: "Otis packs up his pad. “Perfect day. Same time next week?”",
+      cheer: ["Otis cheers loud enough to scare the chickadees.", "“PERFECT sending weather!” Otis shouts."] },
+    rowan: { yes: "“I'd like that. I'll bring my sketchbook, in case you do something worth drawing.”", allDay: "“Honestly, I've got nowhere else I'd rather be today.”", bye: "Rowan closes the sketchbook. “Thanks for today. Really.”",
+      cheer: ["Rowan laughs and claps. “I'm drawing that one.”", "“You made that look easy,” Rowan says. “It didn't look easy.”"] },
+    bea: { yes: "“YES. Can we try something dynamic? We should try something dynamic.”", allDay: "“My mom's not picking me up till dark!”", bye: "Bea's mom is waiting in the lot. “Bye! Try jumping for it!”",
+      cheer: ["Bea screams with joy. Somewhere, a crow takes off.", "“That was SICK,” Bea says. “Do it again!”"] },
+    dez: { yes: "“Sure.”", allDay: "“All day, if you like.”", bye: "Dez nods, shoulders a pad and walks off into the trees. “Good session.”",
+      cheer: ["Dez nods, once. From Dez, that's a standing ovation.", "“Nice,” Dez says, and means it."] },
+  };
+  function canPartner(e) {
+    if (!e || !CLIMB_WITH.includes(e.who) || partnerNow() || G.day.over || UI.busy) return false;
+    return G.day.weather.dusk - G.day.minute >= 60;
+  }
+  function climbTogether() {
+    const e = G.day.encounter; if (!canPartner(e)) return;
+    // Two to four hours; sometimes all day (Rowan more often).
+    const w = G.day.weather, allDay = Math.random() < (e.who === "n:rowan" ? 0.35 : 0.2), stay = 120 + 10 * Math.floor(Math.random() * 13);
+    G.day.partner = { who: e.who, until: allDay ? w.dusk : Math.min(w.dusk, G.day.minute + stay), ...(allDay ? { allDay: true } : {}), ...(G.loc.boulder != null ? { b: G.loc.boulder } : {}) };
+    e.partnered = PARTNER[e.who.slice(2)].yes + (allDay ? ` ${PARTNER[e.who.slice(2)].allDay}` : "");
+    note(`Climbing with ${World.whoName(D, e.who).replace(/^the /, "the ")}.`);
+    save(); renderAll();
+  }
+  function partWays(text) {
+    const w = partnerNow(); if (!w) return;
+    G.day.partner = null;
+    toast(`${firstName(w)} heads off`, text || "“Thanks for the session!”", "info");
+    note(`${firstName(w)} headed off.`);
+  }
+  // Do they know the line well enough to call up beta? Their own first ascent, or a
+  // documented line comfortably within their grade.
+  function partnerKnows(w, i) {
+    const e = v2() && G.world.est[i], n = World.NAMED[w.slice(2)];
+    return !!e && (e.by === w || (n && (n.level || 0) >= D.problems[i].grade + 1));
+  }
+  function partnerBeta(w, i) {
+    const p = D.problems[i], st = pstate(i);
+    if (st.tipped || !partnerKnows(w, i)) return "";
+    const what = Mech.tip(G.player, p, st); st.tipped = true;
+    const tag = p.tagList.find(t => BETA_TIP[t]);
+    note(`Got beta for ${pref(i)} from ${firstName(w)}.`);
+    return ` ${firstName(w)} calls up from the pad: “${what === "alt" ? ALT[p.seq.alt.kind].tip : BETA_TIP[tag] || "Commit to the crux! You had it."}”`;
+  }
+  // The vibes right now (memoised: the problem lists ask for every line).
+  let vibeMemo = { key: "", v: null };
+  function vibesNow() {
+    if (!v2() || !G.day) return { v: 0 };
+    const key = [G.date, G.day.minute, G.loc.sector, partnerNow(), G.ticks.length, G.world.est ? Object.keys(G.world.est).length : 0].join("|");
+    if (vibeMemo.key === key) return vibeMemo.v;
+    const w = G.day.weather, out = peopleToday(), partner = partnerNow(), since = addDays(G.date, -2);
+    const crowd = out.filter(x => x.who !== partner && D.boulders[x.b].sector === G.loc.sector);
+    // Your breakthrough: a hardest-yet send, or a project that took four tries or more.
+    let best = -1; const high = G.ticks.some(t => { const g = D.problems[t.p].grade, nb = t.style !== "Repeat" && g > best; if (t.style !== "Repeat") best = Math.max(best, g); return t.date >= since && t.style !== "Repeat" && (nb || (t.att || 0) >= 4); });
+    // A friend's first ascent: a regular you've met.
+    const friend = Object.values(G.world.est).find(e => e && typeof e.by === "string" && e.by.startsWith("n:") && e.date >= since && e.date <= G.date && K.met(e.by));
+    const why = { partner: !!partner, rowan: partner === "n:rowan", crowd: crowd.length, buzz: w.label === "Prime" && out.length >= 3, high, friend: !!friend };
+    const v = { ...why, v: Mech.vibes(why), crowdWho: crowd.map(x => x.who), friendWho: friend ? friend.by : null };
+    vibeMemo = { key, v };
+    return v;
+  }
+  // The vibes in words, for the climbing scene (only names you know).
+  function vibesWords(i) {
+    const vb = vibesNow(), st = G.ps[i];
+    if (vb.v < 0.08) return "";
+    const known = vb.crowdWho.filter(w => K.met(w));
+    const bits = [];
+    if (vb.rowan) bits.push(pick(["Rowan drops a pad beside yours, and somehow everything feels a little lighter.", "Rowan sets the sketchbook down by your pad and grins at you. You feel like you could climb anything."]));
+    else if (vb.partner) bits.push(`${firstName(partnerNow())} drops a pad beside yours.`);
+    else if (known.length) bits.push(`${firstName(known[0])} is climbing nearby${known.length > 1 ? `, and ${firstName(known[1])}` : ""}.`);
+    else if (vb.crowd) bits.push("There are a few climbers around.");
+    if (vb.buzz) bits.push("The crag's buzzing today.");
+    if (vb.high) bits.push("You're still riding high from your last send.");
+    else if (vb.friend && K.met(vb.friendWho)) bits.push(vb.friendWho === partnerNow() ? `${firstName(vb.friendWho)}'s still buzzing from a new first ascent.` : `Everyone's talking about ${firstName(vb.friendWho)}'s new first ascent.`);
+    if (vb.v >= 0.12 && st && st.att >= 3 && !st.sent) bits.push(pick(["Vibes at the crag are good today. Time to hop on the proj.", "Good vibes today. If it's going to go, it might as well be now."]));
+    else if (vb.v >= 0.12) bits.push("Good vibes at the crag today.");
+    return bits.join(" ");
   }
   function takeBeta() {
     const e = G.day.encounter; if (!e || !e.beta) return;
@@ -1430,8 +1538,15 @@
       if (key !== knownKey) { knownKey = key; P.setKnown(view); }
       const ok = G.day.no + "|" + G.day.weather.temp;
       if (ok !== outfitKey) { outfitKey = ok; P.setOutfit(outfitFor()); }
-      const pk = G.date + "|" + !!G.day.bishop + "|" + peopleToday().length + "|" + !!G.day.over;
-      if (pk !== peopleKey) { peopleKey = pk; P.setPeople(G.day.over ? [] : [...peopleToday(), ...(v2() && isAround("n:pickles") ? [{ who: "n:pickles", name: "Pickles", dog: true }] : [])]); }
+      // Your partner comes along: at the boulder you're at (or the last one you were at).
+      const pal = partnerNow();
+      const palB = pal ? (G.loc.boulder != null ? G.loc.boulder : G.day.partner.b) : null;
+      const pk = G.date + "|" + !!G.day.bishop + "|" + peopleToday().length + "|" + !!G.day.over + "|" + pal + "|" + palB;
+      if (pk !== peopleKey) {
+        peopleKey = pk;
+        const list = peopleToday().map(x => (x.who === pal && palB != null ? { ...x, b: palB, side: 1 } : x));
+        P.setPeople(G.day.over ? [] : [...list, ...(v2() && isAround("n:pickles") ? [{ who: "n:pickles", name: "Pickles", dog: true }] : [])]);
+      }
       if (!walk && !keys.size) P.setMe(G.pos, pose(false));
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
       P.setMarks({
@@ -1632,6 +1747,7 @@
         <div class="meter energy"><i style="width:${G.player.energy.toFixed(0)}%"></i></div>
         <span class="gauge"><span class="label-sm">Skin</span><span class="small">${G.player.skin.toFixed(0)}%</span></span>
         <div class="meter skin"><i style="width:${G.player.skin.toFixed(0)}%"></i></div>
+        ${partnerNow() ? `<span class="small partner">Climbing with ${esc(firstName(partnerNow()))}${G.day.partner.allDay ? " all day" : ""} <button type="button" class="linklike" id="act-part">Part ways</button></span>` : ""}
       </div>
       <div class="actions">
         <button type="button" class="btn" id="act-rest" ${disabled}>Rest 20 min</button>
@@ -1640,6 +1756,7 @@
         <button type="button" class="btn primary" id="act-home" ${disabled}>Head home</button>
       </div>`;
     $("#act-rest").onclick = rest;
+    const part = $("#act-part"); if (part) part.onclick = () => { partWays("“See you out here!”"); save(); renderAll(); };
     $("#act-home").onclick = () => endDay("You pack up your pads and walk out.");
     const skip = $("#act-skip");
     if (skip) skip.onclick = () => { note("Took a rest day."); startDay(1, 1); save(); renderAll(); };
@@ -1695,8 +1812,10 @@
       ${e.reveal != null ? say(e.revealLine) : ""}
       ${e.beta && !e.betaTaken ? `<q>${esc(e.beta.text)}</q>` : ""}
       ${e.chatted ? `<p class="npc-say npc-story">${esc(e.chatted)}</p>` : ""}
+      ${e.partnered ? `<q>${esc(e.partnered.replace(/^“|”$/g, ""))}</q>` : ""}
       <div class="acts">
         ${e.pet && !e.petted ? `<button type="button" class="btn small primary" data-pet>Pet Pickles</button>` : ""}
+        ${canPartner(e) && !e.partnered ? `<button type="button" class="btn small primary" data-together title="Climb together for a few hours">Climb together</button>` : ""}
         ${e.who && e.who.startsWith("n:") && !e.pet && !e.chatted ? `<button type="button" class="btn small" data-chat ${UI.busy || G.day.over ? "disabled" : ""}>Sit and chat · 20 min</button>` : ""}
         ${e.dir ? (e.dirTaken ? `<button type="button" class="btn small primary" data-go-sector="${esc(e.dir)}">Go there</button>` : `<button type="button" class="btn small primary" data-dir>Ask the way</button>`) : ""}
         ${e.reveal != null ? (e.revealTaken ? `<button type="button" class="btn small" data-go-boulder="${D.problems[e.reveal].b}">Go there</button>` : `<button type="button" class="btn small primary" data-reveal>Where exactly?</button>`) : ""}
@@ -1705,6 +1824,16 @@
         ${e.beta && !e.betaTaken ? `<button type="button" class="btn small" data-beta>Thanks for the beta</button>` : ""}
         <button type="button" class="btn small" data-dismiss>Say bye</button>
       </div></div></div>`;
+  }
+  // Where the good vibes come from, in words (for the odds panel's chip).
+  function vibesWhy() {
+    const vb = vibesNow(), out = [];
+    if (vb.partner) out.push(`climbing with ${firstName(partnerNow())}${vb.rowan ? " (it's always a good day with Rowan)" : ""}`);
+    if (vb.crowd) out.push("friends climbing nearby");
+    if (vb.buzz) out.push("the crag's buzzing");
+    if (vb.high) out.push("your recent send");
+    if (vb.friend) out.push("a friend's first ascent");
+    return out.length ? out.join(", ").replace(/^./, c => c.toUpperCase()) + "." : "";
   }
   function feelHtml(i) {
     const f = Mech.feel(chanceFor(i));
@@ -1720,7 +1849,8 @@
     };
     const graded = K.grade(i) != null;
     const chips = Object.entries(parts).filter(([k, v]) => (k === "ability" || k === "grade" ? graded : Math.abs(v) >= 0.05))
-      .map(([k, v]) => `<span class="chip ${k === "grade" || k === "ability" ? "" : v > 0 ? "good" : "bad"}">${label[k]} ${signed(v)}</span>`).join("");
+      .map(([k, v]) => k === "vibes" ? `<span class="chip good" title="${esc(vibesWhy())}">Good vibes</span>`       // never a number
+        : `<span class="chip ${k === "grade" || k === "ability" ? "" : v > 0 ? "good" : "bad"}">${label[k]} ${signed(v)}</span>`).join("");
     const c = chanceFor(i);
     return `<div class="why">About ${c >= 0.1 ? Math.round(c * 100) + "%" : c >= 0.01 ? "1 in " + Math.round(1 / c) : "under 1%"} per try right now.${graded ? "" : " Nobody has climbed it, so nobody knows its grade."}
       <div class="chips">${chips}</div></div>`;
@@ -1996,7 +2126,7 @@
     const projects = Object.entries(G.ps).filter(([, s]) => !s.sent && s.att > 0).map(([i, s]) => [+i, s]).sort((a, b) => b[1].best - a[1].best || b[1].att - a[1].att);
     const rows = [...G.ticks].reverse().slice(0, 80).map(t => {
       const p = D.problems[t.p];
-      return `<tr><td>${shortDate(t.date)}</td><td class="grade" style="font-size:15px">${vg(t.p) || "?"}</td><td><button type="button" class="linklike" data-cl="${t.p}">${esc(pname(t.p))}</button><div class="meta" style="margin:0">${esc(p.sector)}</div></td><td>${t.style}${v2() && World.isMine(G, t.p) && G.world.est[t.p].date === t.date && t.style !== "Repeat" ? " · FA" : ""}</td><td class="num stars">${t.stars ? "★".repeat(t.stars) : ""}</td></tr>`;
+      return `<tr><td>${shortDate(t.date)}</td><td class="grade" style="font-size:15px">${vg(t.p) || "?"}</td><td><button type="button" class="linklike" data-cl="${t.p}">${esc(pname(t.p))}</button><div class="meta" style="margin:0">${esc(p.sector)}</div></td><td>${t.style}${v2() && World.isMine(G, t.p) && G.world.est[t.p].date === t.date && t.style !== "Repeat" ? " · FA" : ""}${t.with && v2() ? `<div class="meta" style="margin:0">with ${esc(firstName(t.with))}</div>` : ""}</td><td class="num stars">${t.stars ? "★".repeat(t.stars) : ""}</td></tr>`;
     }).join("");
     const fas = v2() ? Object.entries(G.world.est).filter(([, e]) => e.by === "you").map(([i, e]) => [+i, e]).sort((a, b) => (a[1].date < b[1].date ? 1 : a[1].date > b[1].date ? -1 : b[0] - a[0])) : [];
     const faHtml = !v2() ? "" : `<h3>Your first ascents</h3>${fas.length ? `<p class="meta">${fas.length} ${fas.length === 1 ? "problem" : "problems"} in Granite Hollow's guidebook ${fas.length === 1 ? "carries" : "carry"} your name.</p>
@@ -2287,6 +2417,7 @@
     on("[data-pet]", petDog);
     on("[data-chat]", sitChat);
     on("[data-beta]", takeBeta);
+    on("[data-together]", climbTogether);
     on("[data-dismiss]", () => { G.day.encounter = null; save(); renderPanel(); });
     on("[data-rate]", n => { const t = G.ticks[G.day.last.tick]; t.stars = +n.dataset.rate; save(); renderPanel(); });
     on("[data-summary]", showSummary);
@@ -3028,6 +3159,10 @@
   }
   function migrateSave(g) {
     learnedFor(g);
+    // A partner only for today, someone who climbs; sends together only with them (Stage 4).
+    if (g.day && g.day.partner != null && !(g.day.partner && CLIMB_WITH.includes(g.day.partner.who) && typeof g.day.partner.until === "number" && isFinite(g.day.partner.until))) g.day.partner = null;
+    if (g.day && g.day.partner && g.day.partner.b != null && !(Number.isInteger(g.day.partner.b) && g.day.partner.b >= 0 && g.day.partner.b < D.boulders.length)) delete g.day.partner.b;
+    for (const t of g.ticks || []) if (t && t.with != null && !CLIMB_WITH.includes(t.with)) delete t.with;
     const fix = name => (name == null || D.sectorBy.has(name) ? name : OLD_SECTOR_NAMES[name] || null);
     g.loc = g.loc || { sector: null, boulder: null };
     const b = Number.isInteger(g.loc.boulder) ? D.boulders[g.loc.boulder] : null;

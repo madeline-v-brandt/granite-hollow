@@ -65,6 +65,16 @@
     todSwing: 0.3,                    // friction through the day: cool mornings and evenings, warm afternoons
     shadeWorth: 0.3,                  // on a warm afternoon, full shade against full sun is about this much better …
     sunWorth: 0.15,                   // … and on a cold one, the sun is this much better (warm fingers)
+    // ---- partners and good vibes (Stage 4). Vibes are never shown as a number: a small lift
+    // to the send chance, inside the shared ceiling, from the people and the mood at the crag.
+    vibePartner: 0.12,                // climbing with a friend
+    vibeRowan: 0.06,                  // and a little more when it's Rowan (review, 2026-11-26)
+    vibeCrowd: 0.02, vibeCrowdMax: 0.04,   // each regular out in the same area (not your partner), up to this
+    vibeBuzz: 0.04,                   // a prime day with the crag busy
+    vibeHigh: 0.04,                   // your own breakthrough in the last couple of days
+    vibeFriend: 0.03,                 // a friend's first ascent in the last couple of days
+    vibesMax: 0.25,
+    partnerLearn: 0.5,                // with someone watching from the ground, a fall teaches this much more
   };
   const BETA_MAX = BAL.betaMax;
   const sigmoid = x => 1 / (1 + Math.exp(-x));
@@ -378,8 +388,9 @@
   // you passed, and less with each try on this problem the same day (today counts
   // this one). A fall on a crux you know fairly well can show you its better way
   // through. fallAt: the move fallen on (-1: sent). Returns { alt: found it now }.
-  function learnBurn(player, p, ps, fallAt, today = 1, rng = Math.random) {
-    const s = sequence(p), mk = knowledge(p, ps), f = dayFactor(today), upto = fallAt < 0 ? s.n : fallAt;
+  // watched: a partner on the ground, who sees what you can't (BAL.partnerLearn more).
+  function learnBurn(player, p, ps, fallAt, today = 1, rng = Math.random, watched = false) {
+    const s = sequence(p), mk = knowledge(p, ps), f = dayFactor(today) * (watched ? 1 + BAL.partnerLearn : 1), upto = fallAt < 0 ? s.n : fallAt;
     for (let i = 0; i < upto; i++) mk[i] += BAL.learnPass * (1 - mk[i]) * f;
     if (fallAt >= 0) mk[fallAt] += BAL.learnFall * (1 - mk[fallAt]) * f;
     let alt = false;
@@ -437,6 +448,15 @@
     ps.mk = mk.map(r2);
     ps.beta = betaFrom(p, ps);
     return what;
+  }
+
+  // Good vibes (Stage 4), from what's going on: { partner, rowan (your partner is
+  // Rowan), crowd (regulars out in your area, not counting a partner), buzz, high,
+  // friend } (booleans, crowd a count). Never shown as a number.
+  function vibes({ partner = false, rowan = false, crowd = 0, buzz = false, high = false, friend = false } = {}) {
+    const v = (partner ? BAL.vibePartner + (rowan ? BAL.vibeRowan : 0) : 0) + Math.min(BAL.vibeCrowdMax, BAL.vibeCrowd * Math.max(0, crowd))
+      + (buzz ? BAL.vibeBuzz : 0) + (high ? BAL.vibeHigh : 0) + (friend ? BAL.vibeFriend : 0);
+    return r2(Math.min(BAL.vibesMax, v));
   }
 
   // ---- previews for the climbing scene's menu --------------------------------------
@@ -587,7 +607,7 @@
   const Mech = { PREF, BAL, levelInfo, levelOf, levelCost, proofCap, proofLeft, ability, baseXp, relFactor, styleBonus, morph, reachDependence,
     frictionSensitivity, breakdown, margin, sendChance, chanceOf, feel, canSpot, attemptCost, restGain, sendXp, skillGains, applySkills,
     convertSkills, replay, topsOf, sequence, altFor, knowledge, betaFrom, seenOf, fallMove, learnBurn, workMove, workCost, fade, tip, previewRest, previewWork, attempt, weather, forecastDay, realize, rainChance, rainStart, dayEnds, hm, startOfDay, describeCond, atLeast,
-    shadeOf, warmth, condAt, tapeFeel, AREA_SHADE,
+    shadeOf, warmth, condAt, tapeFeel, AREA_SHADE, vibes,
     tagsOf, BETA_MAX, clamp };
   if (typeof module !== "undefined") module.exports = Mech; else root.Mech = Mech;
 })(typeof window !== "undefined" ? window : globalThis);

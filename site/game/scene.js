@@ -14,6 +14,7 @@
 //   sc.show({ park, bo, problem, line: { index, count }, seq, outfit, seen });
 //   sc.setAtmosphere({ date, minute, dusk, sky });
 //   sc.setCards({ prob: {...}, me: {...} }); sc.setMenu([...]); sc.say(text);
+//   sc.setPartner(look | null);         // a partner by your pad (Stage 4)
 //   await sc.play("burn", { fallAt });   // "burn" | "work" | "rest" | "ready"
 //   sc.destroy();
 //
@@ -64,7 +65,7 @@
     const sayEl = el.querySelector(".sc-say"), menuEl = el.querySelector(".sc-menu"), banner = el.querySelector(".sc-banner");
     const PRE = "sc-";
     let view = [0, 0, 10, 10], subject = null, geo = null, cur = null, outfit = {}, busy = false, ro = null;
-    let fig = null;
+    let fig = null, pal = null;        // you, and a partner standing by (Stage 4)
 
     // ---- the picture -------------------------------------------------------------
     // spec: { park (illustrate.js parkScene), bo (one of park.boulders), problem
@@ -116,7 +117,8 @@
       const ground = svg.append("g").attr("class", "sc-groundL"), farTrees = svg.append("g").attr("class", "sc-farTrees");
       const mist = svg.append("g").attr("class", "sc-mistL"), behind = svg.append("g").attr("class", "sc-behind");
       const rock = svg.append("g").attr("class", "sc-rock"), holdL = svg.append("g").attr("class", "sc-holds");
-      const padL = svg.append("g").attr("class", "sc-padL"), meL = svg.append("g").attr("class", "sc-me-fig");
+      const padL = svg.append("g").attr("class", "sc-padL"), palL = svg.append("g").attr("class", "sc-pal-fig"), meL = svg.append("g").attr("class", "sc-me-fig");
+      geo_palL = palL; pal = null;
       const before = svg.append("g").attr("class", "sc-before"), light = svg.append("g").attr("class", "sc-light");
       // Wide enough for any window shape.
       const W0 = subject[0] - 60, W1 = subject[2] + 60, H0 = subject[1] - 40, H1 = subject[3] + 30, skyline = Math.min(...ys) + (geo.yb - Math.min(...ys)) * .18;
@@ -261,8 +263,8 @@
     if (root.ResizeObserver) { ro = new ResizeObserver(() => fitView()); ro.observe(stage); }
 
     // ---- the climber -----------------------------------------------------------------
-    function makeFigure(L) {
-      const o = outfit, ink = "#2b2620";
+    function makeFigure(L, o = outfit) {
+      const ink = "#2b2620";
       const sleeve = o.jacket || (o.longSleeves ? o.shirt : o.skin || "#e6bf98"), top = o.jacket || o.shirt || "#c2553a";
       const g = L.append("g").attr("class", "sc-climber");
       const shadow = g.append("path").attr("class", "sc-me-shadow");
@@ -287,8 +289,9 @@
     }
     // Draw a pose: { hip, sh (shoulders' centre), hand: [l, r], foot: [l, r], ground (y of the
     // ground under you, or null on the wall) }.
-    function render(p) {
-      if (!fig) return;
+    function render(p, f = fig) {
+      if (!f) return;
+      const fig = f;
       const ax = [p.sh[0] - p.hip[0], p.sh[1] - p.hip[1]], L = Math.hypot(...ax) || 1, u = [ax[0] / L, ax[1] / L], n = [-u[1], u[0]];
       const ang = Math.atan2(u[1], u[0]) * 180 / Math.PI + 90;
       fig.torso.attr("transform", `translate(${P2(p.hip)}) rotate(${f2(ang)}) scale(1,${f2(L / BODY.torso)})`);
@@ -347,6 +350,32 @@
         return { hip: [x, y - .45], sh: [x - .05, y - 2.4], hand: [[x - .7, y - .95], [x + .72, y - .9]], foot: [[x - .95, y + .45], [x + .95, y + .45]], ground: y + .45 };
       },
     };
+    // ---- a partner (Stage 4): standing by your pad, on the open side of it, with their
+    // own pad. They spot while you climb and cheer when you top out. look: the map's
+    // colours for them (LOOKS in game.js), or null for nobody.
+    let geo_palL = null;
+    function setPartner(look) {
+      if (!geo || !geo_palL) return;
+      geo_palL.selectAll("*").remove(); pal = null;
+      if (!look) return;
+      const mid = (subject[0] + subject[2]) / 2, side = geo.padX > mid ? -1 : 1, x = geo.padX + side * 3.9, y = geo.padTop + .45;
+      const pw = 2.2, pd = 1.2, th = .36;
+      geo_palL.append("path").attr("class", "sc-pad-shadow").attr("d", ell(x, y + pd / 2 + .15, pw * .6, .28));
+      geo_palL.append("path").attr("class", "sc-pad-side").attr("fill", look.pad || "#5a7d5a").attr("d", `M${f2(x - pw / 2)},${f2(y + .1)}h${f2(pw)}v${f2(th)}h${f2(-pw)}Z`);
+      geo_palL.append("path").attr("class", "sc-pad-top").attr("fill", look.pad || "#5a7d5a").attr("d", `M${f2(x - pw / 2 + .2)},${f2(y - pd / 2 + .1)}h${f2(pw - .4)}l.2,${f2(pd / 2)}h${f2(-pw)}Z`);
+      pal = { fig: makeFigure(geo_palL, look), x, y: y + .1, side };
+      partnerPose("stand");
+    }
+    function partnerPose(kind) {
+      if (!pal) return;
+      const { x, y, side } = pal, toward = -side;          // facing the line
+      const p = { hip: [x, y - 1.5], sh: [x + toward * .1, y - 3.5], foot: [[x - .38, y], [x + .38, y]], ground: y,
+        hand: [[x - .7, y - 1.8], [x + .7, y - 1.8]] };
+      if (kind === "spot") p.hand = [[x + toward * 1.05, y - 4.0], [x + toward * .75, y - 4.3]];
+      if (kind === "cheer") p.hand = [[x - 1.05, y - 5.3], [x + 1.05, y - 5.3]];
+      render(p, pal.fig);
+    }
+
     // Tween between poses: every joint moves in a straight line, eased.
     const EASE = { out: t => 1 - Math.pow(1 - t, 3), in: t => t * t, inOut: t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2, lin: t => t };
     const mixPose = (a, b, t) => ({ hip: lerp2(a.hip, b.hip, t), sh: lerp2(a.sh, b.sh, t), hand: [lerp2(a.hand[0], b.hand[0], t), lerp2(a.hand[1], b.hand[1], t)],
@@ -373,20 +402,25 @@
       busy = true; el.classList.add("busy");
       try {
         if (kind === "burn") {
+          partnerPose("stand");
           await tween(poses.chalk(), 260); await tween(poses.ready(), 220);
+          partnerPose("spot");
           const last = data.fallAt < 0 ? geo.n - 1 : data.fallAt;
           for (let k = 0; k <= last; k++) {
             const fall = k === data.fallAt;
             await tween(poses.on(k), k === 0 ? 420 : fall ? 520 : 330 + (geo.seq.moves[k].kind === "crux" ? 260 : 0), EASE.inOut);
             if (fall) { await wait(260); await tumble(); break; }
           }
-          if (data.fallAt < 0) { await tween(poses.topRide(), 420); await tween(poses.top(), 520, EASE.out); }
+          if (data.fallAt < 0) { await tween(poses.topRide(), 420); partnerPose("cheer"); await tween(poses.top(), 520, EASE.out); }
+          else partnerPose("stand");
         } else if (kind === "work") {
           const k = data.at;
+          partnerPose("spot");
           await tween(k > 0 ? poses.on(k - 1) : poses.ready(), 420);
           await tween(poses.on(k), 560);
           if (data.stuck) { await wait(500); await tween(poses.ready(), 520, EASE.inOut); }
           else { await wait(220); await tumble(); }
+          partnerPose("stand");
         } else if (kind === "rest") {
           await tween(poses.ready(), 0);             // instant: you can rest several times in a row
         } else await tween(poses.ready(), 400);
@@ -456,7 +490,7 @@
     }
     el.addEventListener("keydown", e => { if (e.key === "Escape" && opts.onAction && !busy) { e.preventDefault(); opts.onAction("leave"); } });
     function destroy() { if (ro) ro.disconnect(); host.innerHTML = ""; }
-    return { show, setCards, setMenu, say, play, flash, setAtmosphere, setSeen: drawHolds, focusMenu, destroy, fit: fitView, busy: () => busy, el, geo: () => geo,
+    return { show, setCards, setMenu, say, play, flash, setAtmosphere, setSeen: drawHolds, setPartner, focusMenu, destroy, fit: fitView, busy: () => busy, el, geo: () => geo,
       poses: () => poses, __render: p => { cur = p; render(p); } };     // poses and __render: for the prototype's pose checks
   }
 

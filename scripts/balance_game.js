@@ -11,6 +11,7 @@
 //   node scripts/balance_game.js --open             every line climbable from day one, no discovery
 //   node scripts/balance_game.js --json out.json    also write the numbers
 //   node scripts/balance_game.js --noprep           climbers never brush or tape (Stage 3)
+//   node scripts/balance_game.js --novibes          no partners or good vibes (Stage 4)
 //
 // Playstyles: steady (climbs at their level), projector (works one hard line at a
 // time, resting between burns), mileage (lots of easier problems), explorer (finds
@@ -19,7 +20,10 @@
 // and skips days rained out. Since Stage 3 the conditions change through the day
 // and with each boulder's shade, unclimbed lines start dirty, and climbers brush
 // (dirty lines before their first burn, friction holds on a line they're working)
-// and tape up when their skin wears thin, once they'd have learned how.
+// and tape up when their skin wears thin, once they'd have learned how. Since
+// Stage 4, a quarter of their days (after the first few) they climb with a partner
+// for a few hours, and good vibes come and go with the crowd, prime days and
+// their own recent breakthroughs.
 const fs = require("fs");
 const path = require("path");
 const args = process.argv.slice(2);
@@ -38,7 +42,7 @@ const abilityOf = pl => (Mech.levelOf ? Mech.ability(pl) : Mech.ability(pl.xp));
 const chanceOf = (pl, pr, st, w) => (Mech.chanceOf ? Mech.chanceOf(pl, pr, st, w) : Mech.sendChance(Mech.margin(pl, pr, st, w)));
 const addSkills = (pl, gains) => { if (Mech.applySkills) Mech.applySkills(pl, gains); else for (const [t, g] of Object.entries(gains)) pl.skills[t] += g; };
 
-const N = +opt("n", 40), DAYS = +opt("days", 200), OPEN = !!opt("open", false), PREP = !opt("noprep", false);
+const N = +opt("n", 40), DAYS = +opt("days", 200), OPEN = !!opt("open", false), PREP = !opt("noprep", false), VIBES = !opt("novibes", false) && !!Mech.vibes;
 const START = "2025-09-06", START_AREA = "The Tailgate", MAX_CAL = 700;
 const STYLE_NAMES = String(opt("style", "steady,projector,mileage,explorer")).split(",");
 const CHECKS = [15, 30, 55, 100, 180];
@@ -139,8 +143,11 @@ function play(styleName, seed, build) {
   const knowsBrush = () => PREP && !!Mech.condAt && climbDays >= 2;   // Gus teaches it from the second day
   let flapped = false;                                                // a flapper teaches tape
   const knowsTape = () => { const L = levelOf(pl).level; return PREP && !!Mech.condAt && ((L >= 3 && pl.skin < 50) || L >= 5 || flapped || out.tapes > 0); };
+  const withPartner = day => VIBES && day.minute < day.partnerUntil;
   const here = (p, day, judge) => ({ ...day.w, cond: Mech.condAt ? condAt(day.w, day.minute, Mech.shadeOf(D.boulders[D.problems[p].b], +g.date.slice(5, 7) - 1)) : day.w.cond,
-    dirty: dirty(p) && !(judge && knowsBrush()), brushed: !!day.brushed[p], tape: !!day.tape });
+    dirty: dirty(p) && !(judge && knowsBrush()), brushed: !!day.brushed[p], tape: !!day.tape,
+    vibes: VIBES ? Mech.vibes({ ...day.vibe, partner: withPartner(day) }) : 0 });
+  let lastHigh = -99;                                                 // climbing day of the last breakthrough
   function cand(p, day) {
     const pr = D.problems[p], st = stOf(p), L = levelOf(pl).level;
     const ch = chanceOf(pl, pr, g.ps[p], here(p, day, true));
@@ -203,13 +210,14 @@ function play(styleName, seed, build) {
       xp = Mech.sendXp(pl, pr, { first: true, flash, tip: false, newMax, sessions: daysOn[p].size });
       pl.xp += xp; pl.tops[pr.grade] = (pl.tops[pr.grade] || 0) + 1;
       st.sent = true; st.sends = 1; st.best = 1; st.flash = flash; st.sentOn = g.date;
+      if (newMax || st.att >= 4) lastHigh = climbDays;
       g.bestGrade = Math.max(g.bestGrade, pr.grade);
       g.ticks.push({ p, date: g.date, day: climbDays, style: flash ? "Flash" : "Send", att: st.att, stars: null });
       out.sends.push({ d, grade: pr.grade, level: info.level, att: st.att, days: daysOn[p].size, fa: wasOpen, xp, parts: r.parts, alt: !!st.alt });
       if (p === project) project = null;
     } else {
       if (Mech.learnBurn) {
-        Mech.learnBurn(pl, pr, st, r.fallAt, (day.tried[p] || 0) + (day.worked[p] || 0), rng);
+        Mech.learnBurn(pl, pr, st, r.fallAt, (day.tried[p] || 0) + (day.worked[p] || 0), rng, withPartner(day));
         st.lastFall = r.fallAt; st.lastFallCrux = r.move && r.move.kind === "crux";
       } else st.beta = Math.min(Mech.BETA_MAX, st.beta + Mech.betaGain(st.beta, day.tried[p]));
       st.best = Math.max(st.best || 0, r.progress);
@@ -233,6 +241,10 @@ function play(styleName, seed, build) {
     Object.assign(pl, Mech.startOfDay(pl, rest)); rest = 0;
     climbDays++; g.dayNo = climbDays;
     const day = { w, minute: 9 * 60 + Math.floor(rng() * 40), end: Mech.dayEnds(w), tried: {}, worked: {}, brushed: {}, tape: false, startEnergy: pl.energy, warm: 0, project: null, cal };
+    // Partners and vibes (Stage 4): a partner a quarter of days after the first few, for two to four hours.
+    const crowd = Math.floor(rng() * 3);
+    day.partnerUntil = climbDays > 3 && rng() < 0.25 ? (rng() < 0.2 ? Infinity : day.minute + 120 + 120 * rng()) : -1;   // sometimes all day
+    day.vibe = { rowan: rng() < 1 / 6, crowd, buzz: w.cond >= 0.3 && crowd >= 2, high: climbDays - lastHigh <= 2, friend: rng() < 0.15 };
 
     // Hearing of, or finding, a new area now and then.
     if (S.areaEvery && climbDays % S.areaEvery === 0) {

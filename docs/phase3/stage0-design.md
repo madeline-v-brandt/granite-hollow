@@ -1,6 +1,6 @@
 # Phase 3: strategic climbing, projecting and progression (design for review)
 
-Status: **Stages 0a to 3 done (2026-11-26).** Stage 0a measured the old balance (`stage0a-baseline.md`); Stage 0b built the new one (`stage0b-rebalance.md`); Stage 1 added moves (`stage1-moves.md`); Stage 2 the climbing scene (`stage2-scene.md`); Stage 3 preparation, conditions through the day and unlocks (`stage3-preparation.md`). Each records where it differs from this plan. Next is Stage 4, partners and good vibes. The decisions are in section 9.
+Status: **Stages 0a to 4 done (2026-11-26).** Stage 0a measured the old balance (`stage0a-baseline.md`); Stage 0b built the new one (`stage0b-rebalance.md`); Stage 1 added moves (`stage1-moves.md`); Stage 2 the climbing scene (`stage2-scene.md`); Stage 3 preparation, conditions through the day and unlocks (`stage3-preparation.md`); Stage 4 partners and good vibes (`stage4-partners.md`). Each records where it differs from this plan. Next is Stage 5, final balance and play-testing. The decisions are in section 9.
 
 Phase 3 makes climbing itself the heart of the game. Today, sending is mostly clicking Try until a dice roll succeeds. By the end of Phase 3:
 

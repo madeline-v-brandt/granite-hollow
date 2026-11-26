@@ -40,6 +40,9 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   check("a new climber has learned nothing yet", g.learned && Object.keys(g.learned).length === 0, JSON.stringify(g.learned));
   // Open the scene on a line the test picks (by its index), at whichever boulder has one.
   const tryWhere = async pred => {
+    const here0 = (await p.evaluate(() => [...document.querySelectorAll("[data-try]:not([disabled])")].map(x => +x.dataset.try))).find(pred);
+    if (here0 != null) { await click(p, `[data-try='${here0}']`); await sleep(300); return here0; }
+    if (await p.$("[data-back]")) { await click(p, "[data-back]"); await sleep(200); }       // back to the area's boulders
     const nb = await p.evaluate(() => document.querySelectorAll("[data-go-boulder]").length);
     for (let k = -1; k < nb; k++) {
       if (k >= 0) {
@@ -88,11 +91,19 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   // Proof is recounted from the ticks: three first sends of V3 or harder (recorded in the ledger too).
   const prove = D.problems.map((q, k) => k).filter(k => D.problems[k].grade >= 3 && !g.world.est[k] && !(g.ps[k] && g.ps[k].att)).slice(0, 3);
   for (const k of prove) { World.recordSend(D, g, k, g.date, false); g.ps[k] = { att: 1, beta: 0, sent: true, flash: false, best: 1, sends: 1, sentOn: g.date }; g.ticks.push({ p: k, date: g.date, day: g.dayNo, style: "Send", att: 1, stars: null }); }
-  g.player.xp = 70 + 140 + 220 + 600 + 50; g.player.skin = 38; g.player.energy = 30; g.day.minute = 14 * 60;      // tired, so some lines here are still a Try
+  g.player.xp = 70 + 140 + 220 + 600 + 50; g.player.skin = 38; g.player.energy = 15; g.day.minute = 14 * 60;      // tired, so some lines here are still a Try
   g.learned = { brush: g.date };
   g.day.climb = null; g.day.over = false;
   await write(g);
-  check("opened the scene as a V4", (await tryWhere(() => true)) != null);
+  // A line here you've fallen off once is a Try, not a Climb it, however strong you are.
+  let v4 = await tryWhere(() => true);
+  if (v4 == null) {
+    const ids = await p.evaluate(() => [...document.querySelectorAll("[data-climb]")].map(x => +x.dataset.climb));
+    g = await saved();
+    const k = ids.find(x => !(g.ps[x] && g.ps[x].sent));
+    if (k != null) { g.ps[k] = { att: 1, beta: 0, sent: false, best: 0.2, sends: 0 }; g.day.climb = null; await write(g); v4 = await tryWhere(x => x === k); }
+  }
+  check("opened the scene as a V4", v4 != null);
   const learnedSay = [];
   for (let n = 0; n < 4; n++) {
     s = await scene(); if (!s) break;
