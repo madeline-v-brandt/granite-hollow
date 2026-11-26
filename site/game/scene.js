@@ -402,7 +402,7 @@
 
     // ---- cards, words, menu -------------------------------------------------------------
     // prob: { name, grade (text or null), tags: [..], strip (HTML from the game's
-    // moveStrip, trusted), hp, beta, feel }. me: { name, level, energy, skin, clock,
+    // moveStrip, trusted), hp, beta, feel, note (the rock: dirty, brushed, shade) }. me: { name, level, energy, skin, clock,
     // light, note }.
     function setCards({ prob, me } = {}) {
       if (prob) cardP.innerHTML = `
@@ -411,7 +411,8 @@
         <div class="sc-tags">${(prob.tags || []).map(t => `<span>${esc(t)}</span>`).join("")}</div>
         ${prob.strip ? `<div class="sc-strip">${prob.strip}</div>` : ""}
         <div class="sc-sub">${esc(prob.hp || "")}${prob.feel ? ` · <b>${esc(prob.feel)}</b>` : ""}</div>
-        ${prob.beta ? `<div class="sc-sub">${esc(prob.beta)}</div>` : ""}`;
+        ${prob.beta ? `<div class="sc-sub">${esc(prob.beta)}</div>` : ""}
+        ${prob.note ? `<div class="sc-sub sc-note">${esc(prob.note)}</div>` : ""}`;
       if (me) cardMe.innerHTML = `
         <div class="sc-row"><b class="sc-name">${esc(me.name)}</b>${me.level != null ? `<span class="sc-lv">V${esc(me.level)}</span>` : ""}</div>
         <div class="sc-bar"><span>Energy</span><i class="sc-meter en"><i style="width:${clamp(me.energy, 0, 100).toFixed(0)}%"></i></i><span class="n">${Math.round(me.energy)}</span></div>
@@ -420,11 +421,15 @@
         ${me.note ? `<div class="sc-sub">${esc(me.note)}</div>` : ""}`;
     }
     function say(text) { sayEl.textContent = text || ""; sayEl.classList.remove("in"); void sayEl.offsetWidth; sayEl.classList.add("in"); }
-    // items: [{ key, label, sub, disabled, primary }], or a sub-menu with a "back" item.
-    function setMenu(items) {
-      menuEl.innerHTML = items.map(it => `<button type="button" class="sc-act${it.primary ? " primary" : ""}${it.wide ? " wide" : ""}" data-act="${esc(it.key)}" ${it.disabled ? "disabled" : ""}>
+    // items: [{ key, label, sub, disabled, primary, wide, prep (a slimmer preparation
+    // button, under the rest), fresh (just learned) }], or a sub-menu with a "back" item.
+    // reserve: keep room for the preparation row, so the picture doesn't jump as it comes and goes.
+    function setMenu(items, { reserve = false } = {}) {
+      const nPrep = items.filter(it => it.prep).length;
+      menuEl.classList.toggle("reserve", reserve);
+      menuEl.innerHTML = items.map(it => `<button type="button" class="sc-act${it.primary ? " primary" : ""}${it.wide ? " wide" : ""}${it.prep ? " prep" : ""}${it.prep && nPrep === 1 ? " alone" : ""}${it.fresh ? " fresh" : ""}" data-act="${esc(it.key)}" ${it.disabled ? "disabled" : ""}>
         <span class="l">${esc(it.label)}</span>${it.sub ? `<span class="s">${esc(it.sub)}</span>` : ""}</button>`).join("");
-      menuEl.classList.toggle("many", items.length > 4);
+      menuEl.classList.toggle("many", items.length - nPrep > 4);
       menuEl.querySelectorAll("[data-act]").forEach(b => { b.onclick = () => { if (!busy && opts.onAction) opts.onAction(b.dataset.act); }; });
       const first = menuEl.querySelector("button:not([disabled])"); if (first && el.contains(document.activeElement) === false) first.focus({ preventScroll: true });
     }

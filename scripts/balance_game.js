@@ -10,12 +10,16 @@
 //   node scripts/balance_game.js --rules path/to/mechanics.js   candidate rules (same API)
 //   node scripts/balance_game.js --open             every line climbable from day one, no discovery
 //   node scripts/balance_game.js --json out.json    also write the numbers
+//   node scripts/balance_game.js --noprep           climbers never brush or tape (Stage 3)
 //
 // Playstyles: steady (climbs at their level), projector (works one hard line at a
 // time, resting between burns), mileage (lots of easier problems), explorer (finds
 // new areas and goes after first ascents). Builds: average, tall and short, each
 // with two random strengths and a weakness. Everyone climbs two days and rests one,
-// and skips days rained out.
+// and skips days rained out. Since Stage 3 the conditions change through the day
+// and with each boulder's shade, unclimbed lines start dirty, and climbers brush
+// (dirty lines before their first burn, friction holds on a line they're working)
+// and tape up when their skin wears thin, once they'd have learned how.
 const fs = require("fs");
 const path = require("path");
 const args = process.argv.slice(2);
@@ -34,7 +38,7 @@ const abilityOf = pl => (Mech.levelOf ? Mech.ability(pl) : Mech.ability(pl.xp));
 const chanceOf = (pl, pr, st, w) => (Mech.chanceOf ? Mech.chanceOf(pl, pr, st, w) : Mech.sendChance(Mech.margin(pl, pr, st, w)));
 const addSkills = (pl, gains) => { if (Mech.applySkills) Mech.applySkills(pl, gains); else for (const [t, g] of Object.entries(gains)) pl.skills[t] += g; };
 
-const N = +opt("n", 40), DAYS = +opt("days", 200), OPEN = !!opt("open", false);
+const N = +opt("n", 40), DAYS = +opt("days", 200), OPEN = !!opt("open", false), PREP = !opt("noprep", false);
 const START = "2025-09-06", START_AREA = "The Tailgate", MAX_CAL = 700;
 const STYLE_NAMES = String(opt("style", "steady,projector,mileage,explorer")).split(",");
 const CHECKS = [15, 30, 55, 100, 180];
@@ -112,7 +116,7 @@ function play(styleName, seed, build) {
   K.visitArea(START_AREA);
   if (OPEN) for (const s of D.sectors) g.know.areas[s.name] = 2;
   const out = { style: styleName, build, levelDay: {}, checks: {}, attempts: [], sends: [], fa2025: null, faEnd: null, climbDays: 0, outOfLines: 0,
-    works: 0, workMin: 0, altsByWork: 0, falls: { crux: 0, other: 0 } };
+    works: 0, workMin: 0, altsByWork: 0, falls: { crux: 0, other: 0 }, brushes: 0, tapes: 0 };
   const daysOn = {};                    // problem -> set of climbing days it was tried
   const lastOn = {};                    // problem -> calendar day it was last tried (for fading)
   let rest = 0, climbDays = 0, project = null, projectSince = 0;
@@ -129,9 +133,17 @@ function play(styleName, seed, build) {
   };
   const unlooked = s => bouldersIn[s].filter(b => !(g.know.looked || {})[b] || K.spottable(b).length).length;
   const stOf = p => g.ps[p] || { att: 0, beta: 0, sent: false };
+  // Stage 3: the conditions on p's boulder now, and what's been done about them.
+  const condAt = Mech.condAt || ((w) => w.cond);
+  const dirty = p => !!Mech.condAt && open(p) && !(g.ps[p] && g.ps[p].clean) && sectorOf(p) !== START_AREA;   // Gus cleaned the Tailgate's
+  const knowsBrush = () => PREP && !!Mech.condAt && climbDays >= 2;   // Gus teaches it from the second day
+  let flapped = false;                                                // a flapper teaches tape
+  const knowsTape = () => { const L = levelOf(pl).level; return PREP && !!Mech.condAt && ((L >= 3 && pl.skin < 50) || L >= 5 || flapped || out.tapes > 0); };
+  const here = (p, day, judge) => ({ ...day.w, cond: Mech.condAt ? condAt(day.w, day.minute, Mech.shadeOf(D.boulders[D.problems[p].b], +g.date.slice(5, 7) - 1)) : day.w.cond,
+    dirty: dirty(p) && !(judge && knowsBrush()), brushed: !!day.brushed[p], tape: !!day.tape });
   function cand(p, day) {
     const pr = D.problems[p], st = stOf(p), L = levelOf(pl).level;
-    const ch = chanceOf(pl, pr, g.ps[p], day.w);
+    const ch = chanceOf(pl, pr, g.ps[p], here(p, day, true));
     const xp = Mech.sendXp(pl, pr, { first: true, flash: !st.att, newMax: pr.grade > g.bestGrade, sessions: (daysOn[p] ? daysOn[p].size : 0) + 1 });
     return { p, pr, st, ch, xp, d: pr.grade - L, grade: pr.grade, open: open(p), day, pl };
   }
@@ -168,7 +180,17 @@ function play(styleName, seed, build) {
     const info = levelOf(pl), d = pr.grade - info.level;
     if (Mech.fade && lastOn[p] != null && lastOn[p] !== day.cal) Mech.fade(pr, st, day.cal - lastOn[p]);
     lastOn[p] = day.cal;
-    const cost = Mech.attemptCost(pl, pr), r = Mech.attempt(pl, pr, st, day.w, rng);
+    // Preparation: brush a dirty line before the first burn, and a line you're working
+    // on friction holds once a day; tape up when skin wears thin (not for slopers).
+    if (knowsBrush()) {
+      const fric = Mech.frictionSensitivity(pr) >= 0.6, hard = chanceOf(pl, pr, st, here(p, day)) < 0.6;
+      if (dirty(p) || (fric && hard && !day.brushed[p] && (st.att > 0 || p === day.project))) {
+        if (dirty(p)) st.clean = true;
+        day.brushed[p] = true; day.minute += Mech.BAL.brushMin; out.brushes++;
+      }
+    }
+    if (!day.tape && pl.skin < 45 && knowsTape() && Mech.tapeFeel(pr) < 1) { day.tape = true; day.minute += Mech.BAL.tapeMin; out.tapes++; }
+    const now = here(p, day), cost = Mech.attemptCost(pl, pr, now), r = Mech.attempt(pl, pr, st, now, rng);
     pl.energy = Math.max(0, pl.energy - cost.energy); pl.skin = Math.max(0, pl.skin - cost.skin);
     day.minute += Math.round(cost.minutes);
     st.att++; day.tried[p] = (day.tried[p] || 0) + 1;
@@ -192,7 +214,10 @@ function play(styleName, seed, build) {
       } else st.beta = Math.min(Mech.BETA_MAX, st.beta + Mech.betaGain(st.beta, day.tried[p]));
       st.best = Math.max(st.best || 0, r.progress);
     }
-    if (pl.skin < 30 && Mech.frictionSensitivity(pr) >= 0.6 && rng() < 0.07) { pl.skin = Math.max(0, pl.skin - 12); pl.energy = Math.max(0, pl.energy - 8); }
+    if (pl.skin < 30 && !day.tape && Mech.frictionSensitivity(pr) >= 0.6 && rng() < 0.07) {
+      pl.skin = Math.max(0, pl.skin - 12); pl.energy = Math.max(0, pl.energy - 8);
+      if (Mech.condAt) { day.tape = true; flapped = true; out.tapes++; }      // taped for the rest of the day
+    }
     out.attempts.push([d, r.sent ? 1 : 0, Math.round(cost.minutes), xp]);
     if (!r.sent && r.move) out.falls[r.move.kind === "crux" ? "crux" : "other"]++;
     const L = levelOf(pl).level;
@@ -207,7 +232,7 @@ function play(styleName, seed, build) {
     if (wet || (pl.consecutive >= 2 && rest === 0)) { rest++; continue; }
     Object.assign(pl, Mech.startOfDay(pl, rest)); rest = 0;
     climbDays++; g.dayNo = climbDays;
-    const day = { w, minute: 9 * 60 + Math.floor(rng() * 40), end: Mech.dayEnds(w), tried: {}, worked: {}, startEnergy: pl.energy, warm: 0, project: null, cal };
+    const day = { w, minute: 9 * 60 + Math.floor(rng() * 40), end: Mech.dayEnds(w), tried: {}, worked: {}, brushed: {}, tape: false, startEnergy: pl.energy, warm: 0, project: null, cal };
 
     // Hearing of, or finding, a new area now and then.
     if (S.areaEvery && climbDays % S.areaEvery === 0) {
@@ -250,7 +275,7 @@ function play(styleName, seed, build) {
       }
       const stw = g.ps[p];
       if (S.work && stw && S.work({ pl, day }, p, stw)) {
-        const pr = D.problems[p], c = Mech.workCost(pl, pr), w = Mech.workMove(pl, pr, stw, day.w, stw.lastFall, (day.worked[p] || 0) + 1, rng);
+        const pr = D.problems[p], hw = here(p, day), c = Mech.workCost(pl, pr, hw), w = Mech.workMove(pl, pr, stw, hw, stw.lastFall, (day.worked[p] || 0) + 1, rng);
         pl.energy = Math.max(0, pl.energy - c.energy); pl.skin = Math.max(0, pl.skin - c.skin); day.minute += c.minutes;
         day.worked[p] = (day.worked[p] || 0) + 1; out.works++; out.workMin += c.minutes; if (w.alt) out.altsByWork++;
         lastOn[p] = cal; (daysOn[p] = daysOn[p] || new Set()).add(climbDays); stw.lastFall = null;
@@ -342,12 +367,13 @@ function report(name, runs) {
   if (far.length) {
     const m = k => fx(med(far.map(s => s.parts[k])), 2);
     say(`\nWhat lifted sends 2+ grades above your level (${far.length} sends, medians, in grades):`);
-    say(`  style ${m("style")}, reach ${m("morph")}, beta ${m("beta")}, conditions ${m("conditions")}, fatigue ${m("fatigue")}`);
+    say(`  style ${m("style")}, reach ${m("morph")}, beta ${m("beta")}, conditions ${m("conditions")}, brushed ${m("brushed")}, fatigue ${m("fatigue")}`);
   }
   const fc = runs.reduce((a, r) => a + r.falls.crux, 0), fo = runs.reduce((a, r) => a + r.falls.other, 0);
   const hard = runs.flatMap(r => r.sends.filter(s => s.d >= 1));
   say(`\nMoves: ${pct(fc / Math.max(1, fc + fo))} of falls were on a crux. Sends at least a grade up that used a better way through: ${pct(hard.filter(s => s.alt).length / Math.max(1, hard.length))}.` +
     (runs.some(r => r.works) ? ` Worked moves: ${fx(med(runs.map(r => r.works)))} per climber (${fx(med(runs.map(r => r.workMin / 60)), 0)} hours), ${fx(med(runs.map(r => r.altsByWork)))} better ways found that way.` : ""));
+  if (runs.some(r => r.brushes || r.tapes)) say(`Preparation (Stage 3): ${fx(med(runs.map(r => r.brushes)))} brushings and ${fx(med(runs.map(r => r.tapes)))} days taped per climber.`);
   const fa25 = runs.map(r => r.fa2025).filter(v => v != null);
   say(`\nYour share of first ascents: ${pct(med(fa25))} by the end of 2025 (target about 30% for a keen player), ${pct(med(runs.map(r => r.faEnd)))} at the end.`);
   say(`At the end: median level V${fx(med(runs.map(r => r.endLevel)))}, hardest send V${fx(med(runs.map(r => r.endBest)))}, ` +

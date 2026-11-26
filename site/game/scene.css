@@ -90,11 +90,12 @@ body.climbing { overflow: hidden; }
 .sc-foot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 40%); gap: 12px; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--rule); }
 .sc-say {
   margin: 0; padding: 12px 16px; min-height: 4.4em; border: 1.5px solid var(--rule); border-radius: 12px; background: var(--paper);
-  font-family: var(--serif); font-size: 17px; line-height: 1.45; font-variation-settings: "SOFT" 100; text-wrap: pretty;
+  font-family: var(--serif); font-size: 17px; line-height: 1.45; font-variation-settings: "SOFT" 100; text-wrap: pretty; white-space: pre-line;
 }
 .sc-say.in { animation: sc-in .35s ease; }
 @keyframes sc-in { from { opacity: 0; transform: translateY(3px); } }
 .sc-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; min-height: 116px; }   /* two rows, so the picture doesn't jump */
+.sc-menu.reserve { min-height: 164px; }
 .sc-menu.many { grid-template-columns: 1fr 1fr; max-height: 34vh; overflow: auto; }
 .sc-act {
   display: flex; flex-direction: column; justify-content: center; gap: 1px; min-height: 54px; padding: 8px 12px; text-align: left;
@@ -107,6 +108,15 @@ body.climbing { overflow: hidden; }
 .sc-act.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .sc-act.primary .s { color: inherit; opacity: .8; }
 .sc-act.wide { grid-column: 1 / -1; }
+/* preparation (brushing, tape): a slimmer row under the four */
+.sc-act.prep { min-height: 40px; padding: 5px 12px; border-style: dashed; background: transparent; }
+.sc-act.prep .l { font-size: 13.5px; }
+.sc-act.prep.alone { grid-column: 1 / -1; }
+/* something a regular just taught you */
+.sc-act.fresh { border-color: var(--gold); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent); }
+.sc-act.fresh .l::after { content: "New"; margin-left: 7px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--gold); background: var(--gold-soft, var(--chip)); border-radius: 999px; padding: 1px 6px; vertical-align: 1px; }
+.sc-act.primary.fresh .l::after { color: inherit; }
 .sc-act:disabled { opacity: .45; cursor: default; }
 .sc.busy .sc-act { pointer-events: none; opacity: .55; }
 @media (prefers-reduced-motion: reduce) { .sc-say.in, .sc.thud .sc-svg { animation: none; } .sc-banner { transition: none; } }
@@ -115,7 +125,8 @@ body.climbing { overflow: hidden; }
 @media (max-width: 760px) {
   .sc-foot { grid-template-columns: 1fr; gap: 8px; padding: 8px 10px calc(10px + env(safe-area-inset-bottom)); }
   .sc-say { font-size: 15px; min-height: 3.6em; padding: 9px 12px; }
-  .sc-act { min-height: 50px; padding: 6px 10px; } .sc-act .l { font-size: 14px; } .sc-menu { min-height: 108px; }
+  .sc-act { min-height: 50px; padding: 6px 10px; } .sc-act .l { font-size: 14px; } .sc-menu { min-height: 108px; } .sc-menu.reserve { min-height: 152px; }
+  .sc-act.prep { min-height: 36px; padding: 4px 10px; } .sc-act.prep .s { font-size: 11px; }
   .sc-card { width: auto; max-width: calc(58% - 16px); padding: 8px 10px; border-radius: 12px; }
   .sc-prob { top: 8px; left: 8px; } .sc-me { top: 8px; right: 8px; bottom: auto; max-width: calc(42% - 12px); }
   .sc-card h2 { font-size: 17px; } .sc-grade { font-size: 15px; }

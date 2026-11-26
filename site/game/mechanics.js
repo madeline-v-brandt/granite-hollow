@@ -54,6 +54,17 @@
     // ---- resting
     rest: 12, restDay: 1,             // a 20-minute rest gives back 12 energy, every time (play-test, 2026-11-26: rest
                                       // and climb all day; restDay < 1 would give back less each time the same day)
+    // ---- preparation and conditions through the day (Stage 3)
+    dirt: 0.3,                        // a line nobody has climbed is gritty and lichened, this many grades harder, until brushed
+    brush: 0.1,                       // freshly brushed holds: up to this many grades (× how much friction matters), for the day
+    brushMin: 5,                      // minutes to brush a line
+    tapeSkin: 0.5,                    // taped, a burn costs this share of the skin
+    tapeThin: 0.4,                    // and thin skin hurts this share as much
+    tapeFeel: 0.25,                   // but you lose this many grades of feel on slopers and slab
+    tapeMin: 5,
+    todSwing: 0.3,                    // friction through the day: cool mornings and evenings, warm afternoons
+    shadeWorth: 0.3,                  // on a warm afternoon, full shade against full sun is about this much better …
+    sunWorth: 0.15,                   // … and on a cold one, the sun is this much better (warm fingers)
   };
   const BETA_MAX = BAL.betaMax;
   const sigmoid = x => 1 / (1 + Math.exp(-x));
@@ -112,24 +123,37 @@
     return v.length ? Math.max(...v) : 0.4;
   }
 
+  // How much tape costs you on a problem: slopers and slab need the feel of bare skin.
+  function tapeFeel(p) {
+    const ts = tagsOf(p);
+    return ts.includes("slopey") || ts.includes("slab") ? 1 : ts.includes("pinchy") || ts.includes("compression") ? 0.5 : 0;
+  }
+
   // The parts of an attempt's margin, in grades; they add up to the margin. The
-  // good adjustments (style, reach, beta, conditions, vibes) are scaled down
-  // together so they approach BAL.ceiling and never pass it.
+  // good adjustments (style, reach, beta, conditions, brushing, vibes) are scaled
+  // down together so they approach BAL.ceiling and never pass it. day: the
+  // conditions where and when you climb ({ cond }, from condAt), and, since Stage 3,
+  // what you've done about them: dirty (a line nobody has climbed, not yet
+  // brushed), brushed (today), tape (you're taped up).
   function breakdown(player, p, ps, day) {
-    const fric = frictionSensitivity(p);
+    const fric = frictionSensitivity(p), tape = !!day.tape;
+    const thin = player.skin < 40 ? -(40 - player.skin) / 40 * (fric >= 0.6 ? 1.0 : 0.5) : 0;
     const parts = {
       ability: ability(player) + BAL.lift,
       style: styleBonus(player, p),
       morph: morph(player, p),
       beta: ps ? clamp(ps.beta || 0, 0, BAL.betaMax + BAL.altBeta) : 0,
       conditions: day.cond * fric,
+      brushed: day.brushed ? BAL.brush * fric : 0,
       vibes: day.vibes || 0,
+      dirt: day.dirty ? -BAL.dirt : 0,
+      tape: tape ? -BAL.tapeFeel * tapeFeel(p) : 0,
       fatigue: -0.9 * Math.pow(1 - player.energy / 100, 1.5),
-      skin: player.skin < 40 ? -(40 - player.skin) / 40 * (fric >= 0.6 ? 1.0 : 0.5) : 0,
+      skin: tape ? thin * BAL.tapeThin : thin,
       head: tagsOf(p).includes("highball") ? -0.3 : 0,
       grade: -p.grade,
     };
-    const good = ["style", "morph", "beta", "conditions", "vibes"].filter(k => parts[k] > 0);
+    const good = ["style", "morph", "beta", "conditions", "brushed", "vibes"].filter(k => parts[k] > 0);
     const sum = good.reduce((s, k) => s + parts[k], 0);
     if (sum > 0) { const scale = BAL.ceiling * Math.tanh(sum / BAL.ceiling) / sum; for (const k of good) parts[k] *= scale; }
     return parts;
@@ -165,11 +189,12 @@
   }
 
   // ---- costs & gains -------------------------------------------------------------
-  function attemptCost(player, p) {
+  // day (optional): { tape } halves the skin a burn costs.
+  function attemptCost(player, p, day) {
     const d = p.grade - ability(player);
     return {
       energy: 3 + 6 * sigmoid(1.3 * (d + 0.3)),
-      skin: (frictionSensitivity(p) >= 0.6 ? 1.6 : 0.9) * (0.6 + 0.6 * sigmoid(d)),
+      skin: (frictionSensitivity(p) >= 0.6 ? 1.6 : 0.9) * (0.6 + 0.6 * sigmoid(d)) * (day && day.tape ? BAL.tapeSkin : 1),
       minutes: 6 + (d > -0.5 ? 4 : 0),
     };
   }
@@ -384,8 +409,8 @@
     return { stuck, chance, alt };
   }
   // Working a move costs less than a burn, but sharp holds still take skin.
-  function workCost(player, p) {
-    const c = attemptCost(player, p);
+  function workCost(player, p, day) {
+    const c = attemptCost(player, p, day);
     return { energy: c.energy * 0.6, skin: c.skin * 0.8, minutes: 8 };
   }
   // A long break: after BAL.fadeAfter days away, what you knew of the moves fades,
@@ -433,7 +458,7 @@
     const m = margin({ ...player, energy: Math.max(player.energy, 70) }, p, ps, day) + BAL.isolation;
     const stick = Math.pow(sendChance(m, p.grade), s.moves[at].w * (1 - BAL.knownShift * clamp(mk[at], 0, 1)));
     mk[at] = Math.min(1, mk[at] + BAL.learnWork * (1 - mk[at]) * f * (stick * 1.3 + (1 - stick)));
-    const ps2 = { ...ps, mk }, c = workCost(player, p);
+    const ps2 = { ...ps, mk }, c = workCost(player, p, day);
     ps2.beta = betaFrom(p, ps2);
     const pl = { ...player, energy: Math.max(0, player.energy - c.energy), skin: Math.max(0, player.skin - c.skin) };
     return { kept: chanceOf(player, p, ps2, day), next: chanceOf(pl, p, ps2, day) };
@@ -496,6 +521,39 @@
     const was = describeCond(w.cond), now = describeCond(cond);
     return { ...w, cond, label: now.label, note: String(w.note || "").replace(was.note, now.note) || now.note, sky: w.sky === "Humid" ? "Sunny" : w.sky };
   }
+  // ---- conditions through the day, and shade (Stage 3) ----------------------------
+  // A day's cond (its forecast label) is the day as a whole. Where and when you
+  // climb moves it: friction is best in the cool of the morning and the evening and
+  // worst in mid-afternoon, and on a warm day a boulder in the shade keeps cooler
+  // than one in the sun (on a cold day the sun is welcome: warm fingers). Shade
+  // comes from the area's woods (hemlocks keep theirs all year; maples and oaks let
+  // the winter sun through) and the rock's own angle (always cool under a roof).
+  // Areas are keyed by name: a renamed area needs its entry renamed too.
+  const AREA_SHADE = {   // [canopy, evergreen share]
+    "Hemlock Hollow": [0.85, 0.9], "Bracken Gully": [0.75, 0.6], "Millrace Caves": [0.7, 0.4], "The Spillway": [0.5, 0.45],
+    "The Cellar Holes": [0.45, 0.15], "The Schoolhouse": [0.4, 0.1], "The Tailgate": [0.25, 0.4], "The Grout Piles": [0.2, 0.3],
+    "Hawkwatch": [0.15, 0.4], "Back Forty": [0.05, 0.2],
+  };
+  const ANGLE_SHADE = { roof: 0.35, overhang: 0.2, vertical: 0, slab: -0.1 };
+  const LEAF = [0.25, 0.25, 0.3, 0.6, 1, 1, 1, 1, 1, 0.8, 0.35, 0.25];   // how leafy the broadleaf woods are, by month
+  const SHADE_MID = 0.45;                                                  // about the park's average: no better or worse
+  // 0 (full sun) to 1 (deep shade). b: a boulder ({ sector, angle }); month 0–11.
+  function shadeOf(b, month = 6) {
+    const [c, ev] = AREA_SHADE[b && b.sector] || [0.35, 0.4];
+    return r2(clamp(c * (ev + (1 - ev) * LEAF[((month % 12) + 12) % 12]) + (ANGLE_SHADE[b && b.angle] || 0), 0, 1));
+  }
+  // How far into the day's warmth an hour is: 0 at 7 AM, 1 at 3 PM, falling again after.
+  const warmth = minute => clamp(Math.sin(Math.PI * (minute / 60 - 7) / 16), 0, 1);
+  const SUN = { Overcast: 0.3, Humid: 0.7, Rain: 0, Snow: 0 };
+  // The conditions on a boulder with this shade at this minute of the day.
+  function condAt(w, minute, shade = SHADE_MID) {
+    if (!w || !(typeof w.cond === "number")) return 0;
+    if (w.cond <= -0.8) return w.cond;                                     // wet is wet
+    const k = warmth(minute), t = typeof w.temp === "number" ? w.temp : 55;
+    const S = t >= 60 ? BAL.shadeWorth : t <= 40 ? -BAL.sunWorth : -BAL.sunWorth + (BAL.shadeWorth + BAL.sunWorth) * (t - 40) / 20;
+    const sun = S * (shade - SHADE_MID) * (SUN[w.sky] ?? 1) * k;
+    return r2(w.cond + BAL.todSwing * (0.75 - k) + sun);
+  }
   // "30% chance of rain in the morning", or "" for a dry forecast.
   function rainChance(f) {
     if (!f.pop) return "";
@@ -529,6 +587,7 @@
   const Mech = { PREF, BAL, levelInfo, levelOf, levelCost, proofCap, proofLeft, ability, baseXp, relFactor, styleBonus, morph, reachDependence,
     frictionSensitivity, breakdown, margin, sendChance, chanceOf, feel, canSpot, attemptCost, restGain, sendXp, skillGains, applySkills,
     convertSkills, replay, topsOf, sequence, altFor, knowledge, betaFrom, seenOf, fallMove, learnBurn, workMove, workCost, fade, tip, previewRest, previewWork, attempt, weather, forecastDay, realize, rainChance, rainStart, dayEnds, hm, startOfDay, describeCond, atLeast,
+    shadeOf, warmth, condAt, tapeFeel, AREA_SHADE,
     tagsOf, BETA_MAX, clamp };
   if (typeof module !== "undefined") module.exports = Mech; else root.Mech = Mech;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -177,7 +177,7 @@
         xp: 0, tops: [], skills, energy: 100, skin: 100, consecutive: 0 },
       date: START_DATE, dayNo: 0, loc: { sector: null, boulder: null },
       ps: {}, ticks: [], tips: [], todo: [], ach: {}, visited: [], feed: [], bestGrade: -1, board: { joined: false },
-      day: null,
+      day: null, learned: {},
     };
     if (rulesLive()) Object.assign(G, { v: 2, rules: 2, world: World.create(D, World.newSeed()), know: World.initialKnow(D, START_DATE) });
     if (DEV) G.dev = true;
@@ -249,7 +249,22 @@
   const pstate = i => (G.ps[i] = G.ps[i] || { att: 0, beta: 0, sent: false, flash: false, best: 0, sends: 0 });
   const firstSends = () => G.ticks.filter(t => t.style !== "Repeat");
   const levelNow = () => Mech.levelOf(G.player);
-  const chanceFor = i => Mech.chanceOf(G.player, D.problems[i], G.ps[i], G.day.weather);
+  // Where and when you'd climb problem i (Stage 3): the conditions on its boulder
+  // at this hour (shade, the warmth of the day), and what you've done about them:
+  // dirty (nobody has climbed it and you haven't brushed it), brushed today, taped up.
+  // (Gus scrubbed the lines by the lot for the reopening, so the Tailgate's are clean.)
+  const isDirty = i => v2() && !G.world.est[i] && !(G.ps[i] && G.ps[i].clean) && D.problems[i].sector !== START_AREA;
+  const shadeAt = b => Mech.shadeOf(D.boulders[b], monthOf(G.date));
+  // later: minutes from now (a preview of what an action that takes time would do).
+  function here(i, later = 0) {
+    const w = G.day.weather, p = D.problems[i];
+    return { ...w, cond: Mech.condAt(w, Math.min(G.day.minute + later, w.dusk), shadeAt(p.b)),
+      dirty: isDirty(i), brushed: !!(G.day.brushed && G.day.brushed[i]), tape: !!G.day.tape };
+  }
+  const chanceFor = i => Mech.chanceOf(G.player, D.problems[i], G.ps[i], here(i));
+  // What you've learned to do at the boulder (Stage 3; G.learned: { key: date }).
+  // Under the old rules (development mode only) you know it all.
+  const knows = k => !v2() || !!(G.learned && G.learned[k]);
   // "Send 2 more V7s or harder for V8", while your level waits for proof.
   const proofText = L => { const n = Mech.proofLeft(G.player); return `Send ${n} more V${L.level}${n === 1 ? "" : "s"} or harder for V${L.level + 1}`; };
   const reach = () => G.player.height + G.player.ape;
@@ -320,8 +335,12 @@
     if (G.loc.boulder !== p.b) { travel({ sector: p.sector, boulder: p.b }); return null; }
     const st = pstate(i);
     const faded = fadeIfAway(p, st);
-    const cost = Mech.attemptCost(G.player, p);
-    const r = Mech.attempt(G.player, p, st, G.day.weather);
+    // Climb it brushes a dirty line first, once you know how.
+    const brushed = !!opts.brush && knows("brush") && isDirty(i);
+    if (brushed) { st.clean = true; G.day.minute += Mech.BAL.brushMin; }
+    const day = here(i);
+    const cost = Mech.attemptCost(G.player, p, day);
+    const r = Mech.attempt(G.player, p, st, day);
     G.player.energy = Math.max(0, G.player.energy - cost.energy);
     G.player.skin = Math.max(0, G.player.skin - cost.skin);
     G.day.minute += Math.round(cost.minutes);
@@ -387,12 +406,25 @@
       if (L.alt) text += ` Hanging there, you see a better way through: ${ALT[p.seq.alt.kind].see}`;
       else if (st.mk[r.fallAt] - before > 0.04 && st.att <= 6) text += r.move.kind === "crux" ? " You're starting to work out the crux." : " You worked out a bit more of the beta.";
       if (G.day.weather.cond <= -0.8 && Mech.frictionSensitivity(p) >= 0.6) text += " Everything is wet.";
+      else if (day.dirty && !L.alt && Math.random() < 0.5) text += " The holds are gritty with lichen.";
+      else if (day.cond < -0.15 && Mech.frictionSensitivity(p) >= 0.6 && !L.alt && Math.random() < 0.5) text += ` The holds feel greasy${day.cond < G.day.weather.cond - 0.05 ? " in the warmth of the day" : ""}.`;
       G.day.last = { kind: "fall", title: `${titleOf(i)}: attempt ${st.att}`, text, gains, p: i };
     }
-    // Sharp granite and thin skin: flappers happen.
-    if (G.player.skin < 30 && Mech.frictionSensitivity(p) >= 0.6 && Math.random() < 0.07) {
+    if (brushed) G.day.last.text = `You brush the grit and lichen off the holds first. ${G.day.last.text}`;
+    // Sharp granite and thin skin: flappers happen (not through tape). A flapper gets
+    // taped, for the rest of the day, and if you didn't know how, someone shows you.
+    if (G.player.skin < 30 && !G.day.tape && Mech.frictionSensitivity(p) >= 0.6 && Math.random() < 0.07) {
       G.player.skin = Math.max(0, G.player.skin - 12); G.player.energy = Math.max(0, G.player.energy - 8); G.flapper = true;
-      G.day.last.text += " Then you tear a flapper on the sharp granite. Ouch. Tape it up or call it a day.";
+      G.day.tape = true; G.day.flapper = true;
+      let t = " Then you tear a flapper on the sharp granite. Ouch.";
+      if (knows("tape")) t += " You tape it up. The tape stays on for the rest of the day.";
+      else {
+        (G.learned = G.learned || {}).tape = G.date; note("Learned: tape.");
+        t += isAround("n:otis") ? ` Otis Fairweather hurries over with a roll of finger tape. "Oof. Perfect taping weather! Wrap it up, friend. You won't feel the slopers through it, but it'll see you through the day."`
+          : ` Ranger Gus digs a roll of tape out of his first-aid kit. "Let's wrap that up. Won't help you on the slopers, mind."`;
+        t += " You can tape up now. This one stays taped for the rest of the day.";
+      }
+      G.day.last.text += t;
       note("Tore a flapper.");
     }
     afterAction();
@@ -416,7 +448,13 @@
   let SC = null;
   const climbing = () => !!(G && G.day && G.day.climb);
   // Climb it, not Try: a warm-up for you that you haven't fallen off.
-  const easyFor = i => { const st = G.ps[i]; return !(st && st.att > 0 && !st.sent) && chanceFor(i) >= 0.8; };
+  // (Climb it brushes a dirty line first, once you know how, so that's the chance it's judged on.)
+  const easyFor = i => {
+    const st = G.ps[i];
+    if (st && st.att > 0 && !st.sent) return false;
+    const d = here(i); if (knows("brush")) d.dirty = false;
+    return Mech.chanceOf(G.player, D.problems[i], st, d) >= 0.8;
+  };
   const pc = c => (c >= .1 ? Math.round(c * 100) + "%" : c >= .01 ? (Math.round(c * 1000) / 10) + "%" : c >= .002 ? "under 1%" : "almost none");
   const shift = (a, b) => (pc(a) === pc(b) ? `send ${pc(a)}, barely changes` : `send ${pc(a)} → ${pc(b)}`);
   const KNOW = v => (v >= 0.67 ? "well" : v >= 0.34 ? "fairly well" : v > 0.05 ? "a little" : "not yet");
@@ -439,6 +477,8 @@
     const probs = p.boulder.problems.map(k => { const e = v2() ? G.world.est[k] : null; return { ...D.problems[k], sends: v2() ? (e && !e.old ? e.reps + 1 : 0) * 25 : D.problems[k].sends }; });
     SC.show({ park: S, bo: S.boulders[p.b], probs, problem: p, line: { index: ids.indexOf(i), count: ids.length }, seq: p.seq, outfit: outfitFor(),
       seen: st ? Mech.seenOf(p, st) : 0, known: (st && st.mk) || [] });
+    const ls = lessonAt(i);                    // a regular teaches you something new
+    if (ls) { G.day.climb.say = `${G.day.climb.say || climbIntro(i)}\n\n${ls}`; save(); }
     climbAtmosphere(); refreshClimb();
     SC.say(G.day.climb.say || climbIntro(i));
     SC.focusMenu();
@@ -465,14 +505,26 @@
       prob: { name: pname(i), grade: vg(i), where: `${K.boulderName(p.b) || "Unfamiliar boulder"} · ${p.sector}`, tags: p.tagList, strip: moveStrip(i),
         hp: st.sent ? (st.flash ? "Flashed" : "Sent") : st.att ? `Highpoint move ${Math.round(st.best * p.moves)} of ${p.moves}` : `${p.moves} moves`,
         feel: st.sent ? null : Mech.feel(chanceFor(i)).label,
-        beta: st.att && !st.sent ? `Beta ${Math.min(100, Math.round((st.beta || 0) / Mech.BETA_MAX * 100))}% worked out${st.alt ? " · a better way found" : ""}` : null },
+        beta: st.att && !st.sent ? `Beta ${Math.min(100, Math.round((st.beta || 0) / Mech.BETA_MAX * 100))}% worked out${st.alt ? " · a better way found" : ""}` : null,
+        note: st.sent ? null : rockNote(i) },
       me: { name: G.player.name, level: L.level, energy: G.player.energy, skin: G.player.skin, clock: clock(Math.min(G.day.minute, w.dusk)),
-        light: left <= 0 ? "dark" : left >= 120 ? `${Math.floor(left / 60)} h ${left % 60} min of light` : `${left} min of light` },
+        light: left <= 0 ? "dark" : left >= 120 ? `${Math.floor(left / 60)} h ${left % 60} min of light` : `${left} min of light`,
+        note: G.day.tape ? (G.day.flapper ? "Taped up (a flapper)" : "Taped up") : null },
     });
-    SC.setMenu(climbMenu(i));
+    SC.setMenu(climbMenu(i), { reserve: G.day.climb.view === "main" && !(G.ps[i] && G.ps[i].sent) && (knows("brush") || knows("tape")) && v2() });
+  }
+  // The rock, in a few words: dirty or brushed, and once you can read the
+  // conditions, its shade and how the friction is right now.
+  function shadeWord(b) { const s = shadeAt(b); return s >= 0.65 ? "In the shade" : s >= 0.35 ? "Part shade" : "In the sun"; }
+  function rockNote(i) {
+    const d = here(i), out = [];
+    if (d.dirty) out.push("Gritty and lichened: nobody has climbed it");
+    else if (d.brushed) out.push("Brushed today");
+    if (knows("read") && d.cond > -0.8) out.push(`${shadeWord(D.problems[i].b)} · friction ${Mech.describeCond(d.cond).label.toLowerCase()} now`);
+    return out.join(" · ") || null;
   }
   function climbMenu(i) {
-    const p = D.problems[i], st = G.ps[i] || { att: 0, beta: 0 }, day = G.day.weather, now = chanceFor(i), worked = (G.day.worked || {})[i] || 0;
+    const p = D.problems[i], st = G.ps[i] || { att: 0, beta: 0 }, day = here(i), now = chanceFor(i), worked = (G.day.worked || {})[i] || 0;
     if (G.day.climb.view === "work") {
       const mk = Mech.knowledge(p, { ...st }), seen = Math.max(1, Mech.seenOf(p, st));
       const items = p.seq.moves.slice(0, seen).map((m, j) => ({ key: "work:" + j, label: `Move ${j + 1}${m.kind === "crux" ? ", the crux" : m.kind === "top" ? ", the top-out" : ""}`,
@@ -480,23 +532,36 @@
       return [...items, { key: "back", label: "Back", wide: items.length % 2 === 0 }];
     }
     if (st.sent) return [{ key: "again", label: "Climb it again", sub: "A repeat, for fun", primary: true, disabled: G.day.over }, { key: "leave", label: "Leave", sub: "Back to the map" }];
-    const c = Mech.attemptCost(G.player, p), wc = Mech.workCost(G.player, p), seen = Math.max(1, Mech.seenOf(p, st));
+    const c = Mech.attemptCost(G.player, p, day), wc = Mech.workCost(G.player, p, day), seen = Math.max(1, Mech.seenOf(p, st));
     const gains = st.att ? Array.from({ length: seen }, (_, j) => Mech.previewWork(G.player, p, st, day, j, worked + 1).kept) : [now];
     const bestAt = gains.indexOf(Math.max(...gains)), bestName = p.seq.moves[bestAt].kind === "crux" ? "the crux" : `move ${bestAt + 1}`;
-    const full = G.player.energy >= G.day.startEnergy - .5;
-    return [
-      { key: "burn", label: `Send burn · ${pc(now)}`, sub: `Chance to send · ${Math.round(c.energy)} energy · ${Math.round(c.minutes)} min`, primary: true, disabled: G.day.over },
-      { key: "work", label: "Work a move", sub: st.att ? `Best: ${bestName}, ${shift(now, gains[bestAt])} · ${Math.round(wc.energy)} energy` : "Give it a burn first", disabled: G.day.over || !st.att },
-      { key: "rest", label: "Rest", sub: full ? "You're fresh" : `20 min · +${Math.round(Mech.restGain(G.day.rests || 0))} energy · ${shift(now, Mech.previewRest(G.player, p, st, day, G.day.rests || 0, G.day.startEnergy))}`, disabled: G.day.over || full },
+    const full = G.player.energy >= G.day.startEnergy - .5, fresh = k => G.learned && G.learned[k] === G.date && !(G.day.used || {})[k];
+    const items = [
+      { key: "burn", label: `Send burn · ${pc(now)}`, sub: `Chance to send · ${Math.round(c.energy)} energy · ${Math.round(c.minutes)} min`, primary: true, disabled: G.day.over, wide: !knows("work") },
+      ...(knows("work") ? [{ key: "work", label: "Work a move", sub: st.att ? `Best: ${bestName}, ${shift(now, gains[bestAt])} · ${Math.round(wc.energy)} energy` : "Give it a burn first", disabled: G.day.over || !st.att, fresh: fresh("work") }] : []),
+      { key: "rest", label: "Rest", sub: full ? "You're fresh" : `20 min · +${Math.round(Mech.restGain(G.day.rests || 0))} energy · ${shift(now, Mech.previewRest(G.player, p, st, here(i, 20), G.day.rests || 0, G.day.startEnergy))}`, disabled: G.day.over || full },
       { key: "leave", label: "Leave", sub: "Back to the map" },
     ];
+    // Preparation, only where it matters: brushing a dirty line (for good) or friction holds (for the day), and tape for thin skin.
+    if (knows("brush") && (day.dirty || (Mech.frictionSensitivity(p) >= 0.6 && !day.brushed && now < 0.8)))
+      items.push({ key: "brush", label: day.dirty ? "Brush it clean" : "Brush the holds", prep: true, fresh: fresh("brush"), disabled: G.day.over,
+        sub: `${Mech.BAL.brushMin} min · ${shift(now, Mech.chanceOf(G.player, p, st, { ...here(i, Mech.BAL.brushMin), dirty: false, brushed: true }))}` });
+    if (knows("tape") && (day.tape || G.player.skin < 60))
+      items.push(day.tape
+        ? (G.day.flapper ? { key: "untape", label: "Taped for a flapper", prep: true, disabled: true, sub: "It stays on for the rest of the day" }
+          : { key: "untape", label: "Take the tape off", prep: true, sub: `${shift(now, Mech.chanceOf(G.player, p, st, { ...day, tape: false }))} · full skin cost` })
+        : { key: "tape", label: "Tape up", prep: true, fresh: fresh("tape"), disabled: G.day.over,
+          sub: `${Mech.BAL.tapeMin} min · half the skin · ${shift(now, Mech.chanceOf(G.player, p, st, { ...here(i, Mech.BAL.tapeMin), tape: true }))}` });
+    return items;
   }
   async function climbAction(k) {
     const i = G.day.climb.p;
+    if (["work", "brush", "tape"].includes(k)) (G.day.used = G.day.used || {})[k] = true;     // no longer new
     if (k === "leave") { closeClimb(); return; }
     if (k === "work") { G.day.climb.view = "work"; refreshClimb(); SC.say("Which move? You can pull on partway up and try it on its own."); return; }
     if (k === "back") { G.day.climb.view = "main"; refreshClimb(); SC.say(G.day.climb.say || climbIntro(i)); return; }
     if (k === "rest") { rest(); afterClimb([]); return; }
+    if (k === "brush" || k === "tape" || k === "untape") { prepare(i, k); afterClimb([]); return; }
     if (k === "burn" || k === "again") { await burnInScene(i); return; }
     if (k.startsWith("work:")) { await workInScene(i, +k.slice(5)); return; }
   }
@@ -506,6 +571,8 @@
   function afterClimb(next) {
     if (!climbing()) return;
     G.day.climb.say = G.day.last && G.day.last.text;
+    const ls = !G.day.over && lessonAt(G.day.climb.p);
+    if (ls) G.day.climb.say = `${G.day.climb.say || ""}\n\n${ls}`;
     if (G.day.over) closeClimb();
     else { save(); refreshClimb(); climbAtmosphere(); SC.say(G.day.climb.say); }
     UI.levelPending = false;
@@ -531,10 +598,10 @@
     G.day.climb.view = "main";
     const faded = fadeIfAway(p, st);
     sessionOf(st);
-    const c = Mech.workCost(G.player, p);
+    const day = here(i), c = Mech.workCost(G.player, p, day);
     G.player.energy = Math.max(0, G.player.energy - c.energy); G.player.skin = Math.max(0, G.player.skin - c.skin); G.day.minute += c.minutes;
     const worked = G.day.worked = G.day.worked || {}, n = worked[i] = (worked[i] || 0) + 1;
-    const w = Mech.workMove(G.player, p, st, G.day.weather, at, n);
+    const w = Mech.workMove(G.player, p, st, day, at, n);
     let text = w.stuck ? `You stick move ${at + 1}${m.kind === "crux" ? ", the crux," : ""} and hang there a moment, learning the body position.` : `You come off move ${at + 1}${m.kind === "crux" ? ", the crux," : ""} again, but it's starting to make sense.`;
     if (faded) text = `It's been a while, and the moves feel unfamiliar again. ${text}`;
     if (w.stuck && at + 1 < p.moves && Mech.seenOf(p, st) === at + 2) text += " Now you can see the next move.";
@@ -547,6 +614,64 @@
     await SC.play("work", { at, stuck: w.stuck });
     SC.setSeen(Mech.seenOf(p, st), st.mk || []);
     afterClimb([]);
+  }
+
+  // ---- preparation (Stage 3): brushing and tape. Each lasts: a dirty line stays
+  // clean once brushed, brushed friction holds stay good for the day, and tape stays
+  // on until the day ends or you take it off. Instant, like a rest.
+  function prepare(i, k) {
+    if (UI.busy || G.day.over) return;
+    const p = D.problems[i], st = pstate(i), dirty = isDirty(i);
+    if (k === "brush") {
+      G.day.minute += Mech.BAL.brushMin;
+      (G.day.brushed = G.day.brushed || {})[i] = true;
+      if (dirty) st.clean = true;
+      G.day.last = { kind: "info", title: `Brushing ${titleOf(i)}`, p: i, text: dirty
+        ? pick(["You scrub the grit and lichen off every hold you can reach and blow the dust out of the cracks. It's climbable rock now.",
+          "Decades of lichen come off in green flakes. Underneath, the holds are rough and sharp and perfect."])
+        : pick(["You brush the old chalk and grease off the holds. They feel crisp again.", "A few strokes of the brush on each sloper, and they bite like new."]) };
+    } else if (k === "tape") {
+      G.day.minute += Mech.BAL.tapeMin; G.day.tape = true;
+      G.day.last = { kind: "info", title: "Taping up", p: i, text: `You wrap the tips that are wearing thin. ${Mech.tapeFeel(p) >= 1 ? "It'll save your skin, but you can't feel these slopers through it." : "It'll save your skin for a few more burns."}` };
+    } else if (k === "untape" && !G.day.flapper) {
+      G.day.tape = false;
+      G.day.last = { kind: "info", title: "Tape off", p: i, text: "You peel the tape off. Bare skin, and every bit of feel back." };
+    }
+    afterAction();
+  }
+
+  // ---- learning to climb smarter (Stage 3): a new climber knows how to burn and rest.
+  // Each strategy after that is taught by a regular in the climbing scene, the first
+  // time it would help, or once you're strong enough that you'd have picked it up.
+  // G.learned: { key: date }. Climbers from before Stage 3 know what their level would.
+  const LESSONS = [
+    { key: "brush", who: "n:gus", name: "Brushing",
+      when: (i, L) => ((isDirty(i) || Mech.frictionSensitivity(D.problems[i]) >= 0.6) && G.dayNo >= 2) || L >= 2,
+      say: (here, i) => `Ranger Gus wanders over with a soft nylon brush. ${isDirty(i)
+        ? `"I scrubbed the lines by the lot for the reopening, but out here nobody's touched the holds since '87. Give them a scrub before you pull on. Gently, mind: nylon, never wire."`
+        : `"Slopers like these want a fresh brushing. Gets the old chalk and grease off. Gently, mind: nylon, never wire."`} You can brush a line now. A line nobody has climbed comes clean for good, and on sloping, frictiony holds a fresh brushing helps all day.` },
+    { key: "work", who: "n:hollis", name: "Working a move",
+      when: (i, L, st) => (st && st.att >= 4 && !st.sent && (st.log || []).length >= 2) || L >= 3,     // a line you keep coming back to
+      say: here => `${here ? `Hollis Pruitt looks up from a notebook. "You keep coming off the same bit. You don't have to start from the bottom every time: pull on right there and try that move on its own. Cheaper, and you learn more. I have a whole page on it."`
+        : `A climber resting nearby calls over: "You don't have to start from the bottom every time. Pull on at the move you keep falling off and try it on its own."`} You can work a single move now.` },
+    { key: "tape", who: "n:otis", name: "Tape",
+      when: (i, L) => (L >= 3 && G.player.skin < 50) || L >= 5,          // (a flapper teaches it on the spot)
+      say: here => `${here ? `Otis Fairweather tosses you a roll of finger tape. "Perfect taping weather! Wrap the tips that are wearing thin. Not for slopers, though. You'll want to feel those."`
+        : `Ranger Gus digs a roll of tape out of his first-aid kit. "Your tips are looking raw. Wrap them up. Won't help you on the slopers, mind."`} Taped, a burn costs half the skin and thin skin hurts less, but slopers and slab feel worse. Tape stays on for the day, unless you take it off.` },
+    { key: "read", who: "n:bishop", name: "Reading the conditions",
+      when: (i, L) => (L >= 4 && (G.day.minute >= 13 * 60 || here(i).cond < 0.05)) || L >= 6,
+      say: () => `The Bishop squints at the sky. "Granite's like butter by mid-afternoon. In '74 we did the hard stuff before ten, then went down where the hemlocks keep the sun off. And it's always cool under a roof." You can read the conditions now: how the friction runs through the day, and which boulders sit in the shade.` },
+  ];
+  // The lesson to give under problem i right now, if any (and it's learned).
+  function lessonAt(i) {
+    if (!v2() || G.day.over) return null;
+    G.learned = G.learned || {};
+    const L = levelNow().level, st = G.ps[i];
+    const ls = LESSONS.find(l => !G.learned[l.key] && l.when(i, L, st));
+    if (!ls) return null;
+    G.learned[ls.key] = G.date;
+    note(`Learned: ${ls.name.toLowerCase()}.`);
+    return ls.say(isAround(ls.who), i);
   }
 
   function afterAction() {
@@ -1457,6 +1582,28 @@
       <path class="dial-left" d="${arc(now, w.dusk)}"/><path class="dial-dusk" d="M${x1},${base - 5}V${base + 4}"/>${rain}${body}</svg>`;
   }
 
+  // Once you can read the conditions (Stage 3): when the friction's best for the
+  // rest of today, and whether to look for shade or sun.
+  function readingOf(w) {
+    if (!knows("read") || !v2() || G.day.over || w.cond <= -0.8) return "";
+    const from = Math.max(G.day.minute, 8 * 60), to = w.dusk, ms = [];
+    for (let m = from; m <= to; m += 30) ms.push(m);
+    if (ms.length < 2) return "";
+    const at = m => Mech.condAt(w, m), vals = ms.map(at), best = Math.max(...vals), worst = Math.min(...vals);
+    let t = "";
+    if (best - worst < 0.06) t = "The friction holds steady the rest of the day.";
+    else {
+      const good = vals.map(v => v >= best - 0.04);
+      const firstEnd = good.indexOf(false), lastStart = good.lastIndexOf(false) + 1;
+      if (good[0] && firstEnd > 0) t = `Best now, until about ${clock(ms[firstEnd])}`;
+      if (good[good.length - 1] && lastStart < ms.length && lastStart > 0) t += t ? `, and again after ${clock(ms[lastStart])}.` : `Best after about ${clock(ms[lastStart])}.`;
+      else if (t) t += ".";
+    }
+    const sh = Mech.condAt(w, 15 * 60, 0.85) - Mech.condAt(w, 15 * 60, 0.1);
+    if (sh >= 0.08 && to > 13 * 60) t += " Afternoons are cooler in the shade.";
+    else if (sh <= -0.05) t += " It's cold: the sunny boulders are warmer.";
+    return t.trim();
+  }
   function renderHud() {
     const L = levelNow(), w = G.day.weather, d = G.day;
     const disabled = UI.busy || d.over ? "disabled" : "";
@@ -1478,7 +1625,7 @@
       <div class="hud-wx block">
         <span class="label-sm">Conditions</span>
         <span class="cond">${skyIcon(w.sky)}<span><b class="cond-${esc(w.label.toLowerCase())}">${w.label}</b> ${esc(w.sky)}, ${w.temp}°F</span></span>
-        <span class="small note">${esc(w.note)}</span>
+        <span class="small note">${esc(w.note)}</span>${(() => { const r = readingOf(w); return r ? `<span class="small note reading">${esc(r)}</span>` : ""; })()}
       </div>
       <div class="hud-body block">
         <span class="gauge"><span class="label-sm">Energy</span><span class="small">${G.player.energy.toFixed(0)}%</span></span>
@@ -1564,11 +1711,12 @@
     return `<div class="feel" title="How it feels right now"><div class="bars">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= f.bars ? "on" : ""}" style="height:${4 + n * 2}px"></i>`).join("")}</div><span>${f.label}</span></div>`;
   }
   function whyHtml(i) {
-    const p = D.problems[i], parts = Mech.breakdown(G.player, p, G.ps[i], G.day.weather);
+    const p = D.problems[i], parts = Mech.breakdown(G.player, p, G.ps[i], here(i));
     const label = {
       ability: `Your level`, style: `Your skill on ${p.tagList.filter(t => STYLE[t]).map(t => STYLE[t][0].toLowerCase()).join(", ") || "this style"}`,
       morph: Mech.reachDependence(p) < 0 ? "Bunchy, vs your reach" : "Reachy, vs your reach", beta: "Beta you've worked out",
-      conditions: "Today's friction", vibes: "Good vibes", fatigue: "Tiredness", skin: "Thin skin", head: "Highball nerves", grade: `Grade V${p.grade}`,
+      conditions: knows("read") ? `Friction here now (${shadeWord(p.b).toLowerCase()})` : "Friction", brushed: "Freshly brushed", dirt: "Dirty holds",
+      tape: "Tape (less feel)", vibes: "Good vibes", fatigue: "Tiredness", skin: "Thin skin", head: "Highball nerves", grade: `Grade V${p.grade}`,
     };
     const graded = K.grade(i) != null;
     const chips = Object.entries(parts).filter(([k, v]) => (k === "ability" || k === "grade" ? graded : Math.abs(v) >= 0.05))
@@ -2116,7 +2264,7 @@
   function bindPanel(el) {
     const on = (sel, fn) => el.querySelectorAll(sel).forEach(n => { n.onclick = () => fn(n); });
     on("[data-try]", n => openClimb(+n.dataset.try));
-    on("[data-climb]", n => tryProblem(+n.dataset.climb));
+    on("[data-climb]", n => tryProblem(+n.dataset.climb, { brush: true }));
     on("[data-expand]", n => { const i = +n.dataset.expand; UI.expanded.has(i) ? UI.expanded.delete(i) : UI.expanded.add(i); renderPanel(); });
     on("[data-go-sector]", n => travel({ sector: n.dataset.goSector, boulder: null }));
     on("[data-go-boulder]", n => { const b = D.boulders[+n.dataset.goBoulder]; travel({ sector: b.sector, boulder: b.id }); });
@@ -2879,6 +3027,7 @@
     return true;
   }
   function migrateSave(g) {
+    learnedFor(g);
     const fix = name => (name == null || D.sectorBy.has(name) ? name : OLD_SECTOR_NAMES[name] || null);
     g.loc = g.loc || { sector: null, boulder: null };
     const b = Number.isInteger(g.loc.boulder) ? D.boulders[g.loc.boulder] : null;
@@ -2892,6 +3041,28 @@
       for (const [k, v] of Object.entries(g.know.areas)) { const f = fix(k); if (f) a[f] = Math.max(a[f] || 0, v); }
       g.know.areas = a;
     }
+    return g;
+  }
+  // What a climber has learned to do at the boulder (Stage 3). A save from before
+  // it knows what a climber at its level would have picked up by now (brushing from
+  // V1, working moves from V3 or once you've projected, tape from V5, reading the
+  // conditions from V6); the rest the regulars teach as it comes up.
+  const LEARNABLE = ["brush", "work", "tape", "read"];
+  function learnedFor(g) {
+    const isDate = v => typeof v === "string" && /^\d{4}-\d\d-\d\d$/.test(v);
+    if (g.learned && typeof g.learned === "object" && !Array.isArray(g.learned)) {
+      for (const k of Object.keys(g.learned)) if (!LEARNABLE.includes(k) || !isDate(g.learned[k])) delete g.learned[k];
+      return g;
+    }
+    const L = g.player ? Mech.levelOf(g.player).level : 0, on = isDate(g.date) ? g.date : START_DATE;
+    const projected = Object.values(g.ps || {}).some(s => s && s.att >= 3);
+    g.learned = {};
+    if (L >= 1 || (g.ticks || []).length) g.learned.brush = on;
+    if (L >= 3 || projected) g.learned.work = on;
+    if (L >= 5) g.learned.tape = on;
+    if (L >= 6) g.learned.read = on;
+    // Old learning: not "New" in the menu.
+    if (g.day) { g.day.used = g.day.used || {}; for (const k of Object.keys(g.learned)) g.day.used[k] = true; }
     return g;
   }
   const loadScript = src => new Promise((ok, fail) => {
