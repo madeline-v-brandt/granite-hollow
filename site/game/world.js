@@ -362,6 +362,7 @@
   // Grades a year they get stronger by (for two years), on top of NAMED's level.
   const GROWTH = { gus: 0.2, hollis: 0.4, otis: 0.3, rowan: 1.2, bea: 1.5, dez: 0.4 };
   const RP = {
+    between: 5,               // days just climbing after a project ends, before the next (Stage 8)
     window: [-0.8, 1.0],      // a project is within this many grades of their level
     sendAt: 0.12,             // the chance of sending a project at their level, per session…
     perGrade: 1.1,            // …falling by e^-1.1 a grade harder…
@@ -443,7 +444,10 @@
       const s = { d, b: anyB[Math.floor(pb * anyB.length)], out: "mileage", p: null, hi: 0, w: [], t: rt.t };
       if (wet) s.out = "wet";
       else {
-        if (!R.proj && d >= REOPENED) { R.proj = pickProject(D, G, w, d, r, ctx, foundSet, taken); if (R.proj) taken.add(R.proj.p); }
+        // A couple of days just climbing after finishing a project (or giving up on one), before
+        // the next (Stage 8: otherwise every session was on a project, and "just did some laps" never came up).
+        const fresh = !(R.done[0] && daysBetween(R.done[0][2], d) >= 0 && daysBetween(R.done[0][2], d) < RP.between);
+        if (!R.proj && d >= REOPENED && fresh) { R.proj = pickProject(D, G, w, d, r, ctx, foundSet, taken); if (R.proj) taken.add(R.proj.p); }
         const projArea = R.proj ? D.boulders[D.problems[R.proj.p].b].sector : area;
         // Warm-ups: established lines well within them, in the area they're climbing in.
         const easy = linesIn(D, W, projArea, foundSet).filter(p => W.est[p] && W.est[p].date <= d && W.est[p].by !== w && D.problems[p].grade <= L - 1);

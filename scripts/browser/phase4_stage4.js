@@ -51,7 +51,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   // Nearly friends: a chat today will do it. Last talked 40 days ago.
   g = await saved();
   g.know.met = g.know.met || {}; g.know.met[who] = { n: 12, first: "2025-09-08", last: World.addDays(g.date, -40) };
-  g.social = { v: 2, npc: { [who]: { k: { met: 18 }, last: {}, m: [], said: {} } } };     // 18: meeting and a chat make friends (22)
+  g.social = { v: 2, npc: { [who]: { k: { met: 19 }, last: {}, m: [], said: {} } } };     // 19: meeting (1) and a chat (2) make friends (22)
   g.day.met = []; g.day.encounter = null;
   await write(g);
   await walkTo(who);

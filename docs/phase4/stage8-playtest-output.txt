@@ -1,0 +1,31 @@
+Determinism: the crag's history with and without the social game is identical; two runs of the same player are identical.
+  The fall comp's field is the same with and without the social game.
+
+sociable (6 players, 365 climbing days)
+  conversations: 792 a year each (gus 135, rowan 161, hollis 100, otis 131, bea 109, dez 114, bishop 42)
+  what's said: 13% never heard before; 5% repeated inside the no-repeat window
+  repeats by topic: hello 0% of 783, bye 0% of 699, ask 14% of 464, mine 6% of 318, story 6% of 280, today 0% of 185, theirs 0% of 137, ? 47% of 92, tell 5% of 78, others 0% of 73, closer 0% of 21, first 0% of 7, nod 0% of 2
+  openings: 90% have news; 7% are only a hello; 62% are about something you did or share
+  sit and chat: 280 a year; 6% retell a story from the last 45 days
+  friends by climbing day (median): gus 30, rowan 14, hollis 38, otis 26, bea 38, dez 43
+  good friends: gus 71, rowan 35, hollis 87, otis 61, bea 79, dez 80
+  Pickles: knows you 4, greets you 7, follows 12, yours 18 (6/6)
+  Rowan: sweet 15, ready 48, together 48 (6/6)
+
+casual (6 players, 365 climbing days)
+  conversations: 417 a year each (gus 77, rowan 82, hollis 53, otis 70, bea 58, dez 57, bishop 21)
+  what's said: 22% never heard before; 2% repeated inside the no-repeat window
+  repeats by topic: hello 0% of 410, bye 0% of 407, mine 10% of 169, ask 4% of 159, theirs 0% of 85, today 0% of 80, story 0% of 50, others 0% of 41, tell 0% of 31, closer 0% of 20, ? 20% of 10, first 0% of 7
+  openings: 90% have news; 5% are only a hello; 63% are about something you did or share
+  sit and chat: 50 a year; 0% retell a story from the last 45 days
+  friends by climbing day (median): gus 71, rowan 71, hollis 82, otis 68, bea 101, dez 91
+  good friends: gus 194, rowan 141, hollis 231, otis 160, bea 222, dez 222
+  Pickles: knows you 7, greets you 16, follows 24, yours 36 (6/6)
+
+Lines nobody heard in a year (excluding replies the harness doesn't use): 84 of 641
+  nod: gus.n.2 gus.n.3 hol.n.1 hol.n.2 hol.n.3 row.n.1 row.n.2 row.n.3 bea.n.1 bea.n.2 dez.n.1 dez.n.2 dez.n.3
+  hello: gus.h.wet gus.h.cold gus.h.dusk hol.h.wet hol.h.cold oti.h.wet oti.h.greasy oti.h.cold oti.h.evening row.h.us4 row.h.wet row.h.cold bea.h.wet bea.h.cold dez.h.wet dez.h.cold dez.h.hot pic.h.thump pic.h.belly pic.h.stick pic.h.cold pic.h.wet pic.h.knows pic.h.wriggle pic.h.trot
+  mine: gus.m.level gus.e.you gus.m.beta hol.m.level hol.e.you hol.m.beta oti.m.level oti.e.you oti.m.beta row.m.level row.e.you row.m.memory row.m.with row.m.beta bea.m.level bea.e.beat bea.m.beta dez.m.level dez.e.beat dez.m.beta
+  ask: gus.a.same hol.a.same oti.a.same row.a.same row.a.same2 bea.a.same dez.a.same
+  tell: gus.k.did gus.k.same gus.k.tip hol.k.did hol.k.same hol.k.tip oti.k.did oti.k.same oti.k.tip row.k.did row.k.same row.k.tip bea.k.did bea.k.same bea.k.tip dez.k.did dez.k.same dez.k.tip
+  theirs: hol.e.them

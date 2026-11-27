@@ -132,6 +132,13 @@
     // Did they climb your project? (They'd know it.)
     if (c.yourProj && R) c.yourProj.theyDid = R.sent.includes(c.yourProj.p);
     if (c.yourProj) c.yourProj.tipped = !!(G.ps[c.yourProj.p].tips && G.ps[c.yourProj.p].tips[who]);
+    // Stage 8: asked before, the same line as you, told before. "What are you working on?"
+    // twice about the same project gets "still", not the same sentence again.
+    const said = (G.social && G.social.npc && G.social.npc[who] && G.social.npc[who].said) || {}, pre = key.slice(0, 3) + ".a.";
+    c.askedOn = Object.entries(said).filter(([id]) => id.startsWith(pre)).map(([, d]) => d).sort().pop() || null;
+    c.projSame = !!(c.proj && c.askedOn && R.proj.since && R.proj.since <= c.askedOn && days(c.askedOn, date) <= 21);
+    c.sameProj = !!(c.proj && c.yourProj && c.proj.p === c.yourProj.p);
+    c.toldSame = !!(c.told && c.yourProj && c.told.p === c.yourProj.p);
     // Other regulars' news (named: they're the regulars).
     if (W) {
       const n = W.news.find(x => (x.kind === "proj" || (x.kind === "fa" && x.proj >= 3)) && x.by && x.by !== who && x.by.startsWith("n:") && days(x.date, date) <= 5 && days(x.date, date) >= 0);
@@ -165,6 +172,11 @@
     c.shared = sh;
     const oldest = Social.remembers(G, who, ["sendWith"]).filter(x => x[2] != null && x[0] < date).pop();
     if (oldest && days(oldest[0], date) >= 14) c.memory = { ...lineOf(oldest[2]), ago: days(oldest[0], date) };
+    // An event you were at in the last week (Stage 8): the bonfire, the dusk session, or Trail Day if you helped.
+    for (let k = 1; k <= 7 && G.events; k++) {
+      const d = addDays(date, -k), e = G.events[d], ev = World.eventOn ? World.eventOn(d) : null;
+      if (e && ev && e.k === ev.key && (((e.k === "bonfire" || e.k === "midsummer") && e.there) || (e.k === "trail" && e.helped && e.trail))) { c.wasThere = { key: e.k, ago: k }; break; }
+    }
     if (c.youFa) { const p = +myFa[0]; c.youFa.grade = D.problems[p].grade; c.youFa.hard = D.problems[p].grade >= 4 && D.problems[p].grade >= (G.bestGrade ?? 0) - 1; }
     const lv = G.lvlOn && typeof G.lvlOn === "object" ? Object.entries(G.lvlOn).filter(([, d]) => typeof d === "string" && days(d, date) <= 6 && days(d, date) >= 0).map(([l]) => +l).sort((a, b) => b - a)[0] : null;
     if (lv != null && lv >= 2) c.youLevel = { level: lv };
@@ -271,6 +283,7 @@
         l("gus.m.toldNo", "thoughtful", c => c.told && !c.told.sent && c.told.ago >= 2, c => `How's ${c.told.full} going? Still on it?`, { w: 3 }),
         l("gus.m.toldYes", "excited", c => c.told && c.told.sent, c => `You got ${c.told.full}! Pickles and I are very proud.`, { w: 4 }),
         l("gus.m.with", "happy", c => c.together, c => `Still thinking about that day on ${c.together.full}. Good climbing.`, { w: 2 }),
+        l("gus.e.was", "happy", c => !!c.wasThere, c => ({ bonfire: "That was a good fire on the solstice. Pickles still smells of smoke. So do I, to be fair.", midsummer: "Good night, the dusk session. I found three headlamps in the lot afterwards. None of them mine.", trail: "Thanks for your help on Trail Day. I walk the new path twice a day just to look at it." })[c.wasThere.key], { w: 5, story: true }),
         l("gus.m.beta", "happy", c => c.betaWorked, c => `${cap(c.betaWorked.full)}! Told you. ${c.betaWorked.alt ? "That trick" : "Slow and steady"} works every time.`, { w: 5 }),
       ],
       others: [l("gus.o.news", "happy", c => c.other, c => `${c.other.person} finally ${c.other.fa ? "put up" : "sent"} ${c.other.full}. ${cap(c.other.dur)} on it. Whole lot heard about it.`, { w: 2 }),
@@ -278,10 +291,22 @@
       ask: [
         l("gus.a.proj", "thoughtful", c => c.proj, c => `It's ${c.proj.full}. ${cap(c.proj.dur)} so far. The top's fine. It's the bottom that's the problem. And the middle.`),
         l("gus.a.none", "happy", c => !c.proj, () => "Me? I climb the warm-ups and check they're still there. They always are. Very reassuring."),
+      l("gus.a.still", "happy", c => c.projSame, c => `Still ${c.proj.full}. Same as when you last asked. I'm nothing if not consistent.`, { w: 4 }),
+      l("gus.a.close", "excited", c => c.proj && c.proj.close, c => `${cap(c.proj.full)}. I'm close. Don't say it out loud, it'll hear you.`, { w: 2 }),
+      l("gus.a.new", "happy", c => c.proj && c.proj.n <= 2, c => `Just started on ${c.proj.full}. Early days. Mostly I've been looking at it and nodding.`, { w: 2 }),
+      l("gus.a.long", "thoughtful", c => c.proj && c.proj.n >= 8, c => `${cap(c.proj.full)}, still. ${cap(c.proj.dur)}. At this point it's less a project and more a relationship.`, { w: 2 }),
+      l("gus.a.done", "happy", c => !c.proj && c.done && c.done.sent, c => `Nothing, since ${c.done.full}. I'm enjoying it. Ask me next week and I'll have found something to fall off.`, { w: 3 }),
+      l("gus.a.same", "excited", c => c.sameProj, c => `Same as you, as it happens: ${c.proj.full}. We can suffer together.`, { w: 6 }),
+      l("gus.a.none2", "thoughtful", c => !c.proj, () => "Nothing much. The gate, mostly. The gate is a long-term project."),
       ],
       tell: [
         l("gus.k.did", "happy", c => c.yourProj && c.yourProj.theyDid && !c.yourProj.tipped, c => `${cap(c.yourProj.full)}? I've done that one! Took me ages. Ask me how, if you like.`, { w: 3 }),
         l("gus.k.go", "happy", c => c.yourProj, c => `${cap(c.yourProj.full)}? Keep at it. And brush the holds when you're done; the next person will thank you.`),
+      l("gus.k.again", "happy", c => c.toldSame, c => `Still ${c.yourProj.full}? Good. The ones you have to keep coming back for are the ones you remember.`, { w: 2 }),
+      l("gus.k.long", "thoughtful", c => c.yourProj && c.yourProj.att >= 20, c => `${cap(c.yourProj.full)}, still? That's dedication. I'll keep an eye on the weather for you.`, { w: 2 }),
+      l("gus.k.same", "excited", c => c.sameProj, c => `${cap(c.yourProj.full)}! That's mine too. Whoever gets it first buys the coffee. I'm going to lose.`, { w: 6 }),
+      l("gus.k.tip", "thoughtful", c => c.yourProj && c.yourProj.tipped, c => `${cap(c.yourProj.full)}. Did my bit of beta help at all? It's fine if not. It didn't help me either, for a while.`, { w: 2 }),
+      l("gus.k.go2", "happy", c => c.yourProj, c => `${cap(c.yourProj.full)}. Good choice. Pick a cool morning for it; the rock's kinder.`),
       ],
       beta: [
         l("gus.b.alt", "happy", c => c.beta && c.beta.what === "alt", c => `Ah, there's a trick to ${c.beta.full}. ${c.beta.how} Took me a month to see it.`, { w: 3 }),
@@ -319,7 +344,13 @@
         l("gus.s.log", "happy", T, () => "Gus shows you the ranger station's logbook: forty years of weather, one line a day. “Rain. Rain. Sun. Pickles ate a sandwich.”", { narr: true, story: true }),
         l("gus.s.moose", "excited", T, () => "Gus tells you about the moose that walked through the lot in '91. He has clearly told this story many times, and clearly loves it every time.", { narr: true, story: true }),
       ],
-      bye: [l("gus.b.gate", "happy", T, () => "Watch the time. Gate shuts at dusk, and I mean it. Mostly."), l("gus.b.go", "happy", T, () => "Off you go. Leave it better than you found it.")],
+      bye: [l("gus.b.gate", "happy", T, () => "Watch the time. Gate shuts at dusk, and I mean it. Mostly."), l("gus.b.go", "happy", T, () => "Off you go. Leave it better than you found it."),
+        l("gus.b.late", "thoughtful", c => c.part === "evening", () => "Head down before dark, mind. I'm not carrying anyone out. Pickles might."),
+        l("gus.b.prime", "happy", c => c.prime, () => "Go on, make the most of it. Days like this, I almost wish I climbed more."),
+        l("gus.b.cold", "happy", c => c.cold, () => "Keep your hands warm. There's cocoa in my truck if you're desperate. It's from last winter."),
+        l("gus.b.name", "happy", c => c.close && c.me, c => `See you, ${c.me}. Mind the roots on the way back.`),
+        l("gus.b.dog", "happy", c => c.dogWith, () => "Look after that dog. He's had his breakfast. Twice, whatever he tells you."),
+        l("gus.b.proj", "happy", c => c.yourProj, c => `Good luck with ${c.yourProj.full}. I'll want to hear.`)],
       again: [l("gus.g.again", "happy", T, () => "Back again? Everything all right out there?"), l("gus.g.more", "happy", T, () => "Forget something? Happens to me twice a day.")],
     },
     hollis: {
@@ -368,6 +399,7 @@
         l("hol.m.toldNo", "thoughtful", c => c.told && !c.told.sent && c.told.ago >= 2, c => `Have you sent ${c.told.full} yet? I've left a gap in the notes.`, { w: 3 }),
         l("hol.m.toldYes", "excited", c => c.told && c.told.sent, c => `${cap(c.told.full)}, sent! I've filled in the gap in the notes. With a little star.`, { w: 4 }),
         l("hol.m.with", "happy", c => c.together, c => `I've written up our day on ${c.together.full}. You come out of it very well.`, { w: 2 }),
+        l("hol.e.was", "thoughtful", c => !!c.wasThere, c => ({ bonfire: "I wrote up the bonfire. The Bishop's story came out differently in my notes. Again.", midsummer: "The dusk session: I counted thirty-one problems climbed after sunset. Well, I estimated, then counted.", trail: "I've put the new path on my map. In pen. That's how sure I am. Thank you for your help with it." })[c.wasThere.key], { w: 5, story: true }),
         l("hol.m.beta", "excited", c => c.betaWorked, c => `You sent ${c.betaWorked.full} with my beta! I'm adding a footnote. Several.`, { w: 5 }),
       ],
       others: [l("hol.o.news", "thoughtful", c => c.other, c => `For the record: ${c.other.person} ${c.other.fa ? "put up" : "sent"} ${c.other.full}, after ${c.other.dur}. I have it on good authority. Mine.`, { w: 2 }),
@@ -375,10 +407,22 @@
       ask: [
         l("hol.a.proj", "thoughtful", c => c.proj, c => `${cap(c.proj.full)}. I have four pages on it. Three are about the crux. The fourth is also, if I'm honest, about the crux.`),
         l("hol.a.none", "embarrassed", c => !c.proj, () => "Nothing just now. I'm between projects. Which is to say I'm writing about other people's."),
+      l("hol.a.still", "thoughtful", c => c.projSame, c => `${cap(c.proj.full)}, as of my last entry. And the one before that. The notes are getting repetitive.`, { w: 4 }),
+      l("hol.a.close", "excited", c => c.proj && c.proj.close, c => `${cap(c.proj.full)}. I've fallen off the last move four times. I've recorded each one, with the time.`, { w: 2 }),
+      l("hol.a.new", "happy", c => c.proj && c.proj.n <= 2, c => `I've just started on ${c.proj.full}. Page one. The page where everything still seems possible.`, { w: 2 }),
+      l("hol.a.long", "thoughtful", c => c.proj && c.proj.n >= 8, c => `${cap(c.proj.full)}. ${cap(c.proj.dur)}. I've started a second notebook.`, { w: 2 }),
+      l("hol.a.done", "happy", c => !c.proj && c.done && c.done.sent, c => `Nothing, since ${c.done.full}. I'm writing it up. It's going to be long.`, { w: 3 }),
+      l("hol.a.same", "excited", c => c.sameProj, c => `${cap(c.proj.full)}, which I believe is also yours. We should compare notes. I'll bring mine. All of them.`, { w: 6 }),
+      l("hol.a.none2", "thoughtful", c => !c.proj, () => "Officially nothing. Unofficially I'm checking whether the 1983 guide was right about anything."),
       ],
       tell: [
         l("hol.k.did", "happy", c => c.yourProj && c.yourProj.theyDid && !c.yourProj.tipped, c => `${cap(c.yourProj.full)}. I've done it. I have notes, if you want them. Of course I have notes.`, { w: 3 }),
         l("hol.k.go", "thoughtful", c => c.yourProj, c => `Ah, ${c.yourProj.full}. Let me see… yes, I have notes. Mostly question marks. Tell me how it goes.`),
+      l("hol.k.again", "thoughtful", c => c.toldSame, c => `${cap(c.yourProj.full)}, still. I've opened a page for you. Don't worry, it's a small page.`, { w: 2 }),
+      l("hol.k.long", "thoughtful", c => c.yourProj && c.yourProj.att >= 20, c => `${cap(c.yourProj.full)}. That's a long campaign. The good ones always are. I'll want the full account.`, { w: 2 }),
+      l("hol.k.same", "excited", c => c.sameProj, c => `${cap(c.yourProj.full)}? So am I. I've made a note: friendly rivalry, ongoing.`, { w: 6 }),
+      l("hol.k.tip", "thoughtful", c => c.yourProj && c.yourProj.tipped, c => `${cap(c.yourProj.full)}. Did my notes help? Be honest. I'll note your answer.`, { w: 2 }),
+      l("hol.k.go2", "thoughtful", c => c.yourProj, c => `${cap(c.yourProj.full)}. Interesting choice. I'd like to know how you're reading the crux.`),
       ],
       beta: [
         l("hol.b.alt", "excited", c => c.beta && c.beta.what === "alt", c => `I have this in the binder. ${c.beta.how} Footnote nine. Nobody reads footnote nine.`, { w: 3 }),
@@ -417,7 +461,13 @@
         l("hol.s.fa", "embarrassed", c => c.anyFa, () => "Hollis shows you the binder's page for Hollis's own first ascent: three pages of notes, a sketch and a pressed fern. “I may have overdone it.”", { narr: true, story: true }),
         l("hol.s.dot", "thoughtful", T, () => "Hollis tells you what's known about Dot, which isn't much: a handful of first ascents in the notebook, a tick mark shaped like a dot, and the Bishop's stories, which Hollis files under “disputed”.", { narr: true, story: true }),
       ],
-      bye: [l("hol.b.det", "happy", T, () => "Off you go. I'll want details."), l("hol.b.note", "thoughtful", T, () => "Mind how you go. And note the time you topped out, if you can.")],
+      bye: [l("hol.b.det", "happy", T, () => "Off you go. I'll want details."), l("hol.b.note", "thoughtful", T, () => "Mind how you go. And note the time you topped out, if you can."),
+        l("hol.b.late", "thoughtful", c => c.part === "evening", () => "Getting late. Do note your descent time. Nobody ever notes their descent time."),
+        l("hol.b.prime", "excited", c => c.prime, () => "Superb conditions. Historic, possibly. Go and use them."),
+        l("hol.b.cold", "thoughtful", c => c.cold, () => "Cold hands, good friction. I've written that down somewhere."),
+        l("hol.b.name", "happy", c => c.close && c.me, c => `Good to see you, ${c.me}. Truly. Off you go.`),
+        l("hol.b.dog", "thoughtful", c => c.dogWith, () => "Mind Pickles doesn't eat your chalk. He has history."),
+        l("hol.b.proj", "thoughtful", c => c.yourProj, c => `Good luck on ${c.yourProj.full}. Report back.`)],
       again: [l("hol.g.again", "thoughtful", T, () => "Back already? Good. I had a follow-up question."), l("hol.g.more", "happy", T, () => "Ah, you again. I've thought of another footnote.")],
     },
     otis: {
@@ -465,6 +515,7 @@
         l("oti.m.toldYes", "excited", c => c.told && c.told.sent, c => `You got ${c.told.full}! I knew it. Perfect conditions?`, { w: 4 }),
         l("oti.m.hard", "excited", c => c.youHardest, c => `V${c.youHardest.grade}! Look at you!`, { w: 3 }),
         l("oti.m.with", "happy", c => c.together, c => `That day on ${c.together.full}! Perfect sending weather, that was.`, { w: 2 }),
+        l("oti.e.was", "happy", c => !!c.wasThere, c => ({ bonfire: "Wasn't the bonfire lovely? I'm still finding marshmallow on my jacket.", midsummer: "Did you get one of my sandwiches at the dusk session? I made forty. I came home with none. Perfect.", trail: "Trail Day was the best. All those people with rakes! Lenny would've loved it. Thanks for mucking in." })[c.wasThere.key], { w: 5, story: true }),
         l("oti.m.beta", "excited", c => c.betaWorked, c => `${cap(c.betaWorked.full)}! My beta! Well. Your climbing. But my beta!`, { w: 5 }),
       ],
       others: [l("oti.o.news", "excited", c => c.other, c => `Did you hear about ${c.other.person}? ${cap(c.other.fa ? "put up" : "sent")} ${c.other.full}! What a week for it.`, { w: 2 }),
@@ -472,10 +523,22 @@
       ask: [
         l("oti.a.proj", "happy", c => c.proj, c => `${cap(c.proj.full)}! ${cap(c.proj.dur)}. It's the best thing I've never done.`),
         l("oti.a.none", "happy", c => !c.proj, () => "Nothing! Everything! It's that kind of day."),
+      l("oti.a.still", "happy", c => c.projSame, c => `Still ${c.proj.full}! I love it more every time. It doesn't love me back yet.`, { w: 4 }),
+      l("oti.a.close", "excited", c => c.proj && c.proj.close, c => `${cap(c.proj.full)}, and I'm so close! Lenny would've said I'm overthinking it. Lenny was right about most things.`, { w: 2 }),
+      l("oti.a.new", "excited", c => c.proj && c.proj.n <= 2, c => `I've just found ${c.proj.full}. Love at first sight. I've already eaten a sandwich under it.`, { w: 2 }),
+      l("oti.a.long", "happy", c => c.proj && c.proj.n >= 8, c => `${cap(c.proj.full)}. ${cap(c.proj.dur)} and counting. Every one of them a perfect day.`, { w: 2 }),
+      l("oti.a.done", "happy", c => !c.proj && c.done && c.done.sent, c => `Nothing! I finished ${c.done.full}, so now I'm just climbing. Best part.`, { w: 3 }),
+      l("oti.a.same", "excited", c => c.sameProj, c => `You're on ${c.proj.full} too? We're project twins! I'll bring two sandwiches.`, { w: 6 }),
+      l("oti.a.none2", "happy", c => !c.proj, () => "Whatever's in the sun. I go where the sun is. Like a lizard. A happy lizard."),
       ],
       tell: [
         l("oti.k.did", "happy", c => c.yourProj && c.yourProj.theyDid && !c.yourProj.tipped, c => `${cap(c.yourProj.full)}! I did that one in a drizzle once. Perfect conditions. Want the beta?`, { w: 3 }),
         l("oti.k.go", "happy", c => c.yourProj, c => `${cap(c.yourProj.full)}? Oh, you'll get it. Maybe not today. But it's perfect weather for trying.`),
+      l("oti.k.again", "happy", c => c.toldSame, c => `Still ${c.yourProj.full}? Good! It'll go on a perfect day. They're all perfect days.`, { w: 2 }),
+      l("oti.k.long", "happy", c => c.yourProj && c.yourProj.att >= 20, c => `${cap(c.yourProj.full)}, still? That's a proper project. Have a sandwich. It won't help, but it's nice.`, { w: 2 }),
+      l("oti.k.same", "excited", c => c.sameProj, c => `${cap(c.yourProj.full)}! Me too! It's more fun falling off it together.`, { w: 6 }),
+      l("oti.k.tip", "happy", c => c.yourProj && c.yourProj.tipped, c => `${cap(c.yourProj.full)}! Did my beta work? Lenny always said my beta was “optimistic”.`, { w: 2 }),
+      l("oti.k.go2", "happy", c => c.yourProj, c => `Ooh, ${c.yourProj.full}. Lovely. I'd try it after lunch, when the light's on it.`),
       ],
       beta: [
         l("oti.b.alt", "excited", c => c.beta && c.beta.what === "alt", c => `Oh, I know this one! ${c.beta.how} Changes everything. Perfect.`, { w: 3 }),
@@ -512,7 +575,13 @@
         l("oti.s.bad", "thoughtful", T, () => "Otis tells you about the one time it was truly bad weather. Then he decides it wasn't that bad.", { narr: true, story: true }),
         l("oti.s.shoes", "happy", T, () => "Otis tells you about his first climb, in 1994, in borrowed shoes two sizes too small. He sent it. He's been happily chasing that feeling ever since.", { narr: true, story: true }),
       ],
-      bye: [l("oti.b.go", "happy", T, () => "Off you go! Perfect sending weather!"), l("oti.b.sand", "happy", T, () => "Have a good one. There's a spare sandwich if you change your mind.")],
+      bye: [l("oti.b.go", "happy", T, () => "Off you go! Perfect sending weather!"), l("oti.b.sand", "happy", T, () => "Have a good one. There's a spare sandwich if you change your mind."),
+        l("oti.b.late", "happy", c => c.part === "evening", () => "Lovely light now, isn't it? Best bit of the day. Go and climb in it."),
+        l("oti.b.prime", "excited", c => c.prime, () => "Perfect! Well, it's always perfect. But today's extra perfect."),
+        l("oti.b.cold", "happy", c => c.cold, () => "Wrap up! I've got a spare hat if you need one. It's got a pompom."),
+        l("oti.b.name", "happy", c => c.close && c.me, c => `Bye, ${c.me}! You're good company. Lenny would've liked you.`),
+        l("oti.b.dog", "excited", c => c.dogWith, () => "Bye, Pickles! Bye, you! Bye, Pickles again!"),
+        l("oti.b.proj", "excited", c => c.yourProj, c => `Go and get ${c.yourProj.full}! Today's the day. Probably. Maybe!`)],
       again: [l("oti.g.again", "happy", T, () => "Back again! Still perfect out there?"), l("oti.g.more", "happy", T, () => "Hello again! I've had another sandwich since you left.")],
     },
     rowan: {
@@ -572,6 +641,7 @@
         l("row.m.toldYes", "excited", c => c.told && c.told.sent, c => `You got ${c.told.full}! I knew you would.`, { w: 4 }),
         l("row.m.toldNo", "thoughtful", c => c.told && !c.told.sent && c.told.ago >= 2, c => `How's ${c.told.full} going? I've been thinking about that move you told me about.`, { w: 3 }),
         l("row.m.with", "happy", c => c.together, c => `I keep looking at the drawing from the day you sent ${c.together.full}. It's one of my favourites.`, { w: 3 }),
+        l("row.e.was", "happy", c => !!c.wasThere, c => ({ bonfire: "I drew the bonfire. Everyone's in it. You're the one nearest the fire, holding the cocoa.", midsummer: "I'm still thinking about the headlamps at the dusk session. I've tried drawing them six times.", trail: "I walk the new path every day now. It's my favourite way round. Thank you for helping." })[c.wasThere.key], { w: 5, story: true }),
         l("row.m.beta", "happy", c => c.betaWorked, c => `You did ${c.betaWorked.full}! I'm glad the drawing helped.`, { w: 5 }),
         l("row.m.hard", "excited", c => c.youHardest, c => `V${c.youHardest.grade}! That's your hardest yet, isn't it?`, { w: 3 }),
       ],
@@ -580,10 +650,23 @@
       ask: [
         l("row.a.proj", "thoughtful", c => c.proj, c => `${cap(c.proj.full)}. I like it because the holds look like a face. Once you see it you can't unsee it.`),
         l("row.a.none", "happy", c => !c.proj, () => "Nothing really. I'm drawing more than climbing today."),
+      l("row.a.still", "thoughtful", c => c.projSame, c => `Still ${c.proj.full}. I've drawn it so often I could climb it with my eyes shut. Not with them open, though.`, { w: 4 }),
+      l("row.a.close", "happy", c => c.proj && c.proj.close, c => `${cap(c.proj.full)}. I'm close. I keep drawing the last move as if I've done it, for luck.`, { w: 2 }),
+      l("row.a.new", "happy", c => c.proj && c.proj.n <= 2, c => `I've just started ${c.proj.full}. One sketch, no moves. That's the right order.`, { w: 2 }),
+      l("row.a.long", "thoughtful", c => c.proj && c.proj.n >= 8, c => `${cap(c.proj.full)}. ${cap(c.proj.dur)}. It's on nearly every page of this sketchbook.`, { w: 2 }),
+      l("row.a.done", "happy", c => !c.proj && c.done && c.done.sent, c => `Nothing at the moment. Since ${c.done.full} I've mostly been drawing other people's.`, { w: 3 }),
+      l("row.a.same", "smitten", c => c.sameProj && (c.sweet || c.us), c => `${cap(c.proj.full)}. Same as you. I like that. It feels like a secret.`, { w: 6, sweet: true }),
+      l("row.a.same2", "happy", c => c.sameProj && !c.sweet && !c.us, c => `${cap(c.proj.full)}. Same as you! We could work it out together.`, { w: 6 }),
+      l("row.a.none2", "thoughtful", c => !c.proj, () => "I'm between projects. I'm letting the boulders choose me for a bit."),
       ],
       tell: [
         l("row.k.did", "happy", c => c.yourProj && c.yourProj.theyDid && !c.yourProj.tipped, c => `I've done ${c.yourProj.full}! I drew the moves afterwards. Do you want to see?`, { w: 3 }),
         l("row.k.go", "thoughtful", c => c.yourProj, c => `${cap(c.yourProj.full)}? Tell me about the hard move. I want to picture it.`),
+      l("row.k.again", "happy", c => c.toldSame, c => `${cap(c.yourProj.full)}, still? I'd like to draw you on it when you send. If that's all right.`, { w: 2 }),
+      l("row.k.long", "thoughtful", c => c.yourProj && c.yourProj.att >= 20, c => `${cap(c.yourProj.full)}. You've been at it a long time. I like watching people not give up.`, { w: 2 }),
+      l("row.k.same", "happy", c => c.sameProj, c => `${cap(c.yourProj.full)}? That's mine too. We could work it out together, if you want.`, { w: 6 }),
+      l("row.k.tip", "thoughtful", c => c.yourProj && c.yourProj.tipped, c => `${cap(c.yourProj.full)}. Did my drawing of the move make any sense? I can do a bigger one.`, { w: 2 }),
+      l("row.k.go2", "happy", c => c.yourProj, c => `${cap(c.yourProj.full)}. I know the one. The light's lovely on it late in the day.`),
       ],
       beta: [
         l("row.b.alt", "excited", c => c.beta && c.beta.what === "alt", c => `Wait, I drew this. Look. ${c.beta.how} It's easier to see on paper.`, { w: 3 }),
@@ -636,6 +719,11 @@
         l("row.s.winter", "thoughtful", T, () => "Rowan shows you a drawing of the Hollow in winter, all snow and dark rock. “I've never actually seen it in winter. I'm guessing.”", { narr: true, story: true }),
       ],
       bye: [l("row.b.see", "happy", c => !c.us, () => "See you around? I'll be here. Probably drawing."), l("row.b.careful", "happy", c => !c.us, () => "Climb well. Not that you need me to say that."),
+        l("row.b.late", "happy", c => !c.us && c.part === "evening", () => "The light's going gold. If you're still around later, I'll be the one with the sketchbook."),
+        l("row.b.proj", "happy", c => !c.us && c.yourProj, c => `Good luck on ${c.yourProj.full}. I'll be listening for the cheering.`),
+        l("row.b.dog", "happy", c => c.dogWith, () => "Bye, Pickles. Look after your climber."),
+        l("row.b.cold", "happy", c => !c.us && c.cold, () => "Keep warm. Cold hands are good on the rock and terrible for drawing."),
+        l("row.b.name", "happy", c => !c.us && c.close && c.me, c => `See you, ${c.me}. This was nice.`),
         l("row.b.sw", "shy", c => c.sweet, () => "Bye. I mean, see you soon. I mean— bye!", { w: 2, sweet: true }),
         l("row.b.us1", "smitten", c => c.us, () => "See you later? Don't fall off anything. Or do, and I'll draw it.", { sweet: true }),
         l("row.b.us2", "smitten", c => c.us, () => "Rowan squeezes your hand. “Go on, then. Go and climb something.”", { narr: true, sweet: true })],
@@ -686,6 +774,7 @@
         l("bea.m.toldNo", "happy", c => c.told && !c.told.sent && c.told.ago >= 2, c => `Did you send ${c.told.full} yet? Just jump.`, { w: 3 }),
         l("bea.m.toldYes", "excited", c => c.told && c.told.sent, c => `YOU SENT ${c.told.full.toUpperCase()}!`, { w: 4 }),
         l("bea.m.with", "happy", c => c.together, c => `That day on ${c.together.full} was the best. I told my mom about it. She said “that's nice, sweetie.”`, { w: 2 }),
+        l("bea.e.was", "excited", c => !!c.wasThere, c => ({ bonfire: "The bonfire was SO good. I stayed till the very end! My mom came to pick me up and stayed for a story too.", midsummer: "The dusk session!! I did a problem by headlamp! It was V2 but it was in the DARK.", trail: "I raked SO much on Trail Day. My arms are more tired than after climbing. Thanks for helping!" })[c.wasThere.key], { w: 5, story: true }),
         l("bea.m.beta", "excited", c => c.betaWorked, c => `YOU DID ${c.betaWorked.full.toUpperCase()} WITH MY BETA. I'm telling everyone.`, { w: 5 }),
       ],
       others: [l("bea.o.news", "excited", c => c.other, c => `Did you hear ${c.other.person} ${c.other.fa ? "put up" : "sent"} ${c.other.full}?! I wasn't there. I heard about it. I'm basically a witness.`, { w: 2 }),
@@ -693,10 +782,22 @@
       ask: [
         l("bea.a.proj", "excited", c => c.proj, c => `${cap(c.proj.full)}! It's not a dyno. I'm making it a dyno.`),
         l("bea.a.none", "happy", c => !c.proj, () => "Nothing! Everything! Whatever looks jumpy."),
+      l("bea.a.still", "frustrated", c => c.projSame, c => `STILL ${c.proj.full}. I know. I KNOW. It's fine.`, { w: 4 }),
+      l("bea.a.close", "excited", c => c.proj && c.proj.close, c => `${cap(c.proj.full)}, and I'm SO close. Like, fingertips close. Literally fingertips.`, { w: 2 }),
+      l("bea.a.new", "excited", c => c.proj && c.proj.n <= 2, c => `New project! ${cap(c.proj.full)}! I haven't fallen off it yet. Because I haven't tried it yet.`, { w: 2 }),
+      l("bea.a.long", "frustrated", c => c.proj && c.proj.n >= 8, c => `${cap(c.proj.full)}. ${cap(c.proj.dur)}. My mom says I talk about it in my sleep.`, { w: 2 }),
+      l("bea.a.done", "excited", c => !c.proj && c.done && c.done.sent, c => `Nothing! I sent ${c.done.full}, so I'm free. Free to dyno at things.`, { w: 3 }),
+      l("bea.a.same", "excited", c => c.sameProj, c => `WAIT. You're on ${c.proj.full} too? Okay, new rule: whoever sends it first, the other one cheers the loudest.`, { w: 6 }),
+      l("bea.a.none2", "happy", c => !c.proj, () => "I was going to project something but then I saw a jump and now I'm doing the jump."),
       ],
       tell: [
         l("bea.k.did", "embarrassed", c => c.yourProj && c.yourProj.theyDid && !c.yourProj.tipped, c => `I did ${c.yourProj.full}! Want the beta? It's not “jump”. Okay, it's a little bit “jump”.`, { w: 3 }),
         l("bea.k.go", "excited", c => c.yourProj, c => `${cap(c.yourProj.full)}! Have you tried jumping for it?`),
+      l("bea.k.again", "excited", c => c.toldSame, c => `Still ${c.yourProj.full}? You're SO stubborn. I respect it.`, { w: 2 }),
+      l("bea.k.long", "excited", c => c.yourProj && c.yourProj.att >= 20, c => `${cap(c.yourProj.full)}, still?? Okay, you have to send it now. For both of us.`, { w: 2 }),
+      l("bea.k.same", "excited", c => c.sameProj, c => `NO WAY. ${cap(c.yourProj.full)} is mine too! Race you. It's not a race. It's a race.`, { w: 6 }),
+      l("bea.k.tip", "happy", c => c.yourProj && c.yourProj.tipped, c => `${cap(c.yourProj.full)}! Did you try my way? The jumpy way?`, { w: 2 }),
+      l("bea.k.go2", "excited", c => c.yourProj, c => `${cap(c.yourProj.full)}! Ooh. Can I watch when you try it?`),
       ],
       beta: [
         l("bea.b.alt", "excited", c => c.beta && c.beta.what === "alt", c => `OKAY so. ${c.beta.how} It's SO much easier. Nobody believes me.`, { w: 3 }),
@@ -733,7 +834,13 @@
         l("bea.s.highball", "embarrassed", T, c => `Bea admits she's a bit scared of highballs. “Don't tell anyone.${c.around("n:dez") ? " Especially Dez." : ""}”`, { narr: true, story: true }),
         l("bea.s.snacks", "happy", T, () => "Bea explains her ranking of every snack at the gas station by the highway. It's very detailed. The peanut butter cups win by a mile.", { narr: true, story: true }),
       ],
-      bye: [l("bea.b.bye", "excited", T, () => "Byeee! Jump for things!"), l("bea.b.mom", "happy", T, () => "Okay bye! If my mom asks, I was resting.")],
+      bye: [l("bea.b.bye", "excited", T, () => "Byeee! Jump for things!"), l("bea.b.mom", "happy", T, () => "Okay bye! If my mom asks, I was resting."),
+        l("bea.b.late", "embarrassed", c => c.part === "evening", () => "I have to go soon, my mom said home before dark. Okay, she said home at six. It's fine."),
+        l("bea.b.prime", "excited", c => c.prime, () => "It's SO good today! Go send something! Then tell me!"),
+        l("bea.b.cold", "excited", c => c.cold, () => "Byeee! I can't feel my fingers. That's good, right? Dez says that's good."),
+        l("bea.b.name", "happy", c => c.close && c.me, c => `Bye, ${c.me}! You're my favourite. Don't tell Dez.`),
+        l("bea.b.dog", "happy", c => c.dogWith, () => "Bye, Pickles! Bye! He didn't look at me. He's busy. It's fine."),
+        l("bea.b.proj", "excited", c => c.yourProj, c => `Go send ${c.yourProj.full}! I believe in you! Loudly!`)],
       again: [l("bea.g.again", "excited", T, () => "You're back! Did you see me just now? No? Okay, I'll do it again."), l("bea.g.more", "happy", T, () => "Hi again! I've done like ten more dynos since you left.")],
     },
     dez: {
@@ -778,14 +885,26 @@
         l("dez.m.toldNo", "thoughtful", c => c.told && !c.told.sent && c.told.ago >= 2, c => `${cap(c.told.full)}. Still on it?`, { w: 3 }),
         l("dez.m.toldYes", "happy", c => c.told && c.told.sent, c => `Heard about ${c.told.full}. Nice.`, { w: 4 }),
         l("dez.m.with", "happy", c => c.together, c => `Good day, that one. ${cap(c.together.full)}.`, { w: 2 }),
+        l("dez.e.was", "neutral", c => !!c.wasThere, c => ({ bonfire: "Good fire.", midsummer: "Good session, the dusk one. I climb better in the dark.", trail: "New path's good. Faster. Thanks for helping." })[c.wasThere.key], { w: 5, story: true }),
         l("dez.m.beta", "happy", c => c.betaWorked, c => `${cap(c.betaWorked.full)}. Told you.`, { w: 5 }),
       ],
       others: [l("dez.o.news", "neutral", c => c.other, c => `${c.other.person} ${c.other.fa ? "put up" : "got"} ${c.other.full}. Good for them.`, { w: 2 }),
         l("dez.o.party", "neutral", c => c.party, c => `${c.party.person}. ${cap(c.party.full)}. Strong.`, { w: 4, story: true })],
-      ask: [l("dez.a.proj", "thoughtful", c => c.proj, c => `${cap(c.proj.full)}. Hard. Good.`), l("dez.a.none", "neutral", c => !c.proj, () => "Nothing right now. Looking.")],
+      ask: [l("dez.a.proj", "thoughtful", c => c.proj, c => `${cap(c.proj.full)}. Hard. Good.`), l("dez.a.none", "neutral", c => !c.proj, () => "Nothing right now. Looking."),
+        l("dez.a.still", "neutral", c => c.projSame, c => `${cap(c.proj.full)}. Still.`, { w: 4 }),
+        l("dez.a.close", "happy", c => c.proj && c.proj.close, c => `${cap(c.proj.full)}. Close.`, { w: 2 }),
+        l("dez.a.new", "thoughtful", c => c.proj && c.proj.n <= 2, c => `Started ${c.proj.full}. Don't know it yet.`, { w: 2 }),
+        l("dez.a.long", "thoughtful", c => c.proj && c.proj.n >= 8, c => `${cap(c.proj.full)}. ${cap(c.proj.dur)}. I like the long ones.`, { w: 2 }),
+        l("dez.a.done", "neutral", c => !c.proj && c.done && c.done.sent, c => `Nothing. Did ${c.done.full}. Looking for the next one.`, { w: 3 }),
+        l("dez.a.same", "happy", c => c.sameProj, c => `${cap(c.proj.full)}. Same as you. Good line.`, { w: 6 })],
       tell: [
         l("dez.k.did", "thoughtful", c => c.yourProj && c.yourProj.theyDid && !c.yourProj.tipped, c => `${cap(c.yourProj.full)}. Did it. Want the beta?`, { w: 3 }),
         l("dez.k.go", "happy", c => c.yourProj, c => `${cap(c.yourProj.full)}. You'll get it.`),
+      l("dez.k.again", "neutral", c => c.toldSame, c => `${cap(c.yourProj.full)}. Still. Good.`, { w: 2 }),
+      l("dez.k.long", "thoughtful", c => c.yourProj && c.yourProj.att >= 20, c => `${cap(c.yourProj.full)}. Long one. They're worth it.`, { w: 2 }),
+      l("dez.k.same", "happy", c => c.sameProj, c => `${cap(c.yourProj.full)}. Mine too. Huh.`, { w: 6 }),
+      l("dez.k.tip", "neutral", c => c.yourProj && c.yourProj.tipped, c => `${cap(c.yourProj.full)}. The beta work?`, { w: 2 }),
+      l("dez.k.go2", "neutral", c => c.yourProj, c => `${cap(c.yourProj.full)}. Good line.`),
       ],
       beta: [
         l("dez.b.alt", "happy", c => c.beta && c.beta.what === "alt", c => `${c.beta.how} …Changes it.`, { w: 3 }),
@@ -822,7 +941,12 @@
         l("dez.s.listen", "happy", T, () => "Dez asks what you're working on, and listens properly to the whole answer. “You'll get it,” Dez says, as if it's a fact.", { narr: true, story: true }),
         l("dez.s.trip", "thoughtful", T, () => "Dez tells you about a boulder in another country that took three trips to send. It's the most words you've ever heard Dez say. At the end: “Worth it.”", { narr: true, story: true }),
       ],
-      bye: [l("dez.b.see", "neutral", T, () => "See you."), l("dez.b.good", "happy", T, () => "Good session.")],
+      bye: [l("dez.b.see", "neutral", T, () => "See you."), l("dez.b.good", "happy", T, () => "Good session."),
+        l("dez.b.late", "neutral", c => c.part === "evening", () => "Light's going. Last tries."),
+        l("dez.b.prime", "happy", c => c.prime, () => "Good day. Use it."),
+        l("dez.b.cold", "happy", c => c.cold, () => "Cold. Good. Go."),
+        l("dez.b.name", "happy", c => c.close && c.me, c => `See you, ${c.me}.`),
+        l("dez.b.proj", "neutral", c => c.yourProj, c => `Go get ${c.yourProj.full}.`)],
       again: [l("dez.g.again", "neutral", T, () => "Hey again."), l("dez.g.more", "happy", T, () => "Mm. Hi.")],
     },
   };
@@ -848,8 +972,14 @@
       l("bis.s.name", "happy", T, () => "The Bishop tells you how the crag got its name. The story takes nineteen minutes, involves a mule, and doesn't seem to be about the crag.", { narr: true, story: true }),
       l("bis.s.dot", "thoughtful", T, () => "The Bishop says Dot was the best climber he ever saw. He says it quietly, and for once he doesn't add anything funny.", { narr: true, story: true }),
       l("bis.s.tape", "happy", T, () => "The Bishop shows you how they used to tape their fingers in the seventies. It involves electrical tape. You decide not to try it.", { narr: true, story: true }),
+    l("bis.s.mule", "happy", T, () => "The Bishop explains how they used to get pads up to the far boulders: they didn't have pads. They had a mule called Gerald and a lot of jumpers. Gerald, he says, was the better climber.", { narr: true, story: true }),
+    l("bis.s.closed", "thoughtful", T, () => "The Bishop tells you about the day the park closed in '87. He came up anyway, the week after, and sat on the Billboard for an hour. “Just to tell it I'd be back.” It took thirty-eight years.", { narr: true, story: true }),
+    l("bis.s.valley", "thoughtful", T, () => "The Bishop points out where the old road went down into the valley before they flooded it. “There's a boulder down there nobody will ever climb again. Best problem I ever saw. Don't ask me what it was called.”", { narr: true, story: true }),
     ],
-    bye: [l("bis.b.bye", "happy", T, () => "Off you go. Mind the holds. Some of them are older than me.")],
+    bye: [l("bis.b.bye", "happy", T, () => "Off you go. Mind the holds. Some of them are older than me."),
+        l("bis.b.walk", "happy", T, () => "In my day we didn't say goodbye. We just walked off into the woods. Goodbye."),
+        l("bis.b.dark", "thoughtful", c => c.part === "evening", () => "Mind the dark. In '78 I spent a night up here by accident. Lovely night. Never again."),
+        l("bis.b.name", "happy", c => c.close && c.me, c => `Good to see you, ${c.me}. You remind me of me. Don't take it the wrong way.`)],
     closer: [
       l("bis.c.know", "happy", c => c.up === "know", c => `You've got a good ear for a story. Rare, these days. Back in '${c.yy}, everyone listened.`),
       l("bis.c.friends", "thoughtful", c => c.up === "friends", () => "I'll tell you something I don't tell everyone. Some of my stories are true. I'll let you work out which."),
@@ -1048,9 +1178,21 @@
     if (!out.length) { const h = choose(env, who, ["nod", "hello"], c, r); if (h) out.push(h); }
     return out;
   }
+  // When every goodbye's been said lately, they wave you off instead (Stage 8: a goodbye
+  // ends every conversation, so the spoken ones would otherwise come round every few days).
+  const WAVES = {
+    gus: ["Gus gives you a little salute with his clipboard.", "Gus waves you off and goes back to frowning at the gate.", "Gus nods. “Mind how you go.”"],
+    hollis: ["Hollis raises a pencil in farewell and goes back to the notebook.", "Hollis nods, already writing something down. You hope it's nice.", "Hollis waves, then checks the time and writes that down too."],
+    otis: ["Otis waves with a sandwich.", "Otis beams and waves you off.", "Otis gives you a thumbs up and a very big smile."],
+    rowan: ["Rowan waves, and goes back to the sketchbook.", "Rowan smiles and waves you off.", "Rowan gives you a little wave with the pencil."],
+    bea: ["Bea waves with both arms.", "Bea yells “BYE!” across the boulders.", "Bea gives you a fist bump and runs off to jump at something."],
+    dez: ["Dez nods.", "Dez lifts a hand. That's a wave, from Dez.", "Dez nods and goes back to the line."],
+    bishop: ["The Bishop tips an imaginary hat.", "The Bishop waves you off with his walking stick."],
+  };
   function reply(env, who, topic) {
     const c = ctxFor(env, who), r = env.rng || Math.random;
-    const b = choose(env, who, [topic], c, r);
+    const b = topic === "bye" && WAVES[c.key] ? choose(env, who, [topic], c, r, true) : choose(env, who, [topic], c, r);
+    if (!b && topic === "bye" && WAVES[c.key]) { const w = WAVES[c.key]; return [{ id: c.key.slice(0, 3) + ".wave", t: w[Math.floor(r() * w.length)], mood: "happy", narr: true }]; }
     return b ? [b] : [];
   }
   // For tests: every line, rendered against a save's context (no choosing, nothing recorded).
@@ -1066,6 +1208,7 @@
       out.push({ id: "row.f." + x.id + ".label", topic: "playful", t: x.label(c), mood: "neutral" });
       for (const [k, v] of Object.entries({ early: x.early, sweet: x.sweet, us: x.say })) if (v) out.push({ id: `row.f.${x.id}.${k}`, topic: "playful", t: cap(v[1]), mood: v[0] });
     }
+    (WAVES[c.key] || []).forEach((t, i) => out.push({ id: `${c.key.slice(0, 3)}.wave.${i}`, topic: "bye", t, mood: "happy" }));
     if (c.key === "rowan") for (const [k, t] of Object.entries(SUNSET)) out.push({ id: "row.sunset." + k, topic: "sunset", t, mood: "smitten" });
     return out;
   }
@@ -1076,6 +1219,6 @@
     const b = choose(env, who, ["note"], c, r, false, sun);
     return b ? b.t : null;
   }
-  const Talk = { context, opening, reply, note, everyLine, LINES, PLAYFUL, SUNSET, playful, flirtBack, GENDERED, how, moveWord, ALT_HOW, STYLE_HOW, HOLD_HOW, mentions: (t, c) => /rowan/i.test(t) || !!(c && c.me && t.includes(c.me)) };
+  const Talk = { WAVES, context, opening, reply, note, everyLine, LINES, PLAYFUL, SUNSET, playful, flirtBack, GENDERED, how, moveWord, ALT_HOW, STYLE_HOW, HOLD_HOW, mentions: (t, c) => /rowan/i.test(t) || !!(c && c.me && t.includes(c.me)) };
   if (typeof module !== "undefined") module.exports = Talk; else root.Talk = Talk;
 })(typeof window !== "undefined" ? window : globalThis);

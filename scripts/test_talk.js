@@ -305,6 +305,39 @@ test("the comp, after: results, your place, theirs; grade disputes; a big first 
     Object.assign(e, JSON.parse(keepE)); e.logs = JSON.parse(keepE).logs;
   } finally { g.events = keepEv; g.date = keepDate; }
 });
+test("Stage 8: asking again says “still”; the same project as you; goodbyes vary, then a wave; gatherings remembered", () => {
+  const { g, K } = saves[2], keep = JSON.stringify(g.social), keepEv = g.events, keepReg = JSON.stringify(g.world.reg);
+  try {
+    const p = Object.keys(g.ps).map(Number).find(i => !g.ps[i].sent && g.ps[i].att >= 3 && K.visible(i));
+    for (const w of World.REG) {
+      const R = World.regOf(g, w);
+      R.proj = { p: p ?? 0, since: World.addDays(g.date, -20), n: 9, best: 0.5 };
+      Social.say(g, w, w.slice(2, 5) + ".a.proj", World.addDays(g.date, -3));
+      const c = Talk.context(env(g, K), w);
+      assert(c.projSame, `${w}: asked about the same project 3 days ago`);
+      const lines = Talk.everyLine(env(g, K), w);
+      assert(lines.some(x => /\.a\.still$/.test(x.id)), `${w} has a “still” answer`);
+      if (p != null && c.yourProj && c.yourProj.p === p) {
+        assert(c.sameProj && lines.some(x => /\.a\.same2?$/.test(x.id)) && lines.some(x => /\.k\.same$/.test(x.id)), `${w}: the same project as you`);
+      }
+      for (const x of lines) if (/\.(a|k|b)\./.test(x.id) || /\.wave\./.test(x.id)) { assert(x.t && !/undefined|null|NaN/.test(x.t), x.id); if (w === "n:rowan") assert(!Talk.GENDERED.test(x.t), `${x.id}: ${x.t}`); }
+      // A goodbye every conversation: spoken ones while they're fresh, then a wave.
+      const seen = new Set(); let waves = 0;
+      for (let k = 0; k < 12; k++) { const b = Talk.reply(env(g, K), w, "bye")[0]; assert(b && b.t, `${w} says goodbye`); if (/\.wave$/.test(b.id)) waves++; else { assert(!seen.has(b.id), `${w} repeated ${b.id} the same day`); seen.add(b.id); } }
+      assert(seen.size >= 3 && waves > 0, `${w}: ${seen.size} goodbyes, then ${waves} waves`);
+    }
+    // The bonfire you went to, three days later; Trail Day only if you helped (and a trail opened).
+    g.events = { "2025-12-21": { k: "bonfire", there: true } };
+    const d = g.date; g.date = "2025-12-24";
+    for (const w of World.REG) { const x = Talk.everyLine(env(g, K), w).find(x => /\.e\.was$/.test(x.id)); assert(x && x.t, `${w} remembers the bonfire`); if (w === "n:rowan") assert(!Talk.GENDERED.test(x.t), x.t); }
+    g.date = "2025-12-30"; assert(!Talk.context(env(g, K), "n:gus").wasThere, "a week later, it's not news");
+    g.events = { "2025-12-21": { k: "bonfire" } }; g.date = "2025-12-24"; assert(!Talk.context(env(g, K), "n:gus").wasThere, "not if you weren't there");
+    g.events = { "2026-08-01": { k: "trail", helped: true, trail: "quarrymen" } }; g.date = "2026-08-03";
+    assert(Talk.context(env(g, K), "n:otis").wasThere.key === "trail", "Trail Day, helped");
+    g.events = { "2026-08-01": { k: "trail" } }; assert(!Talk.context(env(g, K), "n:otis").wasThere, "Trail Day, didn't help");
+    g.date = d;
+  } finally { g.social = JSON.parse(keep); g.events = keepEv; g.world.reg = JSON.parse(keepReg); }
+});
 if (process.argv.includes("--show")) {
   const { g, K } = saves[2];
   for (const w of WHO) {

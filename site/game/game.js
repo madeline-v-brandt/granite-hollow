@@ -223,7 +223,10 @@
     if (ev && !first) G.day.last.text += " " + EVENT_INTRO[ev.key] + (ev.key === "trail" ? trailDayWords() : "");
     else if (v2() && !first) {
       const n = World.nextEvent(addDays(G.date, 1), 6);
-      if (n) G.day.last.text += ` Gus has put up a poster at the kiosk: ${n.name}, ${n.in === 0 ? "tomorrow" : longDay(n.date)}.`;
+      // The first day you see it, and again the day before (Stage 8: not every morning that week).
+      if (n && G.poster !== n.date) G.day.last.text += ` Gus has put up a poster at the kiosk: ${n.name}, ${n.in === 0 ? "tomorrow" : longDay(n.date)}.`;
+      else if (n && n.in === 0) G.day.last.text += ` Tomorrow: ${n.name}. Somebody has added a drawing of Pickles to the poster at the kiosk.`;
+      if (n) G.poster = n.date;
       if (w.label === "Prime" && [0, 6].includes(toDate(G.date).getUTCDay()) && Mech.rainStart(w) == null) { G.day.busy = true; G.day.last.text += " Word's out that it's prime: the lot's busier than usual."; }
     }
     // Rained out: no climbing on wet granite, but the park's open (since the polish
@@ -1136,7 +1139,7 @@
   // Midsummer Dusk Session gather everyone at The Tailgate at dusk; on Trail Day you can help
   // Gus. Missing one costs nothing: it's in Local Buzz, and people talk about it.
   // G.events[date]: what you did (a comp: { k, score, place, of, there }; { k, there };
-  // { k: "trail", helped, area }); G.day.trail: you helped today.
+  // { k: "trail", helped, trail }); G.day.trail: you helped today.
   const eventToday = () => (v2() && G.day ? World.eventOn(G.date) : null);
   const compGrade = p => (G.world && G.world.est[p] ? G.world.est[p].grade : D.problems[p].grade);
   const ORDS = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
@@ -1343,10 +1346,13 @@
     const ro = Social.romance(G), dusk = G.day.weather.dusk;
     // Rowan, once it's time to ask about the sunset, and out till dusk: always (Stage 6).
     const sunsetNote = x => x.who === "n:rowan" && ro.canAsk && x.to >= dusk && !rainNow() && !(Mech.rainStart(G.day.weather) != null && Mech.rainStart(G.day.weather) < dusk);
-    for (const x of cand.sort((a, b) => (sunsetNote(b) ? 1 : 0) - (sunsetNote(a) ? 1 : 0) || Math.random() - 0.5)) {
+    // One friend might leave a note, not each of them (Stage 8: with several good friends a
+    // note came most mornings), and never two mornings running, except Rowan's sunset note.
+    const yesterday = last.date === addDays(G.date, -1);
+    for (const x of cand.filter(x => (Social.tier(G, x.who) || { n: 0 }).n >= 2).sort((a, b) => (sunsetNote(b) ? 1 : 0) - (sunsetNote(a) ? 1 : 0) || Math.random() - 0.5).slice(0, 1)) {
       const t = Social.tier(G, x.who), sun = sunsetNote(x);
       const p = x.who === "n:rowan" && ro.n === 4 ? 0.45 : x.who === "n:rowan" && ro.n >= 2 ? 0.3 : t && t.n >= 3 ? 0.3 : 0.18;
-      if (!t || t.n < 2 || (!sun && Math.random() >= p)) continue;
+      if (!sun && (yesterday || Math.random() >= p)) continue;
       const b = x.b, sec = D.boulders[b].sector;
       const where = K.boulder(b) >= 1 ? `at ${D.boulders[b].name}` : `at ${sec}`;
       const when = x.from <= G.day.minute + 30 ? (x.to <= 800 ? "this morning" : "today") : `from about ${clock(x.from)}`;
@@ -1914,6 +1920,10 @@
     root.hidden = false; $("#mapwrap").classList.add("talking");
     root.querySelectorAll("[data-act]").forEach(x => { x.onclick = ev => { ev.stopPropagation(); x.dataset.act === "dismiss" ? closeTalk() : talkAct(x.dataset.act); }; });
     const focus = root.querySelector("[data-next], .talk-choice:not([disabled])"); if (focus && !document.querySelector(".modal")) focus.focus({ preventScroll: true });
+    // On a phone the page scrolls, and the box covers the map's lower half, which can be
+    // below the screen: bring it into view as a conversation starts (Stage 8).
+    const box = root.querySelector(".talk");
+    if (fresh && box && innerWidth <= 760) { const r = box.getBoundingClientRect(); if (r.bottom > innerHeight + 1 || r.top < 0) box.scrollIntoView({ block: r.height > innerHeight ? "start" : "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }
   }
   // Keys while you're talking: Esc leaves, 1–9 pick a reply, Enter or Space goes on.
   document.addEventListener("keydown", ev => {
@@ -4070,6 +4080,7 @@
       }
       if (Object.keys(ok).length) g.events = ok; else delete g.events;
     }
+    if (g.poster != null && !(typeof g.poster === "string" && World.eventOn(g.poster))) delete g.poster;   // the event whose poster you've seen (Stage 8)
     if (g.day && g.day.trail != null && g.day.trail !== true) delete g.day.trail;
     if (g.day && g.day.busy != null && g.day.busy !== true) delete g.day.busy;
     // Rowan (Stage 6): G.romance checked and cleaned; today's sunset state only if it's one we know.
