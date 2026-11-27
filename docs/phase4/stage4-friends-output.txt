@@ -1,0 +1,18 @@
+
+sociable (30 players, 240 climbing days): tiers know 8, friends 22, good 55
+  first friend of each tier, climbing day (median): know 6, friends 14, good friends 40
+  gus     know    7 (30/30)   friends   21 (30/30)   good   53 (30/30)
+  rowan   know    8 (30/30)   friends   21 (30/30)   good   44 (30/30)
+  hollis  know    9 (30/30)   friends   27 (30/30)   good   63 (30/30)
+  otis    know   14 (30/30)   friends   29 (30/30)   good   62 (30/30)
+  bea     know   19 (30/30)   friends   34 (30/30)   good   78 (30/30)
+  dez     know   29 (30/30)   friends   44 (30/30)   good   81 (30/30)
+
+casual (30 players, 240 climbing days): tiers know 8, friends 22, good 55
+  first friend of each tier, climbing day (median): know 15, friends 53, good friends 140
+  gus     know   30 (30/30)   friends   82 (30/30)   good  195 (24/30)
+  rowan   know   26 (30/30)   friends   68 (30/30)   good  160 (30/30)
+  hollis  know   45 (30/30)   friends  121 (30/30)   good  215 (16/30)
+  otis    know   40 (30/30)   friends   93 (30/30)   good  191 (19/30)
+  bea     know   57 (30/30)   friends  135 (30/30)   good  221 (14/30)
+  dez     know   50 (30/30)   friends  109 (30/30)   good  208 (12/30)

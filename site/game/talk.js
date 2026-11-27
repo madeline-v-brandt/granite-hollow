@@ -152,6 +152,24 @@
       const t = st && st.tips && st.tips[who];
       if (st && st.sent && Array.isArray(t) && st.sentOn && st.sentOn >= t[0] && days(st.sentOn, date) <= 10 && days(st.sentOn, date) >= 0) { c.betaWorked = { ...lineOf(+p), p: +p, alt: t[2] === "alt" }; break; }
     }
+    // Friendship (Stage 4): how close you are, a deepening they've yet to mention, how
+    // long since you last talked, what you've shared, and what you've done lately.
+    const rec = G.social && G.social.npc && G.social.npc[who];
+    c.tierN = (Social.tier(G, who) || { n: 0 }).n;
+    c.close = c.tierN >= 2;                                        // friends or good friends
+    c.up = rec && rec.up ? rec.up.key : null;
+    c.gap = env.gap || 0;                                          // days since you last talked, before today
+    c.knownFor = met && met.first ? days(met.first, date) : 0;
+    c.since = met && met.first ? (n => (n >= 330 ? "about a year" : n >= 60 ? `${num(Math.round(n / 30))} months` : n >= 14 ? `${num(Math.round(n / 7))} weeks` : "a few days"))(days(met.first, date)) : null;
+    const sh = Social.shared ? Social.shared(G, who) : {};
+    c.shared = sh;
+    const oldest = Social.remembers(G, who, ["sendWith"]).filter(x => x[2] != null && x[0] < date).pop();
+    if (oldest && days(oldest[0], date) >= 14) c.memory = { ...lineOf(oldest[2]), ago: days(oldest[0], date) };
+    if (c.youFa) { const p = +myFa[0]; c.youFa.grade = D.problems[p].grade; c.youFa.hard = D.problems[p].grade >= 4 && D.problems[p].grade >= (G.bestGrade ?? 0) - 1; }
+    const lv = G.lvlOn && typeof G.lvlOn === "object" ? Object.entries(G.lvlOn).filter(([, d]) => typeof d === "string" && days(d, date) <= 6 && days(d, date) >= 0).map(([l]) => +l).sort((a, b) => b - a)[0] : null;
+    if (lv != null && lv >= 2) c.youLevel = { level: lv };
+    if (env.invite && env.invite.who === who) c.invite = env.invite;
+    c.invited = !!(G.day && G.day.invite && G.day.invite.who === who && !G.day.invite.seen);
     c.pets = env.pets || 0; c.gusOut = !!env.gusOut;
     return c;
   }
@@ -166,6 +184,7 @@
       first: [l("gus.hi1", "happy", T, () => "Ranger Gus. Welcome to the Hollow. You're one of the first climbers allowed back in since '87, you know."),
         l("gus.hi2", "happy", T, () => "Morning! Gus. I look after the park. Mostly I look after Pickles.")],
       hello: [
+        l("gus.h.gap", "happy", c => c.gap >= 21, c => `Well, look who it is! ${c.gap >= 45 ? "I was about to put up a missing poster." : "Thought you'd found another park."} Good to have you back.`, { w: 6 }),
         l("gus.h.drill", "happy", T, () => "Pack it in, pack it out. You know the drill."),
         l("gus.h.early", "happy", c => c.part === "morning", () => "Morning! You're out early. Pickles was up before both of us."),
         l("gus.h.geese", "thoughtful", T, () => "If you see anyone feeding the geese, tell them Gus said no."),
@@ -191,6 +210,9 @@
         l("gus.d.fa", "excited", c => c.theirFa && !c.sentToday, c => `I put up ${c.theirFa.full} this week. A ranger's allowed one first ascent. It's in the rules. I wrote the rules.`, { w: 2 }),
       ],
       mine: [
+        l("gus.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level} now, I hear! The whole lot's talking about it. Well. Pickles is.`, { w: 4 }),
+        l("gus.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `A V${c.youFa.grade} first ascent! In my park! I'm going to have to make a little sign.`, { w: 5 }),
+        l("gus.m.memory", "happy", c => c.close && c.memory, c => `I still think about that day you sent ${c.memory.full}. Pickles does too, I reckon.`, { w: 2 }),
         l("gus.m.fa", "excited", c => c.youFa, c => `Saw ${c.youFa.full} on the CragLog. A first ascent in my park! I'll need to update the map.`, { w: 4 }),
         l("gus.m.send", "happy", c => c.youSent, c => `Heard you got up ${c.youSent.full}. Nice work. Did you leave the holds how you found them?`, { w: 2 }),
         l("gus.m.hard", "excited", c => c.youHardest, c => `V${c.youHardest.grade}! When you turned up you were climbing the kiosk steps.`, { w: 3 }),
@@ -224,7 +246,20 @@
         l("gus.r.1", "happy", c => c.rec, c => `Try ${c.rec.full}. I did it last week. It's just right for a sunny afternoon.`),
         l("gus.r.2", "happy", c => c.rec, c => `If you want something nice, ${c.rec.full}. I've been up it a few times now. Strictly for inspection purposes.`),
       ],
+      closer: [
+        l("gus.c.know", "happy", c => c.up === "know", c => `${c.me ? c.me + "! " : ""}You're becoming a regular. I'll stop writing your licence plate down.`),
+        l("gus.c.friends", "happy", c => c.up === "friends", () => "You know, Pickles has decided you're all right. And between you and me, so have I."),
+        l("gus.c.good", "excited", c => c.up === "good", () => "I had a spare gate key cut. I'm not going to give it to you. But I had it cut. That's the sort of thing I do for friends."),
+      ],
+      note: [
+        l("gus.v.1", "happy", c => c.invite, c => `Pickles and I are doing the rounds ${c.invite.where} ${c.invite.when}. Come and keep us company? —Gus`),
+        l("gus.v.2", "happy", c => c.invite, c => `If you're about, I'm trying a problem ${c.invite.where} ${c.invite.when}. Need a spotter. Pickles is useless. —Gus`),
+      ],
+      invited: [l("gus.i.1", "happy", c => c.invited, () => "You got my note! I wasn't sure it would survive the wipers.", { w: 3 })],
       story: [
+        l("gus.s.first", "thoughtful", c => c.close, () => "Gus tells you about his first day as ranger, in 1985: one truck, one map, and a radio that only picked up the polka station. “Two years later they shut the climbing. I kept the polka.”", { narr: true, story: true }),
+        l("gus.s.keys", "happy", c => c.close, () => "Gus shows you the key ring: forty-one keys, and he knows what about nine of them open. “The other thirty-two are a mystery. I like a mystery.”", { narr: true, story: true }),
+        l("gus.s.good", "thoughtful", c => c.tierN >= 3, () => "Gus admits the reopening was his idea, mostly: twenty years of letters to the county. “I just thought the rocks were lonely,” he says, and goes a bit pink.", { narr: true, story: true }),
         l("gus.s.closure", "thoughtful", T, () => "Gus tells you about the closure in '87: insurance, mostly, and one very loud town meeting. “Took thirty-eight years and a new county commissioner to get that gate open again.”", { narr: true, story: true }),
         l("gus.s.pickles", "happy", T, () => "Gus explains that Pickles turned up at the lot as a puppy one spring and simply never left. “He's not my dog. I just feed him. Every day. And he sleeps in my truck.”", { narr: true, story: true }),
         l("gus.s.walls", "thoughtful", T, () => "Gus points out the old quarry road through the trees, and the stone wall the farmers built before there was a park. “Everything out here was something else first.”", { narr: true, story: true }),
@@ -239,6 +274,7 @@
       first: [l("hol.hi1", "neutral", T, () => "Hollis Pruitt. I'm keeping notes on everything that goes up out here. Somebody has to."),
         l("hol.hi2", "thoughtful", T, () => "Hollis. I'm documenting every problem in this park. Some of them twice, in case the first one was wrong.")],
       hello: [
+        l("hol.h.gap", "excited", c => c.gap >= 21, c => `There you are! I'd marked you as “whereabouts unknown”. ${c.gap >= 45 ? "With a question mark." : "In pencil."} Welcome back.`, { w: 6 }),
         l("hol.h.witness", "thoughtful", T, () => "Ah, good. I need a witness. Does the Billboard traverse go left to right, or did I make that up?"),
         l("hol.h.twice", "happy", T, () => "Back again! I've updated the notes. Twice."),
         l("hol.h.prime", "happy", c => c.prime, () => "Prime conditions. I've written that down. I write the weather down every day. It'll matter one day.", { w: 2 }),
@@ -262,6 +298,9 @@
         l("hol.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3 && !c.theirFa, c => `I finally sent ${c.done.full}. ${cap(c.done.dur)}. I've written it up. Three pages. I may have overdone it.`, { w: 3 }),
       ],
       mine: [
+        l("hol.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level}! I've updated your entry. You have an entry, did I mention?`, { w: 4 }),
+        l("hol.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `${cap(c.youFa.full)}: a V${c.youFa.grade} first ascent. That's a proper addition to the record. I'll need a sketch. I'll do the sketch.`, { w: 5 }),
+        l("hol.m.memory", "happy", c => c.close && c.memory, c => `I was re-reading my notes on ${c.memory.full}, from the day you sent it. I wrote “witnessed”. I don't write that for everyone.`, { w: 2 }),
         l("hol.m.fa", "excited", c => c.youFa, c => `I've added ${c.youFa.full} to the binder. I'll need you to confirm the start holds. Officially.`, { w: 4 }),
         l("hol.m.send", "thoughtful", c => c.youSent, c => `${cap(c.youSent.full)}! I'll make a note. What did you think of the grade?`, { w: 2 }),
         l("hol.m.toldNo", "thoughtful", c => c.told && !c.told.sent && c.told.ago >= 2, c => `Have you sent ${c.told.full} yet? I've left a gap in the notes.`, { w: 3 }),
@@ -295,7 +334,20 @@
         l("hol.r.1", "happy", c => c.rec, c => `May I recommend ${c.rec.full}? I climbed it recently. The grade is, for once, correct.`),
         l("hol.r.2", "thoughtful", c => c.rec, c => `Have you been on ${c.rec.full}? I did it last week. Very well documented. By me.`),
       ],
+      closer: [
+        l("hol.c.know", "happy", c => c.up === "know", () => "I've started recognising your chalk bag from across the clearing. That's a sign, in my experience."),
+        l("hol.c.friends", "happy", c => c.up === "friends", () => "I've moved you from “acquaintances” to “friends” in the index. It's a very exclusive section. Otis is in it."),
+        l("hol.c.good", "excited", c => c.up === "good", () => "I'd like you to have a copy of the binder. A photocopy. Of the important pages. Which is all of them."),
+      ],
+      note: [
+        l("hol.v.1", "thoughtful", c => c.invite, c => `I'll be ${c.invite.where} ${c.invite.when}, checking grades. A second opinion would be very welcome. —H.P.`),
+        l("hol.v.2", "happy", c => c.invite, c => `Session ${c.invite.where} ${c.invite.when}? I've brought two pencils, one for you. —Hollis`),
+      ],
+      invited: [l("hol.i.1", "happy", c => c.invited, () => "You came! I'd put you down as “probable”. I'll change it to “confirmed”.", { w: 3 })],
       story: [
+        l("hol.s.why", "thoughtful", c => c.close, () => "Hollis explains the binder, properly, for the first time: a grandmother who climbed here in the sixties and never wrote anything down. “So nobody knows what she did. I didn't want that to happen again.”", { narr: true, story: true }),
+        l("hol.s.dispute", "embarrassed", c => c.close, () => "Hollis confesses to the Great Grade Dispute of last spring, conducted entirely in footnotes with someone who turned out to be Hollis, from an earlier draft.", { narr: true, story: true }),
+        l("hol.s.good", "happy", c => c.tierN >= 3, c => `Hollis shows you a new tab in the binder. It has your name on it${c.me ? ": “" + c.me + "”" : ""}, in very careful handwriting. “For your problems. All of them. Even the ones you fell off.”`, { narr: true, story: true }),
         l("hol.s.binder", "happy", T, () => "Hollis has a binder. An actual binder, with tabs. Every problem in the park is in it, with sketches, and some of them have footnotes.", { narr: true, story: true }),
         l("hol.s.attend", "thoughtful", T, () => "Hollis explains that the schoolhouse boulders are named after the 1920s attendance book. “Somebody had to. It might as well be accurate.”", { narr: true, story: true }),
         l("hol.s.nofa", "embarrassed", c => !c.anyFa, () => "Hollis admits to never having made a first ascent. “I'm a historian. Someone has to write it down.” Then, quieter: “There's one I've been looking at, though.”", { narr: true, story: true }),
@@ -309,6 +361,7 @@
       nod: [l("oti.n.1", "happy", T, () => "Hey hey!"), l("oti.n.2", "happy", T, () => "Well, hello!"), l("oti.n.3", "excited", T, () => "Look who it is!")],
       first: [l("oti.hi1", "excited", T, () => "Otis! Isn't it perfect sending weather?"), l("oti.hi2", "happy", T, () => "Name's Otis. Perfect day for it, isn't it?")],
       hello: [
+        l("oti.h.gap", "excited", c => c.gap >= 21, () => "Look who it is! You picked a perfect day to come back. Every day's perfect, but still.", { w: 6 }),
         l("oti.h.perfect", "happy", T, () => "Perfect sending weather!"),
         l("oti.h.wet", "happy", c => c.wx.wet, () => "Perfect sending weather! Well. Perfect sandwich weather.", { w: 3 }),
         l("oti.h.greasy", "happy", c => c.greasy || c.hot, () => "Bit warm. Perfect for… rest days. And sandwiches.", { w: 3 }),
@@ -332,6 +385,9 @@
         l("oti.d.slab", "happy", c => !c.done && c.proj && c.proj.n >= 6, c => `I've been on ${c.proj.full} for ${c.proj.dur}. It's a relationship now.`, { w: 2 }),
       ],
       mine: [
+        l("oti.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level}! In perfect sending weather, I bet. This calls for a sandwich.`, { w: 4 }),
+        l("oti.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `A V${c.youFa.grade} first ascent! ${cap(c.youFa.full)}! I'd have named it “Perfect Sending Weather”. But yours is good too.`, { w: 5 }),
+        l("oti.m.memory", "happy", c => c.close && c.memory, c => `Remember ${c.memory.full}? Perfect day. Perfect send. I had two sandwiches.`, { w: 2 }),
         l("oti.m.send", "happy", c => c.youSent, c => `${cap(c.youSent.full)}! I saw from over there. Beautiful. Perfect weather for it, too.`, { w: 2 }),
         l("oti.m.fa", "excited", c => c.youFa, c => `A first ascent! In perfect sending weather! ${cap(c.youFa.full)}. Ha! I love it.`, { w: 4 }),
         l("oti.m.toldNo", "happy", c => c.told && !c.told.sent && c.told.ago >= 2, c => `How's ${c.told.full}? Don't tell me. It's going perfectly.`, { w: 3 }),
@@ -365,7 +421,20 @@
         l("oti.r.1", "excited", c => c.rec, c => `Get on ${c.rec.full}! I did it the other day. Perfect conditions. Perfect line.`),
         l("oti.r.2", "happy", c => c.rec, c => `You'd love ${c.rec.full}. I've done it a few times now. It's like a sandwich: good every time.`),
       ],
+      closer: [
+        l("oti.c.know", "happy", c => c.up === "know", () => "You know what, I'm going to start bringing an extra sandwich for you. Officially."),
+        l("oti.c.friends", "excited", c => c.up === "friends", () => "We're friends now, you know. Climbing friends. Sandwich friends. The best kind."),
+        l("oti.c.good", "excited", c => c.up === "good", () => "I told Lenny about you on the phone. He says hi. He says I talk about you more than the weather."),
+      ],
+      note: [
+        l("oti.v.1", "happy", c => c.invite, c => `PERFECT SENDING WEATHER ${c.invite.where.toUpperCase()} ${c.invite.when.toUpperCase()}. Bring nothing. I have sandwiches. —Otis`),
+        l("oti.v.2", "happy", c => c.invite, c => `I'll be ${c.invite.where} ${c.invite.when}! Come and climb! There will be sandwiches. —O.`),
+      ],
+      invited: [l("oti.i.1", "excited", c => c.invited, () => "You found my note! Perfect. Sandwich?", { w: 3 })],
       story: [
+        l("oti.s.pal", "thoughtful", c => c.close, () => "Otis tells you about Lenny, who climbed with him every weekend from 1994 until Lenny moved to Arizona. “He said it was too humid here. Too humid! It was perfect.” Otis still makes Lenny's sandwich, out of habit.", { narr: true, story: true }),
+        l("oti.s.rain", "happy", c => c.close, () => "Otis confides that he does, in fact, know when it's raining. “But if you say it's perfect, people stay. And then you've got company.”", { narr: true, story: true }),
+        l("oti.s.good", "happy", c => c.tierN >= 3, () => "Otis hands you a sandwich wrapped in wax paper, with your initial on it in marker. “I've been making you one every time. You weren't always here. I ate those.”", { narr: true, story: true }),
         l("oti.s.1994", "thoughtful", T, () => "Otis has been climbing since 1994, mostly at the same three crags. “People ask why. Well, look at it.” You look at it. He has a point.", { narr: true, story: true }),
         l("oti.s.sandwich", "happy", T, () => "Otis shares half his sandwich. It's an excellent sandwich. He's been on the same slab for months and says it's the best thing he's never done.", { narr: true, story: true }),
         l("oti.s.bad", "thoughtful", T, () => "Otis tells you about the one time it was truly bad weather. Then he decides it wasn't that bad.", { narr: true, story: true }),
@@ -379,6 +448,7 @@
       first: [l("row.hi1", "embarrassed", T, () => "Oh! Hi. Sorry, I was sketching. I'm Rowan. This boulder has the best shadows in the morning."),
         l("row.hi2", "happy", T, () => "Hi, I'm Rowan. I come up here to draw the rocks and occasionally climb one.")],
       hello: [
+        l("row.h.gap", "happy", c => c.gap >= 21, () => "Oh! You're back. I kept looking up whenever someone came down the trail. Anyway. Hi.", { w: 6 }),
         l("row.h.back", "happy", T, () => "Hey, you're back! I was hoping someone would come up here."),
         l("row.h.light", "thoughtful", c => c.part === "morning", () => "The light's doing something lovely on the rock this morning. I've drawn it three times and it's still wrong.", { w: 2 }),
         l("row.h.glow", "happy", c => c.part !== "morning", () => "The afternoon light makes everything look like it's glowing. Even the chalk.", { w: 2 }),
@@ -400,6 +470,9 @@
       ],
       theirs: [l("row.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `I finally sent ${c.done.full}. The drawing of it is pinned up at the library now. Nobody knows it's a boulder.`, { w: 3 })],
       mine: [
+        l("row.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level}! I could tell, you know. You climb differently now. Smoother.`, { w: 4 }),
+        l("row.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `${cap(c.youFa.full)}. A V${c.youFa.grade} first ascent. Can I draw it? I want to get it down before anyone else climbs it.`, { w: 5 }),
+        l("row.m.memory", "happy", c => c.close && c.memory, c => `I found the drawing from the day you sent ${c.memory.full}. You're a little smudge at the top, with your arms up.`, { w: 2 }),
         l("row.m.send", "happy", c => c.youSent, c => `I saw you on ${c.youSent.full}. You looked so calm. Was it calm?`, { w: 2 }),
         l("row.m.fa", "excited", c => c.youFa, c => `You named a problem! ${cap(c.youFa.full)}. I'd like to draw it, if that's all right.`, { w: 4 }),
         l("row.m.toldYes", "excited", c => c.told && c.told.sent, c => `You got ${c.told.full}! I knew you would.`, { w: 4 }),
@@ -433,7 +506,20 @@
         l("row.r.1", "happy", c => c.rec, c => `Have you tried ${c.rec.full}? I did it recently. The light on it in the afternoon is lovely.`),
         l("row.r.2", "thoughtful", c => c.rec, c => `${cap(c.rec.full)}. I climbed it last week and thought of you. Is that weird? It suits how you climb.`),
       ],
+      closer: [
+        l("row.c.know", "happy", c => c.up === "know", () => "I've started saving you a spot on the pad without thinking about it. I hope that's all right."),
+        l("row.c.friends", "happy", c => c.up === "friends", () => "I'm really glad you keep coming up here. It's better with you around."),
+        l("row.c.good", "embarrassed", c => c.up === "good", () => "I've started drawing you into the background of all my boulders. They look a bit empty without you now."),
+      ],
+      note: [
+        l("row.v.1", "happy", c => c.invite, c => `I'll be ${c.invite.where} ${c.invite.when}, drawing and maybe climbing. Come by? —R.`),
+        l("row.v.2", "happy", c => c.invite, c => `${cap(c.invite.where)}, ${c.invite.when}. The light should be lovely. It'd be nice to climb together. —Rowan`),
+      ],
+      invited: [l("row.i.1", "happy", c => c.invited, () => "You came. I was hoping the note didn't blow away.", { w: 3 })],
       story: [
+        l("row.s.why", "thoughtful", c => c.close, () => "Rowan tells you why the drawing started: a year when everything felt too fast, and an art teacher who said “draw what's in front of you, slowly”. “Boulders are very good at staying still.”", { narr: true, story: true }),
+        l("row.s.library", "happy", c => c.close, () => "Rowan tells you about the regulars at the library: a man who reads every bus timetable, a girl working through the encyclopedia, a cat nobody owns. “It's a bit like here, really.”", { narr: true, story: true }),
+        l("row.s.good", "happy", c => c.tierN >= 3, () => "Rowan tears a page out of the sketchbook and gives it to you: the two of you, small, on a pad under a big grey boulder, done in charcoal. “I wanted you to have one.”", { narr: true, story: true }),
         l("row.s.book", "thoughtful", T, () => "Rowan shows you a sketchbook full of boulders, each with tiny arrows for the moves. “I can't always climb them. But I can draw them.”", { narr: true, story: true }),
         l("row.s.moved", "happy", T, () => "Rowan moved to the village in the spring for a job at the library, and found the park by accident on a walk. “I thought the rocks looked like they wanted to be climbed.”", { narr: true, story: true }),
         l("row.s.nothing", "happy", T, () => "You talk about nothing much for twenty minutes: the light on the rock, the best sandwich in the village, a song you both half remember. It's nice.", { narr: true, story: true }),
@@ -447,6 +533,7 @@
       first: [l("bea.hi1", "excited", T, () => "I'm Bea! Have you tried jumping for it? You should always try jumping for it."),
         l("bea.hi2", "excited", T, () => "Hi! Bea. Did you see that? I almost stuck it. Almost!")],
       hello: [
+        l("bea.h.gap", "excited", c => c.gap >= 21, () => "WHERE HAVE YOU BEEN. Okay, sorry. Hi. I've learned SO many dynos since.", { w: 6 }),
         l("bea.h.almost", "excited", T, () => "Did you see that? I almost stuck it! Almost!"),
         l("bea.h.school", "excited", c => !c.weekend && c.part !== "morning" && c.season !== "summer", () => "School was SO long today. I've got till my mom gets here. Go go go.", { w: 3 }),
         l("bea.h.nine", "happy", c => c.weekend && c.part === "morning", () => "My mom dropped me off at nine. I've already done like forty dynos.", { w: 3 }),
@@ -468,6 +555,9 @@
       ],
       theirs: [l("bea.d.sent", "excited", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `I sent ${c.done.full}! After ${c.done.dur}! I still can't believe it. I keep thinking about it in class.`, { w: 3 })],
       mine: [
+        l("bea.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level}!! That's so good! Okay now try a dyno at that grade.`, { w: 4 }),
+        l("bea.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `A V${c.youFa.grade} FIRST ASCENT?! ${c.youFa.full.toUpperCase()}! I'm telling my mom. She won't get it. I'm telling her.`, { w: 5 }),
+        l("bea.m.memory", "happy", c => c.close && c.memory, c => `Remember when you did ${c.memory.full} and I screamed? I'm still proud of that scream.`, { w: 2 }),
         l("bea.m.send", "excited", c => c.youSent, c => `You got ${c.youSent.full}?! Did you jump for it? You should've jumped for it.`, { w: 2 }),
         l("bea.m.fa", "excited", c => c.youFa, c => `You made a first ascent! ${cap(c.youFa.full)}. That's SO good.`, { w: 4 }),
         l("bea.m.hard", "excited", c => c.youHardest, c => `Your hardest one yet?! V${c.youHardest.grade}! Okay that's amazing.`, { w: 3 }),
@@ -501,7 +591,20 @@
         l("bea.r.1", "excited", c => c.rec, c => `Try ${c.rec.full}! I did it like a week ago. It's basically a dyno if you want it to be.`),
         l("bea.r.2", "excited", c => c.rec, c => `${cap(c.rec.full)}! I just did it. You'd crush it. You should do it now. Or after lunch.`),
       ],
+      closer: [
+        l("bea.c.know", "excited", c => c.up === "know", () => "Okay you're officially one of my crag people now. There's no test. Well, there's one test. Jump for something."),
+        l("bea.c.friends", "excited", c => c.up === "friends", () => "We're friends now! Climbing friends! I'm going to text you dynos. I don't have your number. I'll text them in my head."),
+        l("bea.c.good", "excited", c => c.up === "good", () => "You're honestly one of my favourite people. At the crag. And in general. Okay, moving on, look at this dyno."),
+      ],
+      note: [
+        l("bea.v.1", "excited", c => c.invite, c => `${c.invite.where.toUpperCase()} ${c.invite.when.toUpperCase()}!!! Dyno session. Be there!! —Bea`),
+        l("bea.v.2", "excited", c => c.invite, c => `I'll be ${c.invite.where} ${c.invite.when} (mom's dropping me off). Come climb!!! —B`),
+      ],
+      invited: [l("bea.i.1", "excited", c => c.invited, () => "YOU CAME!! Okay okay okay, I have so many things to show you.", { w: 3 })],
       story: [
+        l("bea.s.college", "thoughtful", c => c.close, () => "Bea admits she's been looking at colleges, but only the ones near good bouldering. “Mom says that's not how you pick. It's exactly how you pick.”", { narr: true, story: true }),
+        l("bea.s.first", "happy", c => c.close, () => "Bea tells you about her first time climbing, at a birthday party at the gym when she was nine. She jumped for the top hold of a route. “They said you can't do that. I did that.”", { narr: true, story: true }),
+        l("bea.s.good", "embarrassed", c => c.tierN >= 3, () => "Bea admits that before she met everyone here, she climbed alone and was a bit lonely. “Now it's like having a crag family. You're like my cool cousin. Don't make it weird.”", { narr: true, story: true }),
         l("bea.s.log", "happy", T, () => "Bea demonstrates a dyno on a log. She doesn't stick it. She is delighted anyway.", { narr: true, story: true }),
         l("bea.s.questions", "excited", T, () => "Bea wants to know your hardest send, your favourite problem, your shoe size and whether you've ever fallen off the top of something. All at once.", { narr: true, story: true }),
         l("bea.s.highball", "embarrassed", T, c => `Bea admits she's a bit scared of highballs. “Don't tell anyone.${c.around("n:dez") ? " Especially Dez." : ""}”`, { narr: true, story: true }),
@@ -514,6 +617,7 @@
       nod: [l("dez.n.1", "neutral", T, () => "Hey."), l("dez.n.2", "happy", T, () => "Mm. Hi."), l("dez.n.3", "neutral", c => c.part === "morning", () => "Morning.")],
       first: [l("dez.hi1", "neutral", T, () => "Dez. Good to meet you."), l("dez.hi2", "neutral", T, () => "…Dez. Hi.")],
       hello: [
+        l("dez.h.gap", "happy", c => c.gap >= 21, () => "Hey. Been a while. Good to see you.", { w: 6 }),
         l("dez.h.mm", "neutral", T, () => "Mm. Good conditions."),
         l("dez.h.prime", "happy", c => c.prime, () => "Good day.", { w: 2 }),
         l("dez.h.wet", "thoughtful", c => c.wx.wet, () => "Wet.", { w: 2 }),
@@ -534,6 +638,9 @@
       ],
       theirs: [l("dez.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `Finished ${c.done.full}. ${cap(c.done.dur)}. Worth it.`, { w: 3 })],
       mine: [
+        l("dez.m.level", "happy", c => c.youLevel, c => `V${c.youLevel.level}. Nice.`, { w: 4 }),
+        l("dez.m.hardfa", "happy", c => c.youFa && c.youFa.hard, c => `${cap(c.youFa.full)}. V${c.youFa.grade}, first ascent. …Respect.`, { w: 5 }),
+        l("dez.m.memory", "happy", c => c.close && c.memory, c => `${cap(c.memory.full)}. Still a good day, that.`, { w: 2 }),
         l("dez.m.send", "happy", c => c.youSent, c => `Saw ${c.youSent.full}. Clean.`, { w: 2 }),
         l("dez.m.fa", "happy", c => c.youFa, c => `${cap(c.youFa.full)}. Good name.`, { w: 4 }),
         l("dez.m.hard", "happy", c => c.youHardest, () => "You're getting strong.", { w: 3 }),
@@ -564,7 +671,20 @@
         l("dez.r.1", "happy", c => c.rec, c => `${cap(c.rec.full)}. Did it last week. Good moves.`),
         l("dez.r.2", "neutral", c => c.rec, c => `Try ${c.rec.full}. You'd like it.`),
       ],
+      closer: [
+        l("dez.c.know", "happy", c => c.up === "know", () => "You're here a lot. Good."),
+        l("dez.c.friends", "happy", c => c.up === "friends", () => "…Glad you're around. Saying it once."),
+        l("dez.c.good", "happy", c => c.up === "good", () => "You're a good friend. Not many of those out here. Well. Not many of those anywhere."),
+      ],
+      note: [
+        l("dez.v.1", "neutral", c => c.invite, c => `${cap(c.invite.where)}. ${cap(c.invite.when)}. Climb? —D`),
+        l("dez.v.2", "neutral", c => c.invite, c => `Session ${c.invite.where}, ${c.invite.when}. Coffee's on me. —Dez`),
+      ],
+      invited: [l("dez.i.1", "happy", c => c.invited, () => "You came. Good.", { w: 3 })],
       story: [
+        l("dez.s.mornings", "thoughtful", c => c.close, () => "Dez explains the early mornings: night shifts at the hospital, then straight here before sleep. “Quiet. Cold rock. Nobody asking anything.” A pause. “You don't count.”", { narr: true, story: true }),
+        l("dez.s.fear", "thoughtful", c => c.close, () => "Dez tells you, unprompted, about being scared of highballs for years, and climbing them anyway, slowly, one move higher each time. “Still scared. Just better at it.”", { narr: true, story: true }),
+        l("dez.s.good", "happy", c => c.tierN >= 3, () => "Dez hands you a thermos lid of coffee before you've asked, the way you'd hand one to an old friend. “You're one of the good ones,” Dez says, and goes back to the problem.", { narr: true, story: true }),
         l("dez.s.light", "thoughtful", T, () => "Dez doesn't say much. You sit and watch the light move across the rock. After a while: “That one's been bugging me for a month.”", { narr: true, story: true }),
         l("dez.s.rest", "happy", T, () => "Dez says the trick to hard climbing is resting properly. Then demonstrates, by lying down on the pad and closing their eyes.", { narr: true, story: true }),
         l("dez.s.listen", "happy", T, () => "Dez asks what you're working on, and listens properly to the whole answer. “You'll get it,” Dez says, as if it's a fact.", { narr: true, story: true }),
@@ -587,6 +707,7 @@
       l("bis.h.everything", "thoughtful", T, c => `Back in '${c.yy} we climbed everything out here. Everything. Nobody wrote any of it down, of course.`),
       l("bis.h.first", "happy", T, () => "You know who put up the first problem in this park? Me. Well. Me and Dot. Mostly me."),
       l("bis.h.name", "thoughtful", T, () => "They call me the Bishop. Don't ask why. It's a long story, and most of it's true."),
+      l("bis.h.gap", "happy", c => c.gap >= 21, c => `Thought you'd given up! Back in '${c.yy}, people gave up all the time. You're made of sterner stuff.`, { w: 5 }),
     ],
     story: [
       l("bis.s.name", "happy", T, () => "The Bishop tells you how the crag got its name. The story takes nineteen minutes, involves a mule, and doesn't seem to be about the crag.", { narr: true, story: true }),
@@ -594,6 +715,11 @@
       l("bis.s.tape", "happy", T, () => "The Bishop shows you how they used to tape their fingers in the seventies. It involves electrical tape. You decide not to try it.", { narr: true, story: true }),
     ],
     bye: [l("bis.b.bye", "happy", T, () => "Off you go. Mind the holds. Some of them are older than me.")],
+    closer: [
+      l("bis.c.know", "happy", c => c.up === "know", c => `You've got a good ear for a story. Rare, these days. Back in '${c.yy}, everyone listened.`),
+      l("bis.c.friends", "thoughtful", c => c.up === "friends", () => "I'll tell you something I don't tell everyone. Some of my stories are true. I'll let you work out which."),
+      l("bis.c.good", "happy", c => c.up === "good", () => "Dot would have liked you. That's the highest thing I can say about anybody."),
+    ],
     again: [l("bis.g.again", "thoughtful", T, c => `Back for more? Did I tell you about '${c.yy}?`)],
   };
   // Pickles: narration.
@@ -631,10 +757,11 @@
       return cap(t.trim());
     } catch (e) { return null; }
   }
-  function choose(env, who, topics, c, rng, freshOnly = false) {
+  function choose(env, who, topics, c, rng, freshOnly = false, only = null) {
     const { G, Social } = env, lib = LINES[c.key] || {};
     const cand = [];
     for (const tp of topics) for (const ln of lib[tp] || []) {
+      if (only && !only(ln)) continue;
       let ok = false; try { ok = !ln.when || !!ln.when(c); } catch (e) { ok = false; }
       if (!ok) continue;
       const t = render(ln, c); if (!t) continue;
@@ -660,8 +787,12 @@
     const c = ctxFor(env, who), r = env.rng || Math.random, out = [];
     // A hello they haven't used on you lately (or a nod), then news you haven't heard
     // from them; never the same news twice in a fortnight. At least one beat.
-    const hi = c.firstMeeting ? choose(env, who, ["first"], c, r) : choose(env, who, ["hello"], c, r, true) || choose(env, who, ["nod"], c, r, true);
+    const hi = c.firstMeeting ? choose(env, who, ["first"], c, r)
+      : c.invited ? choose(env, who, ["invited"], c, r)
+      : (c.gap >= 21 && choose(env, who, ["hello"].filter(() => true), { ...c }, r, true, ln => /\.gap$/.test(ln.id))) || choose(env, who, ["hello"], c, r, true) || choose(env, who, ["nod"], c, r, true);
     if (hi) out.push(hi);
+    // A friendship that's just deepened: they say so (once).
+    if (c.up && !c.firstMeeting) { const b = choose(env, who, ["closer"], c, r); if (b) { out.push(b); env.Social.heard(env.G, who); return out; } }
     if (c.key === "pickles" || c.key === "bishop") { if (!out.length) { const h = choose(env, who, ["hello"], c, r); if (h) out.push(h); } return out; }
     const news = choose(env, who, c.firstMeeting ? ["today"] : ["mine", "theirs", "today", "others"], c, r, true);
     if (news) out.push(news);
@@ -682,6 +813,12 @@
     }
     return out;
   }
-  const Talk = { context, opening, reply, everyLine, LINES, GENDERED, how, moveWord, ALT_HOW, STYLE_HOW, HOLD_HOW, mentions: (t, c) => t.includes("Rowan") || !!(c && c.me && t.includes(c.me)) };
+  // An invitation, written on a note left on your windscreen (Stage 4): env.invite = { who, where, when }.
+  function note(env, who) {
+    const c = ctxFor(env, who), r = env.rng || Math.random;
+    const b = choose(env, who, ["note"], c, r);
+    return b ? b.t : null;
+  }
+  const Talk = { context, opening, reply, note, everyLine, LINES, GENDERED, how, moveWord, ALT_HOW, STYLE_HOW, HOLD_HOW, mentions: (t, c) => t.includes("Rowan") || !!(c && c.me && t.includes(c.me)) };
   if (typeof module !== "undefined") module.exports = Talk; else root.Talk = Talk;
 })(typeof window !== "undefined" ? window : globalThis);

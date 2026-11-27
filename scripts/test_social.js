@@ -69,5 +69,52 @@ test("a new climber gets a record with their first moment", () => {
   const g = save(); assert(!g.social);
   assert(Social.moment(g, "n:gus", "met", "2025-09-06") && g.social.npc["n:gus"].k.met === 1);
 });
+// ---- Stage 4: friendship
+const days = (n, from = "2025-10-01") => { const d = new Date(from + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+test("each regular especially values their own thing, and it's worth nothing to anyone else", () => {
+  const g = save(); Social.ensure(g);
+  Social.moment(g, "n:gus", "brush", "2025-10-01"); Social.moment(g, "n:bea", "brush", "2025-10-01");
+  assert(Social.bond(g, "n:gus") > 0 && Social.bond(g, "n:bea") === 0, `${Social.bond(g, "n:gus")} ${Social.bond(g, "n:bea")}`);
+  for (const [w, l] of Object.entries(Social.LIKES)) assert(l.words && Object.keys(l.kinds).every(k => k in Social.KINDS), w);
+});
+test("a friendship deepens step by step: you're told once, and they mention it once", () => {
+  const g = save(); Social.ensure(g);
+  const ups = [];
+  for (let n = 0; n < 80; n++) { const u = Social.befriend(g, "n:otis", "climb", days(n)); if (u) ups.push(u.key); const v = Social.befriend(g, "n:otis", "met", days(n)); if (v) ups.push(v.key); }
+  assert(ups.join() === "know,friends,good", ups.join());
+  assert(g.social.npc["n:otis"].up.key === "good");
+  Social.heard(g, "n:otis"); assert(!g.social.npc["n:otis"].up);
+  assert(Social.befriend(g, "n:otis", "chat", days(90)) === null, "nothing past good friends");
+});
+test("talking ten times in a day is one day of talking (nothing to farm)", () => {
+  const g = save(); Social.ensure(g);
+  for (let k = 0; k < 10; k++) Social.befriend(g, "n:dez", "chat", "2025-10-01");
+  assert(Social.bond(g, "n:dez") === Social.KINDS.chat);
+});
+test("a save from before Stage 4 keeps the friendships it had (they never go down)", () => {
+  const g = save();
+  g.social = { v: 1, npc: { "n:bea": { k: { met: 10, chat: 8 }, last: {}, m: [] }, "n:hollis": { k: { met: 5 }, last: {}, m: [] } } };   // bond 26 and 5
+  const keep = Social.TIERS.map(t => t.at); Social.TIERS[2].at = 30;      // (as if today's tiers were higher than the old ones)
+  Social.ensure(g);
+  assert(Social.tier(g, "n:bea").key === "friends", `Bea: ${Social.tier(g, "n:bea").key} (bond ${Social.bond(g, "n:bea")})`);
+  assert(Social.tier(g, "n:hollis").key === "met", "Hollis wasn't a friend before either");
+  assert(g.social.v === 2);
+  Social.ensure(g); assert(Social.tier(g, "n:bea").key === "friends", "and it stays");
+  Social.TIERS.forEach((t, i) => { t.at = keep[i]; });
+  const h = save(); Social.moment(h, "n:bea", "chat", "2025-10-01"); Social.ensure(h);
+  assert(!h.social.npc["n:bea"].best, "a new climber is on today's tiers");
+});
+test("what you've shared, from the moments", () => {
+  const g = save(); Social.ensure(g);
+  Social.moment(g, "n:rowan", "climb", "2025-10-01"); Social.moment(g, "n:rowan", "sendWith", "2025-10-01", 4); Social.moment(g, "n:rowan", "met", "2025-10-02");
+  const sh = Social.shared(g, "n:rowan");
+  assert(sh.climbs === 1 && sh.sends === 1 && sh.met === 1 && sh.chats === 0, JSON.stringify(sh));
+});
+test("a bad deepening or best tier from a save file is dropped", () => {
+  const g = save();
+  g.social = { v: 2, npc: { "n:bea": { k: { met: 2 }, last: {}, m: [], up: { key: "<b>", date: "x" }, best: "emperor" } } };
+  Social.ensure(g);
+  assert(!g.social.npc["n:bea"].up && !g.social.npc["n:bea"].best);
+});
 console.log(`\n${passed} passed${failed ? `, ${failed} FAILED` : ""}`);
 process.exit(failed ? 1 : 0);

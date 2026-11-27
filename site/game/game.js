@@ -229,6 +229,7 @@
         note(`${who} made the first ascent of ${pname(it.p)}, a line you'd spotted.`);
       }
     });
+    if (v2()) safely("an invitation", makeInvite);
     // (Pickles used to be "waiting by the car" here while the map drew him asleep at
     // his rock. He's only ever where he's drawn now: go and find him. Phase 4, Stage 0.)
   }
@@ -335,6 +336,8 @@
     const day = here(i);
     const cost = Mech.attemptCost(G.player, p, day);
     const r = Mech.attempt(G.player, p, st, day);
+    if (v2() && p.tagList.includes("dyno") && nearNow("n:bea") && K.met("n:bea")) bond("n:bea", "dyno", i);
+    if (v2() && p.grade >= levelNow().level + 1 && nearNow("n:dez") && K.met("n:dez")) bond("n:dez", "hard", i);
     G.player.energy = Math.max(0, G.player.energy - cost.energy);
     G.player.skin = Math.max(0, G.player.skin - cost.skin);
     G.day.minute += Math.round(cost.minutes);
@@ -366,7 +369,8 @@
       const style = first ? (flash ? "Flash" : "Send") : "Repeat";
       const pal = partnerNow();
       G.ticks.push({ p: i, date: G.date, day: G.dayNo, style, att: st.att, stars: null, ...(pal ? { with: pal } : {}) });
-      if (pal) Social.moment(G, pal, "sendWith", G.date, i);
+      if (pal) bond(pal, "sendWith", i);
+      if (fa) noticed("n:hollis", "fa", i);                    // one for the binder (Hollis)
       G.day.sends.push({ p: i, style, xp, ...(fa ? { fa: true } : {}) });
       let text;
       if (flash) text = "Flash! You read every move from the ground.";
@@ -386,7 +390,7 @@
       // After the banner: name your first ascent, then the level-up, then (if the day's over) the summary.
       const after = levelNow().level, next = [];
       if (fa) next.push(() => nameDialog(i, { first: true, was: openLabel }));
-      if (after > before) next.push(() => showLevelUp(after));
+      if (after > before) { next.push(() => showLevelUp(after)); (G.lvlOn = G.lvlOn || {})[after] = G.date; }
       out = { r, style, fa: !!fa, xp, next };
       if (next.length && !opts.scene) {
         UI.levelPending = true;
@@ -637,6 +641,7 @@
       G.day.minute += Mech.BAL.brushMin;
       (G.day.brushed = G.day.brushed || {})[i] = true;
       if (dirty) st.clean = true;
+      noticed("n:gus", "brush", i);                           // Gus notices you looking after the park
       G.day.last = { kind: "info", title: `Brushing ${titleOf(i)}`, p: i, text: dirty && rainNow()
         ? "You scrub the lichen and grit off the holds in the drizzle. It'll be clean and ready when it dries."
         : dirty ? pick(["You scrub the grit and lichen off every hold you can reach and blow the dust out of the cracks. It's climbable rock now.",
@@ -682,7 +687,7 @@
     const ls = LESSONS.find(l => !G.learned[l.key] && l.when(i, L, st));
     if (!ls) return null;
     G.learned[ls.key] = G.date;
-    if (isAround(ls.who)) Social.moment(G, ls.who, "lesson", G.date);
+    if (isAround(ls.who)) bond(ls.who, "lesson");
     note(`Learned: ${ls.name.toLowerCase()}.`);
     return ls.say(isAround(ls.who), i);
   }
@@ -912,7 +917,7 @@
   function takeBetaFrom(w, i, from) {
     const p = D.problems[i], st = pstate(i), r = Mech.giveBeta(G.player, p, st, from);
     st.tips = { ...tipsOf(i), [w]: [G.date, r.at, r.what] }; st.tipped = true;
-    if (typeof w === "string" && w.startsWith("n:")) Social.moment(G, w, "beta", G.date, i);
+    if (typeof w === "string" && w.startsWith("n:")) bond(w, "beta", i);
     const name = typeof w === "string" && w.startsWith("n:") ? firstName(w) : whoOf(+String(w).slice(1));
     note(`${name} gave you beta for ${pref(i)}${r.at >= 0 ? `: ${Talk.moveWord(r)}` : ""}.`);
     if (r.what === "alt") toast("Beta: a better way through", `${name} showed you a better way through the crux of ${pname(i)}.`, "info");
@@ -974,6 +979,62 @@
     if (!bits.length) return "";
     const ask = bits.some(b => !/gave you beta/.test(b)) && G.ps[i] && !G.ps[i].sent ? " Ask them about it when you see them." : "";
     return `<div class="why knowers">${esc(bits.join(" · "))}.${esc(ask)}</div>`;
+  }
+
+  // ---- friendship (Phase 4, Stage 4) -----------------------------------------------------------
+  // Every moment with someone goes through here: it's recorded (social.js), and if the
+  // friendship has just deepened you're told (and they'll mention it next time you talk).
+  const TIER_SAY = { know: w => `You and ${firstName(w)} know each other now.`, friends: w => `You and ${firstName(w)} are friends now.`, good: w => `You and ${firstName(w)} are good friends now.` };
+  function bond(w, kind, p = null) {
+    if (!v2() || typeof w !== "string" || !w.startsWith("n:")) return null;
+    const up = Social.befriend(G, w, kind, G.date, p);
+    if (up && w !== "n:pickles" && TIER_SAY[up.key]) {
+      toast(up.key === "know" ? "Getting to know people" : "A friendship", TIER_SAY[up.key](w), "info");
+      note(TIER_SAY[up.key](w));
+    }
+    return up;
+  }
+  // Something a regular especially values, if they're out today and you've met (Social.LIKES).
+  const outToday = w => peopleToday().some(x => x.who === w);
+  const nearNow = w => peopleNow().some(x => x.who === w && D.boulders[x.b].sector === G.loc.sector);
+  function noticed(w, kind, p = null) { if (v2() && K.met(w) && outToday(w)) bond(w, kind, p); }
+  // They say so in the conversation, if it deepened while you were talking.
+  function closerNow(e) {
+    const rec = G.social && G.social.npc[e.who];
+    if (!rec || !rec.up || e.who === "n:pickles") return;
+    const b = Talk.reply(talkEnv(), e.who, "closer");
+    if (b.length) { talkAdd(e, b); Social.heard(G, e.who); }
+  }
+
+  // ---- invitations (Stage 4): a friend who's out today leaves a note on your windscreen ----
+  // At most one a day, from someone who's at least a friend, in an area you know, and
+  // never the same person two days running. Ignoring one costs nothing.
+  function makeInvite() {
+    if (!v2() || G.day.rainedOut) return;
+    const last = G.lastInvite || {};
+    const cand = peopleToday().filter(x => CLIMB_WITH.includes(x.who) && x.s && K.met(x.who) && K.area(D.boulders[x.b].sector) >= 1
+      && !(last.who === x.who && last.date === addDays(G.date, -1)) && x.to - Math.max(x.from, G.day.minute) >= 120 && x.to <= G.day.weather.dusk);
+    for (const x of cand.sort(() => Math.random() - 0.5)) {
+      const t = Social.tier(G, x.who);
+      if (!t || t.n < 2 || Math.random() >= (t.n >= 3 ? 0.3 : 0.18)) continue;
+      const b = x.b, sec = D.boulders[b].sector;
+      const where = K.boulder(b) >= 1 ? `at ${D.boulders[b].name}` : `at ${sec}`;
+      const when = x.from <= G.day.minute + 30 ? (x.to <= 800 ? "this morning" : "today") : `from about ${clock(x.from)}`;
+      const text = Talk.note({ ...talkEnv(), invite: { who: x.who, where, when } }, x.who);
+      if (!text) continue;
+      G.day.invite = { who: x.who, b, from: x.from, to: x.to, text };
+      G.lastInvite = { who: x.who, date: G.date };
+      G.day.last.text += ` There's a note tucked under your windscreen wiper: “${text}”`;
+      note(`A note from ${firstName(x.who)}: “${text}”`);
+      return;
+    }
+  }
+  function inviteHtml() {
+    const iv = G.day.invite; if (!iv || G.day.over || !World.NAMED[iv.who.slice(2)]) return "";
+    const m = G.day.minute, here = m >= iv.from && m < iv.to, gone = m >= iv.to, sec = D.boulders[iv.b].sector;
+    const btn = iv.met ? `<span class="v">Found</span>` : gone ? `<span class="v">Gone</span>` : here && K.area(sec) >= 1 ? `<span class="v">Find</span>` : `<span class="v">Later</span>`;
+    const tag = here && !iv.met && !gone && K.area(sec) >= 1 ? `button type="button" class="rowbtn" data-find="${esc(iv.who)}"` : `div class="rowbtn" style="cursor:default"`;
+    return `<h3>A note on your windscreen</h3><ul class="rowlist invite"><li><${tag}><span><span class="t">${esc(firstName(iv.who))}</span><span class="s note-hand">“${esc(iv.text)}”</span></span>${btn}</${tag.split(" ")[0]}></li></ul>`;
   }
 
   // ---- the regulars (Stage 5): people you get to know. Who's around, where,
@@ -1120,14 +1181,17 @@
     return Object.keys(G.ps).map(Number).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && K.visible(i) && (G.ps[i].log || []).some(x => Array.isArray(x) && String(x[0]) >= addDays(G.date, -7))).sort((a, b) => G.ps[b].att - G.ps[a].att)[0] ?? null;
   }
   function buildRegular(w, sector, ctx = {}) {
-    const key = w.slice(2), n = World.NAMED[key], r = K.meet(w, G.date), first = r.n === 1;
-    Social.moment(G, w, "met", G.date);
+    const key = w.slice(2), n = World.NAMED[key], prev = K.met(w), lastMet = prev && prev.last, r = K.meet(w, G.date), first = r.n === 1;
+    const gap = lastMet && lastMet < G.date ? World.daysBetween(lastMet, G.date) : 0;   // since you last talked (Stage 4)
+    bond(w, "met");
+    if (key === "otis" && (rainNow() || G.day.weather.cond <= -0.3)) bond(w, "wet");    // company on a wet or greasy day
     // They know what you're working on (for later conversations).
     const proj = key === "pickles" ? null : currentProject();
-    if (proj != null) Social.moment(G, w, "proj", G.date, proj);
+    if (proj != null) bond(w, "proj", proj);
     const e = { who: w, sector, line: "", rec: null, recLine: "", beta: null, accepted: false, betaTaken: false, open: true, idx: 0, used: [] };
     // What they say: a hello and their news (talk.js), or, back again today, a short hello.
-    e.beats = ctx.again ? Talk.reply(talkEnv(), w, "again") : Talk.opening(talkEnv(), w);
+    e.beats = ctx.again ? Talk.reply(talkEnv(), w, "again") : Talk.opening({ ...talkEnv(), gap }, w);
+    if (G.day.invite && G.day.invite.who === w) G.day.invite.seen = G.day.invite.met = true;
     if (!e.beats.length) e.beats = [{ t: "Hello again.", mood: "happy" }];
     e.line = e.beats.map(b => b.t).join(" ");
     if (key === "pickles") { e.pet = true; return e; }
@@ -1178,10 +1242,12 @@
   function sitChat() {
     const e = G.day.encounter; if (!e || !e.who || !e.who.startsWith("n:") || e.pet || e.chatted || UI.busy || G.day.over) return;
     K.chat(e.who, G.date);
-    Social.moment(G, e.who, "chat", G.date);
+    bond(e.who, "chat");
+    if (e.who === "n:rowan" && peopleNow().length <= 2) bond(e.who, "quiet");   // Rowan likes the quiet days
     const told = Talk.reply(talkEnv(), e.who, "story");
     e.chatted = told.length ? told[0].t : "You sit and talk for a while.";
     talkAdd(e, told.length ? told : [{ t: e.chatted, mood: "happy", narr: true }]);
+    closerNow(e);
     G.day.minute += 20;
     G.player.energy = Math.min(G.day.startEnergy, G.player.energy + 15);
     note(`Sat and talked with ${whoOf(e.who).replace(/^the /, "the ")}.`);
@@ -1190,7 +1256,7 @@
   function petDog() {
     const e = G.day.encounter; if (!e || !e.pet || e.petted) return;
     K.pet(e.who, G.date);
-    Social.moment(G, e.who, "pet", G.date);
+    bond(e.who, "pet");
     const b = Talk.reply(talkEnv(), e.who, "pet");
     e.petted = b.length ? b[0].t : "He leans into your hand.";
     talkAdd(e, b.length ? b : [{ t: e.petted, mood: "happy", narr: true }]);
@@ -1236,9 +1302,11 @@
     const e = G.day.encounter; if (!canPartner(e)) return;
     // Two to four hours; sometimes all day (Rowan more often).
     const w = G.day.weather, allDay = Math.random() < (e.who === "n:rowan" ? 0.35 : 0.2), stay = 120 + 10 * Math.floor(Math.random() * 13);
-    G.day.partner = { who: e.who, until: allDay ? w.dusk : Math.min(w.dusk, G.day.minute + stay), ...(allDay ? { allDay: true } : {}), ...(G.loc.boulder != null ? { b: G.loc.boulder } : {}) };
+    const iv = G.day.invite && G.day.invite.who === e.who ? G.day.invite : null;     // they asked you: the rest of their session
+    G.day.partner = { who: e.who, until: allDay ? w.dusk : iv ? Math.min(w.dusk, Math.max(iv.to, G.day.minute + 60)) : Math.min(w.dusk, G.day.minute + stay), ...(allDay ? { allDay: true } : {}), ...(G.loc.boulder != null ? { b: G.loc.boulder } : {}) };
     e.partnered = PARTNER[e.who.slice(2)].yes + (allDay ? ` ${PARTNER[e.who.slice(2)].allDay}` : "");
-    Social.moment(G, e.who, "climb", G.date);
+    bond(e.who, "climb");
+    if (G.day.invite && G.day.invite.who === e.who) bond(e.who, "invite");
     note(`Climbing with ${World.whoName(D, e.who).replace(/^the /, "the ")}.`);
     save(); renderAll();
   }
@@ -1347,8 +1415,8 @@
     switch (k) {
       case "next": if (e.idx < e.beats.length - 1) e.idx++; else if (e.closing) return closeTalk(); break;
       case "ask": use(); talkAdd(e, Talk.reply(env, e.who, "ask")); break;
-      case "tell": { use(); const p = currentProject(); if (p != null) Social.moment(G, e.who, "proj", G.date, p); talkAdd(e, Talk.reply(env, e.who, "tell")); break; }
-      case "together": climbTogether(); if (e.partnered) talkAdd(e, [{ t: e.partnered.replace(/^“|”$/g, ""), mood: "happy" }]); break;
+      case "tell": { use(); const p = currentProject(); if (p != null) bond(e.who, "proj", p); talkAdd(e, Talk.reply(env, e.who, "tell")); break; }
+      case "together": climbTogether(); if (e.partnered) { talkAdd(e, [{ t: e.partnered.replace(/^“|”$/g, ""), mood: "happy" }]); closerNow(e); } break;
       case "beta": { const t = takeBeta(); if (t) talkAdd(e, [{ t, mood: "thoughtful" }]); break; }
       case "dir": { const line = e.dirLine; askWay(); talkAdd(e, [{ t: line, mood: "thoughtful", narr: e.who === "n:bishop" }, { t: `${e.who === "n:bishop" ? "He draws" : who + " draws"} you a little map to ${e.dir} on the back of a receipt.`, mood: "happy", narr: true }]); break; }
       case "reveal": { const line = e.revealLine; hearLine(); talkAdd(e, [{ t: line, mood: "thoughtful", narr: e.who === "n:bishop" }]); break; }
@@ -1447,7 +1515,7 @@
         UI.talkTo = who;                                  // when you get there, you'll talk (again, if you already have today)
         const p = who === "n:pickles" ? (d => d && [d.x + 3, d.y - 1])(dogSpot()) : personSpot(who);
         if (!p) return;
-        if (G.pos && Math.hypot(G.pos[0] - p[0], G.pos[1] - p[1]) < 1.5) { if (meetNearby(G.pos)) renderAll(); return; }
+        if (G.pos && Math.hypot(G.pos[0] - p[0], G.pos[1] - p[1]) < 1.5) { if (meetNearby(G.pos)) { save(); renderAll(); } return; }
         goToPoint(p);
       },
       personTipHtml,
@@ -1621,7 +1689,7 @@
     }
     // Where you are changed: arriving at a boulder or an area (walking past things on a trip is quiet).
     function moved_(quiet = false) {
-      if (!quiet && meetNearby(G.pos)) { renderAll(); showPrompt(); }
+      if (!quiet && meetNearby(G.pos)) { save(); renderAll(); showPrompt(); }
       else if (G.day.encounter && walkedAway(G.day.encounter)) { G.day.encounter = null; renderTalk(); save(); }   // walked off mid-conversation
       const now = locAt(G.pos, G.loc);
       if (sameLoc(now, G.loc)) return;
@@ -2014,7 +2082,7 @@
 
   function renderPanel() {
     const el = $("#tabbody");
-    el.innerHTML = { here: () => hereHtml() + outTodayHtml(), climber: climberHtml, logbook: logbookHtml, craglog: cragHtml, journal: journalHtml }[UI.tab]();
+    el.innerHTML = { here: () => hereHtml() + inviteHtml() + outTodayHtml(), climber: climberHtml, logbook: logbookHtml, craglog: cragHtml, journal: journalHtml }[UI.tab]();
     bindPanel(el);
   }
 
@@ -2175,6 +2243,27 @@
   const hasOldCopy = () => { try { const c = JSON.parse(localStorage.getItem(OLD_RULES_COPY) || "null"); return !!(c && c.id === G.id); } catch (e) { return false; } };
 
   // ---- Climber ----
+  // Your people (Phase 4, Stage 4): the regulars you've met, how close you are (in
+  // words, never a number), what you've shared, and once you know each other, what
+  // they especially value.
+  function yourPeopleHtml() {
+    const MONTH = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const who = [...World.REG, "n:bishop"].filter(w => K.met(w)).map(w => ({ w, t: Social.tier(G, w) || { n: 0, words: "You've met", bond: 0 } }))
+      .sort((a, b) => b.t.n - a.t.n || b.t.bond - a.t.bond);
+    if (!who.length) return "";
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    const rows = who.map(({ w, t }) => {
+      const sh = Social.shared(G, w), m = K.met(w), key = w.slice(2), first = m && m.first;
+      const bits = [first ? `since ${MONTH[+first.slice(5, 7) - 1]}${first.slice(0, 4) !== G.date.slice(0, 4) ? " " + first.slice(0, 4) : ""}` : "",
+        sh.climbs ? `climbed together on ${plural(sh.climbs, "day", "days")}` : "", sh.sends ? plural(sh.sends, "send together", "sends together") : "",
+        sh.beta ? `beta on ${plural(sh.beta, "day", "days")}` : "", sh.chats ? plural(sh.chats, "long chat", "long chats") : ""].filter(Boolean);
+      const likes = t.n >= 1 && Social.LIKES[w] ? `<div class="pp-likes">${esc(Social.LIKES[w].words)}</div>` : "";
+      return `<li><div class="pp-face">${Portraits.svg(key, t.n >= 2 ? "happy" : "neutral", { seed: w, label: callName(w) })}</div>
+        <div><div class="pp-name">${esc(callName(w))} <span class="pp-tier t${t.n}">${esc(t.words)}</span></div>
+        <div class="meta" style="margin:0">${esc(bits.join(" · "))}</div>${likes}</div></li>`;
+    }).join("");
+    return `<h3>Your people</h3><p class="meta">Friendships grow from time together: talking, climbing together, sharing beta, and the things each of them cares about. They never fade.</p><ul class="your-people">${rows}</ul>`;
+  }
   function climberHtml() {
     const pl = G.player, L = levelNow(), sends = firstSends();
     const days = new Set(G.ticks.map(t => t.date)).size;
@@ -2186,6 +2275,7 @@
         <div><b>${G.bestGrade >= 0 ? "V" + G.bestGrade : "–"}</b><span>hardest send</span></div><div><b>${sends.length}</b><span>problems sent</span></div>
         <div><b>${G.ticks.filter(t => t.style === "Flash").length}</b><span>flashes</span></div><div><b>${G.dayNo}</b><span>days at the crag</span></div>
         ${v2() ? `<div><b>${World.faCount(G)}</b><span>first ascents</span></div>` : ""}<div><b>${Object.keys(G.ach).length}</b><span>achievements</span></div></div>
+      ${v2() ? yourPeopleHtml() : ""}
       <h3>How leveling works</h3>
       <p class="lede">Every first send earns XP: more for harder grades, extra when it's above your level, and less the further below your level it is. Flashes, tips from locals, new hardest sends and projects that took several sessions earn bonuses. Falling earns nothing, and repeats count a little, a few times a day. To move up a grade you also need three sends at your level or harder, so your level is always a grade you climb.</p>
       <h3>Style skills</h3>
@@ -3427,6 +3517,12 @@
     if (g.day && g.day.partner != null && !(g.day.partner && CLIMB_WITH.includes(g.day.partner.who) && typeof g.day.partner.until === "number" && isFinite(g.day.partner.until))) g.day.partner = null;
     if (g.day && g.day.partner && g.day.partner.b != null && !(Number.isInteger(g.day.partner.b) && g.day.partner.b >= 0 && g.day.partner.b < D.boulders.length)) delete g.day.partner.b;
     for (const t of g.ticks || []) if (t && t.with != null && !CLIMB_WITH.includes(t.with)) delete t.with;
+    // Friendship (Phase 4, Stage 4): today's invitation, the last one, and when you reached each level.
+    const day_ = s => typeof s === "string" && /^\d{4}-\d\d-\d\d$/.test(s), num_ = x => typeof x === "number" && isFinite(x);
+    if (g.day && g.day.invite != null && !(g.day.invite && CLIMB_WITH.includes(g.day.invite.who) && Number.isInteger(g.day.invite.b) && g.day.invite.b >= 0 && g.day.invite.b < D.boulders.length
+      && num_(g.day.invite.from) && num_(g.day.invite.to) && typeof g.day.invite.text === "string" && g.day.invite.text.length <= 400)) delete g.day.invite;
+    if (g.lastInvite != null && !(g.lastInvite && CLIMB_WITH.includes(g.lastInvite.who) && day_(g.lastInvite.date))) delete g.lastInvite;
+    if (g.lvlOn != null) { const l = {}; if (typeof g.lvlOn === "object") for (const [k, v] of Object.entries(g.lvlOn)) if (/^\d{1,2}$/.test(k) && day_(v)) l[k] = v; g.lvlOn = l; }
     // Beta from people (Phase 4, Stage 3): { who: [date, move, "alt" | "move" | "none"] } per line;
     // Phase 3's single tip (tipped) counts as one from someone unknown ("?"). Falls per move (fx).
     for (const [k, st] of Object.entries(g.ps || {})) {

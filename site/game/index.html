@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=49">
+<link rel="stylesheet" href="scene.css?v=51">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -729,6 +729,15 @@ svg#map:active { cursor: grabbing; }
 .why .chips { gap: 4px; margin-top: 4px; }
 .why .chip { font-size: 12.5px; padding: 1px 6px; }
 .why.knowers { font-style: italic; }
+.your-people { list-style: none; padding: 0; margin: 6px 0 14px; display: grid; gap: 10px; }   /* your people (Phase 4, Stage 4) */
+.your-people li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: center; }
+.pp-face svg { width: 48px; height: 48px; display: block; border-radius: 9px; }
+.pp-name { font-family: var(--serif); font-weight: 700; font-size: 15.5px; }
+.pp-tier { font-family: var(--body); font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 99px; margin-left: 4px; background: color-mix(in oklab, var(--panel), var(--ink) 7%); color: var(--ink-2); white-space: nowrap; }
+.pp-tier.t2 { background: color-mix(in oklab, var(--gold) 22%, var(--panel)); color: var(--ink); }
+.pp-tier.t3 { background: color-mix(in oklab, var(--gold) 45%, var(--panel)); color: var(--ink); }
+.pp-likes { font-size: 12.5px; color: var(--ink-2); font-style: italic; margin-top: 2px; }
+.rowlist.invite .note-hand { font-family: var(--hand, "Caveat", cursive); font-size: 17px; line-height: 1.25; color: var(--ink); }
 .rowlist { list-style: none; margin: 0; padding: 0; }
 .rowlist li { border-bottom: 1px solid var(--rule); }
 .rowbtn {
@@ -1108,16 +1117,16 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=49"></script>
-<script src="art.js?v=49"></script>
-<script src="world.js?v=49"></script>
-<script src="knowledge.js?v=49"></script>
-<script src="social.js?v=49"></script>
-<script src="portraits.js?v=49"></script>
-<script src="talk.js?v=49"></script>
-<script src="illustrate.js?v=49"></script>
-<script src="paint.js?v=49"></script>
-<script src="paper.js?v=49"></script>
-<script src="travel.js?v=49"></script>
-<script src="scene.js?v=49"></script>
-<script src="game.js?v=49"></script>
+<script src="mechanics.js?v=51"></script>
+<script src="art.js?v=51"></script>
+<script src="world.js?v=51"></script>
+<script src="knowledge.js?v=51"></script>
+<script src="social.js?v=51"></script>
+<script src="portraits.js?v=51"></script>
+<script src="talk.js?v=51"></script>
+<script src="illustrate.js?v=51"></script>
+<script src="paint.js?v=51"></script>
+<script src="paper.js?v=51"></script>
+<script src="travel.js?v=51"></script>
+<script src="scene.js?v=51"></script>
+<script src="game.js?v=51"></script>

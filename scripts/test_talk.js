@@ -159,6 +159,32 @@ test("beta, pointers and recommendations: every kind renders in every voice, wit
   }
   assert(n > 200, `${n} beta lines`);
 });
+test("friendship: deepening, a long gap, your level, a hard first ascent, memories, friends' stories, notes", () => {
+  const { g, K } = saves[2];
+  const save0 = JSON.stringify(g.social);
+  for (const w of World.REG) {
+    const rec = g.social.npc[w];
+    rec.best = "good";
+    const all = [];
+    for (const up of ["know", "friends", "good"]) {
+      rec.up = { key: up, date: g.date };
+      const xs = Talk.everyLine({ ...env(g, K), gap: 40 }, w).filter(x => x.topic === "closer");
+      assert(xs.length === 1 && xs[0].t, `${w} ${up}: ${xs.map(x => x.id)}`); all.push(...xs);
+    }
+    delete rec.up;
+    g.lvlOn = { 6: g.date }; g.bestGrade = 5;
+    const xs = Talk.everyLine({ ...env(g, K), gap: 40, invite: { who: w, where: "at Hawkwatch", when: "from about 3 PM" } }, w);
+    for (const want of ["gap", "level", "story", "note"]) assert(xs.some(x => (x.id.includes("." + want) || x.topic === want) && x.t), `${w} has no ${want} line`);
+    const notes = xs.filter(x => x.topic === "note");
+    assert(notes.every(x => /Hawkwatch|HAWKWATCH/.test(x.t)), `${w}'s note says where`);
+    for (const x of [...all, ...xs].filter(x => x.t)) { assert(x.t.length < 330, x.id); if (w === "n:rowan" || Talk.mentions(x.t, Talk.context(env(g, K), w))) assert(!Talk.GENDERED.test(x.t), `${x.id}: "${x.t}"`); }
+    // An opening after a deepening says so (once), and the deepening is then heard.
+    rec.up = { key: "friends", date: g.date };
+    const o = Talk.opening({ ...env(g, K), gap: 0 }, w);
+    assert(o.some(b => /\.c\.friends$/.test(b.id)) && !rec.up, `${w}: ${o.map(b => b.id)}`);
+  }
+  g.social = JSON.parse(save0); delete g.lvlOn;
+});
 test("Hollis only says “never made a first ascent” when that's true", () => {
   for (const { g, K } of saves) {
     const has = Object.values(g.world.est).some(e => e.by === "n:hollis");
