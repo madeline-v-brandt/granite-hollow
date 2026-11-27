@@ -535,7 +535,7 @@ test("Local Buzz: a poster before an event, the comp's results after, and grade 
   // A dispute: a regular's log suggests another grade.
   const [p, e] = Object.entries(h.world.est).find(([, e]) => e.by !== "n:hollis");
   e.logs.unshift(["n:hollis", World.addDays(h.date, -1), "S", 3, e.grade + 1]);
-  const gr = Kh.buzz({ max: 20, perDay: 9 }).find(x => x.kind === "grade" && x.by === "n:hollis");
+  const gr = Kh.buzz({ max: 20, perDay: 9 }).find(x => x.kind === "grade" && x.by === "n:hollis" && /sandbagged/.test(x.text));   // (Hollis may have real disputes too)
   assert.ok(gr && /Hollis reckons/.test(gr.text) && /sandbagged/.test(gr.text), gr && gr.text);
 });
 if (process.argv.includes("--curve")) {

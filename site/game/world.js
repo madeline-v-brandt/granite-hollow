@@ -82,6 +82,13 @@
       blurb: "is seventeen and jumps for everything" },
     dez: { name: "Dez Kowalczyk", h: 175, level: 13.4, likes: "powerful|overhang|compression|roof", type: "local_hero", regular: true, home: ["Millrace Caves", "The Grout Piles"], arrive: 18,
       blurb: "is the strongest climber in the valley, and the quietest" },
+    // After Phase 4 (from play-testing): three more who are actually out in the park.
+    mags: { name: "Mags Oduya", h: 163, level: 3, likes: "slab|mantle|technical", type: "regular", regular: true, home: ["The Cellar Holes", "Hemlock Hollow"], arrive: 5,
+      blurb: "taught at the village school for thirty-four years, and took up climbing at sixty" },
+    ade: { name: "Ade Mensah", h: 181, level: 6.2, likes: "technical|crimpy|overhang", type: "regular", regular: true, home: ["The Tailgate", "The Schoolhouse"], arrive: 8,
+      blurb: "coaches at the gym in town, and brings a group out at weekends" },
+    juno: { name: "Juno Park", h: 168, level: 8.4, likes: "highball|technical|crimpy", type: "local_hero", regular: true, home: ["Back Forty", "The Spillway"], arrive: 12,
+      blurb: "hunts for unclimbed lines, wire brush always in hand" },
   };
   // The regulars who climb (and so arrive in the community and the ledger), apart from Gus, who arrives first anyway.
   const CLIMBING_REGULARS = Object.keys(NAMED).filter(k => NAMED[k].regular && !NAMED[k].dog && !NAMED[k].old && k !== "gus").map(k => "n:" + k);
@@ -283,6 +290,9 @@
       : dow(d) % 2 === 0 ? { p: 0.65, t: [780, 1170] } : { p: 0.65, t: [420, 780] }),  // other days, before or after a half-day shift
     bea: d => (!schoolDay(d) ? { p: 0.75, t: [570, 1170] } : weekend(d) ? { p: 0.8, t: [540, 1170] } : { p: 0.3, t: [900, 1170] }),   // weekends and after school; all summer
     dez: d => (weekend(d) ? { p: 0.55, t: [390, 1110] } : { p: 0.5, t: [360, 810] }),  // early mornings; longer at weekends
+    mags: d => (weekend(d) ? { p: 0.25, t: [600, 840] } : { p: 0.6, t: [480, 780] }),   // weekday mornings (the grandchildren at weekends)
+    ade: d => (weekend(d) ? { p: 0.85, t: [540, 1020] } : { p: 0.25, t: [960, 1170] }), // weekends with the gym group; the odd evening after work
+    juno: d => (weekend(d) ? { p: 0.7, t: [360, 1080] } : { p: 0.55, t: [360, 900] }),  // from first light
   };
   // ---- the seasonal events (Phase 4, Stage 7; docs/phase4/stage7-events.md) ----------------
   // Five a year, each on a fixed date: two comps (fall and spring, scored the same way: comp),
@@ -360,7 +370,7 @@
     return { top, score: top.reduce((a, x) => a + x.pts, 0) };
   }
   // Grades a year they get stronger by (for two years), on top of NAMED's level.
-  const GROWTH = { gus: 0.2, hollis: 0.4, otis: 0.3, rowan: 1.2, bea: 1.5, dez: 0.4 };
+  const GROWTH = { gus: 0.2, hollis: 0.4, otis: 0.3, rowan: 1.2, bea: 1.5, dez: 0.4, mags: 0.3, ade: 0.3, juno: 0.6 };
   const RP = {
     between: 5,               // days just climbing after a project ends, before the next (Stage 8)
     window: [-0.8, 1.0],      // a project is within this many grades of their level

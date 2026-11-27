@@ -50,7 +50,7 @@ function leaks(g, all) {
     s.day.minute = 600; s.day.met = []; s.day.bishop = day % 2 === 0; s.day.encounter = null; s.day.over = false;
     s.day.levelBefore = Mech.levelInfo(s.player.xp).level;          // no level-up dialog in the way
     await put(s);
-    const who = await p.evaluate(() => [...document.querySelectorAll("#map g.person")].map(e => e.dataset.who));
+    const who = await p.evaluate(() => [...document.querySelectorAll("#map g.person:not(.crowd)")].map(e => e.dataset.who));   // (not Ade's group: figures only)
     console.log(`  day ${day + 1}: on the map: ${who.join(", ") || "nobody"}`);
     for (const w of who.includes("n:pickles") ? who : [...who, "pickles"]) {   // Pickles is on the map (Stage 6); walking up to him is the fallback
       if (w === "pickles") {

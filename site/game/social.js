@@ -33,15 +33,18 @@
 (function (root) {
   "use strict";
   const KINDS = { met: 1, chat: 2, climb: 3, sendWith: 3, beta: 1, proj: 0, pet: 1, lesson: 2, invite: 2, walk: 0,
-    brush: 0, fa: 0, wet: 0, dyno: 0, hard: 0, quiet: 0, flirt: 1, sunset: 2, event: 2 };
+    brush: 0, fa: 0, wet: 0, dyno: 0, hard: 0, quiet: 0, flirt: 1, sunset: 2, event: 2, rest: 0, clean: 0, new: 0 };
   // Each regular's own: what's worth more to them (added to KINDS), and how you'd notice.
   const LIKES = {
     "n:gus": { kinds: { brush: 3, lesson: 1 }, words: "Gus notices when you look after the park: brushing the holds, leaving it better than you found it." },
-    "n:hollis": { kinds: { fa: 4, beta: 1 }, words: "Hollis loves a new first ascent for the binder, and loves being asked." },
+    "n:hollis": { kinds: { fa: 4, beta: 1 }, words: "Hollis loves a new first ascent for CragLog, and loves being asked." },
     "n:otis": { kinds: { wet: 3 }, words: "Otis is always glad of company on a wet or greasy day. Perfect sending weather, apparently." },
     "n:bea": { kinds: { dyno: 3, sendWith: 1 }, words: "Bea lights up when you try dynos with her around." },
     "n:dez": { kinds: { hard: 3 }, words: "Dez respects trying hard: projecting near Dez counts for a lot." },
     "n:rowan": { kinds: { quiet: 3, chat: 1 }, words: "Rowan likes the quiet days best: sitting and talking when there's hardly anyone about." },
+    "n:mags": { kinds: { rest: 3, chat: 1 }, words: "Mags approves of a proper rest between goes, and of a good long chat." },
+    "n:juno": { kinds: { clean: 3, fa: 1 }, words: "Juno loves to see you brushing a line nobody's climbed yet." },
+    "n:ade": { kinds: { new: 3 }, words: "Ade cheers when you send a style you've never sent before." },
   };
   const MEMORY = 40, SAID = 300;
   // How well you know each other, in words (never a number on screen). Tuned in Stage 4

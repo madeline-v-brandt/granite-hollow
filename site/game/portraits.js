@@ -11,7 +11,8 @@
 // The look: inked like the map (warm dark lines, flat watercolour fills, a paper
 // card behind). A head and shoulders, front on, in a 120 × 120 box. Each regular
 // has their own face, hair, hat and one or two things that are theirs (Gus's
-// moustache, Hollis's glasses and laptop, Rowan's pencil, Dez's earring, the Bishop's beard).
+// moustache, Hollis's glasses and laptop, Rowan's pencil, Dez's earring, the Bishop's beard,
+// Mags's bun and scarf, Ade's whistle, Juno's wire brush).
 (function (root) {
   "use strict";
   const INK = "#3b3226";
@@ -23,6 +24,9 @@
     otis: { shirt: "#c46a3a", pants: "#2e3440", hat: "headband", hatC: "#d0a23a", skin: "#7a5038", hair: "#1e1a18", pad: "#2e4f6e", chalk: "#b5462e" },
     bea: { shirt: "#b0436e", stripes: "rgba(255,255,255,.4)", pants: "#2e3440", shorts: true, hat: null, skin: "#c08a64", hair: "#3a2418", pad: "#3f7fa6", chalk: "#d0a23a" },
     dez: { shirt: "#3b3f46", pants: "#5b4a3a", hat: "beanie", hatC: "#6d5aa8", skin: "#5e3b2a", hair: "#151210", pad: "#a43b2f", chalk: "#e3dccb" },
+    mags: { shirt: "#8a9a6a", pants: "#5b4a3a", hat: null, skin: "#8a5a3e", hair: "#cfc9bf", pad: "#9b5a3c", chalk: "#e3dccb", longSleeves: true },
+    ade: { shirt: "#2f6fae", pants: "#2e3440", hat: null, skin: "#6e4632", hair: "#151210", pad: "#d0a23a", chalk: "#e3dccb" },
+    juno: { shirt: "#2f7f7a", pants: "#4b4a52", hat: "cap", hatC: "#b5462e", skin: "#e8c4a0", hair: "#1e1a18", pad: "#7a8f4a", chalk: "#e3dccb" },
   };
   // Who has which face: hair style, head width, the card's wash, and what's theirs.
   const FACES = {
@@ -33,6 +37,9 @@
     otis: { hair: "crop", wide: 1.08, wash: "#ecd0bd", extras: ["stubble"] },
     bea: { hair: "ponytail", wide: 0.94, wash: "#efd0dc", extras: ["clip"], young: true },
     dez: { hair: "temples", wide: 1, wash: "#d9d4e6", extras: ["earring"] },
+    mags: { hair: "bun", wide: 0.98, wash: "#dfe3cf", extras: ["scarf"], age: 2 },
+    ade: { hair: "crop", wide: 1.04, wash: "#d0deeb", extras: ["whistle"] },
+    juno: { hair: "temples", wide: 0.97, wash: "#cfe3df", extras: ["brush"] },
   };
   const MOODS = ["neutral", "happy", "excited", "thoughtful", "frustrated", "embarrassed"];
   const SWEET = ["smitten", "shy", "laugh"];                       // Rowan's own (Stage 6)
@@ -107,6 +114,7 @@
   function hairBack(style, c) {
     if (style === "tousled") return P("M39,72 C34,52 38,31 60,30 C82,31 86,52 81,72 C79,62 78,55 77,50 L43,50 C42,55 41,62 39,72 Z", c);
     if (style === "ponytail") return P("M70,37 C82,26 98,32 93,52 C91,58 88,62 85,64 C87,54 85,45 76,43 Z", c);
+    if (style === "bun") return `<ellipse cx="60" cy="31" rx="9.5" ry="7.5" fill="${c}" stroke="${INK}" stroke-width="1.3"/>` + L("M54,30 Q60,26.5 66,30", .9, `stroke-opacity=".45"`);
     return "";
   }
   function hairFront(style, c, look) {
@@ -114,6 +122,7 @@
       case "crop": return P("M40,55 C38,39 46,32 60,32 C74,32 82,39 80,55 C78,46 72,42 60,42 C48,42 42,46 40,55 Z", c);
       case "tousled": return P("M40,53 C39,37 49,30.5 60,30.5 C72,30.5 82,37 80,53 C77,45 72,41 66,45 C64,40 57,39.5 53,44 C49,41 43,45 40,53 Z", c);
       case "ponytail": return P("M40,55 C38,38 48,32 60,32 C72,32 82,38 80,55 C76,45 67,40 57,42 C51,43.5 44,48 40,55 Z", c);
+      case "bun": return P("M40,57 C38,40 47,34 60,34 C73,34 82,40 80,57 C78,47 70,43 60,43.5 C50,43 42,47 40,57 Z", c) + L("M47,40 Q53,37.5 59,40.4 M61,40.4 Q67,37.5 73,40", .8, `stroke-opacity=".35"`);
       case "tufts": return P("M40.5,64 C36,55 37,46 43,42 C42,50 43,57 44.5,63 Z", c) + P("M79.5,64 C84,55 83,46 77,42 C78,50 77,57 75.5,63 Z", c)
         + L("M53,37 Q56,33.6 58,36.4 M61,36.2 Q64,32.8 66.4,36.6", 1.1);
       case "temples": default: return P("M40.6,49 C40,54 40.6,58.6 42.4,62 C43.2,57.6 43.6,53 44,49 Z", c) + P("M79.4,49 C80,54 79.4,58.6 77.6,62 C76.8,57.6 76.4,53 76,49 Z", c)
@@ -138,6 +147,7 @@
       if (x === "beard") out += P("M41.5,63 C39,86 52,95 60,95 C68,95 81,86 78.5,63 C75,71 70,74.4 65,73.4 C63,75.6 57,75.6 55,73.4 C50,74.4 45,71 41.5,63 Z", look.hair);
       if (x === "glasses") out += `<g fill="#fff" fill-opacity=".18" stroke="${INK}" stroke-width="1.3"><circle cx="52" cy="60" r="5.6"/><circle cx="68" cy="60" r="5.6"/></g>` + L("M57.6,59.4 Q60,58 62.4,59.4 M46.4,59 L40.6,57.6 M73.6,59 L79.4,57.6", 1.2);
       if (x === "pencil") out += `<g transform="rotate(28 82 46)">${P("M80.6,34 L83.4,34 L83.4,55 L82,58.4 L80.6,55 Z", "#e8c25a", `stroke-width="1"`)}${P("M80.6,34 L83.4,34 L83.4,31 Q82,29.6 80.6,31 Z", "#d98b9a", `stroke-width="1"`)}</g>`;
+      if (x === "brush") out += `<g transform="rotate(-24 84 46)">${P("M82.6,40 L85.4,40 L85.4,58 L82.6,58 Z", "#a0703e", `stroke-width="1"`)}${P("M81.4,32 L86.6,32 L86.6,40.4 L81.4,40.4 Z", "#d9d4c4", `stroke-width="1"`)}${L("M82.6,32 L82.6,29.6 M84,32 L84,29.4 M85.4,32 L85.4,29.6", .8)}</g>`;
       if (x === "earring") out += `<circle cx="80.6" cy="66.4" r="2" fill="none" stroke="#d6b04a" stroke-width="1.4"/>`;
       if (x === "clip") out += P("M45,45.4 L52,42 L53,44.4 L46,47.6 Z", "#7fc1d6", `stroke-width="1"`);
       if (x === "stubble" && mood !== "excited") out += `<path d="M47,72 C49,80 55,82.6 60,82.6 C65,82.6 71,80 73,72" fill="none" stroke="${INK}" stroke-opacity=".22" stroke-width="5" stroke-linecap="round"/>`;
@@ -150,6 +160,9 @@
     if (look.stripes) out += `<clipPath id="pt-body"><path d="M16,121 C18,101 33,92.5 60,92.5 C87,92.5 102,101 104,121 Z"/></clipPath>`
       + `<g clip-path="url(#pt-body)" stroke="${look.stripes}" stroke-width="3.2"><path d="M10,106 H110 M10,114 H110 M10,99 H110"/></g>` + P("M16,121 C18,101 33,92.5 60,92.5 C87,92.5 102,101 104,121 Z", "none");
     if (face.extras.includes("collar")) out += P("M50,92.6 L60,101 L56,104 L46,95 Z", shade(sh, .18), `stroke-width="1"`) + P("M70,92.6 L60,101 L64,104 L74,95 Z", shade(sh, .18), `stroke-width="1"`);
+    if (face.extras.includes("scarf")) out += P("M44,92 C50,99 70,99 76,92 L78,97 C70,104 50,104 42,97 Z", "#b5462e", `stroke-width="1.1"`)
+      + P("M64,99 L70,99 L72,115 L64,114 Z", "#b5462e", `stroke-width="1.1"`) + L("M65,111 L71,111.5 M64.8,107 L70.8,107.4", .8, `stroke-opacity=".5"`);
+    if (face.extras.includes("whistle")) out += L("M50,93 Q60,108 70,93", 1.1) + `<path d="M58.6,106 h5.4 a2.6,2.6 0 0 1 0,5.2 h-5.4 z" fill="#c9ced6" stroke="${INK}" stroke-width="1"/>`;
     if (face.extras.includes("badge")) out += P("M80,103 l1.6,3.4 3.6,.4 -2.7,2.4 .8,3.6 -3.3,-1.9 -3.3,1.9 .8,-3.6 -2.7,-2.4 3.6,-.4 Z", "#e3c76a", `stroke-width="1"`);
     return out;
   }

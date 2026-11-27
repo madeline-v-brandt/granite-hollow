@@ -2079,6 +2079,7 @@
         const tries = [[sd * R * 1.1, -R * 1.15], [-sd * R * 1.1, -R * 1.15], [sd * R * 1.5, -R * .3], [-sd * R * 1.5, -R * .3], [0, -R * 1.7], [sd * R * 1.9, -R * 1.5], [-sd * R * 1.9, -R * 1.5]];
         let [ox, oy] = tries[0];
         for (const [tx, ty] of tries) { const x0 = bo.b.x + tx, y0 = bo.b.y + ty; if (standable(x0, y0) && !treeInFront(x0, y0)) { [ox, oy] = [tx, ty]; break; } }
+        if (p.group) drawGroup(bo, p, [ox, oy]);
         const x = bo.b.x + ox, y = bo.b.y + oy, facing = ox > 0 ? 1 : ox < 0 ? -1 : sd;
         personAt.set(p.who, { x, y, side: facing });
         const g = people.append("g").attr("class", "person").attr("data-who", p.who).attr("data-facing", facing).attr("data-size", p.look.size || 1).attr("transform", `translate(${f2(x)},${f2(-y)})`);
@@ -2095,6 +2096,25 @@
         nameTag(g, p.tag, -38);
       }
       peopleK = null; sizePeople();
+    }
+    // A coach's group (Ade's, at weekends: after Phase 4): a few figures standing round the
+    // same boulder, in their own colours. Not people you talk to: no names, no clicks.
+    const GROUP_LOOKS = [{ shirt: "#3f7f6a", pants: "#2e3440", hat: "beanie", hatC: "#c9772b", skin: "#c08a64", hair: "#2b1d16" },
+      { shirt: "#c9a13a", pants: "#4b4a52", skin: "#f0c9a6", hair: "#8c3c22", shorts: true }, { shirt: "#7a3b52", pants: "#3c4a5c", hat: "cap", hatC: "#2f6b8f", skin: "#7a5038", hair: "#151210" },
+      { shirt: "#5a7d9a", pants: "#5b4a3a", skin: "#e2b996", hair: "#b0803e" }];
+    function drawGroup(bo, p, [mx, my]) {
+      const R = bo.form.R, spots = [[R * 1.6, -R * .9], [-R * 1.6, -R * .9], [R * .5, -R * 1.9], [-R * .6, -R * 1.85], [R * 2.1, -R * .2], [-R * 2.1, -R * .2]];
+      let n = 0;
+      for (const [tx, ty] of spots) {
+        if (n >= p.group) break;
+        const x = bo.b.x + tx, y = bo.b.y + ty;
+        if (Math.hypot(tx - mx, ty - my) < 2.2 || !standable(x, y) || treeInFront(x, y)) continue;
+        const facing = tx > 0 ? 1 : -1, look = GROUP_LOOKS[n % GROUP_LOOKS.length];
+        const g = people.append("g").attr("class", "person crowd").attr("data-facing", facing).attr("data-size", .94).attr("transform", `translate(${f2(x)},${f2(-y)})`);
+        g.append("ellipse").attr("class", "me-shadow");
+        poseStill(drawSide(g.append("g").attr("class", "person-fig"), { skin: "#e6bf98", hair: "#4a3426", pants: "#3f4f63", pad: null, ...look }));
+        n++;
+      }
     }
     // A name over the head of someone you know (Phase 4, Stage 1), shown on hover or for
     // a moment after a tap; the same size on screen at any zoom (sizePeople scales it).

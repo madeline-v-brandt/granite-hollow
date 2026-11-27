@@ -26,8 +26,8 @@
 // for a few hours, and good vibes come and go with the crowd, prime days and
 // their own recent breakthroughs. Since Phase 4, Stage 3, a keen climber asks every
 // regular who's out that day and knows a line they're working (they've climbed it, are
-// on it, or it's their style) for beta, once each per line, and a stranger now and then
-// gives a hint.
+// on it, or it's their style) for beta, once each per line. (Strangers no longer stop
+// you to give hints: after Phase 4, from play-testing.)
 const fs = require("fs");
 const path = require("path");
 const args = process.argv.slice(2);
@@ -270,7 +270,6 @@ function play(styleName, seed, build) {
           st.tips[w] = 1; out.beta++; if (r.what === "alt") out.betaAlt++;
           day.minute += 10;
         }
-        if (!st.tips.c && st.att >= 3 && rng() < 0.15) { Mech.giveBeta(pl, pr, st, { knows: "hint", tier: "met" }); st.tips.c = 1; out.beta++; }
       }
     }
     if (S.project) {

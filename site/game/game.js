@@ -353,7 +353,7 @@
     const faded = fadeIfAway(p, st);
     // Climb it brushes a dirty line first, once you know how.
     const brushed = !!opts.brush && knows("brush") && isDirty(i);
-    if (brushed) { st.clean = true; G.day.minute += Mech.BAL.brushMin; }
+    if (brushed) { st.clean = true; G.day.minute += Mech.BAL.brushMin; noticed("n:juno", "clean", i); }
     const day = here(i);
     const cost = Mech.attemptCost(G.player, p, day);
     const r = Mech.attempt(G.player, p, st, day);
@@ -388,6 +388,7 @@
       if (tip && first) tip.done = true;
       G.todo = G.todo.filter(t => t !== i || !first);
       const style = first ? (flash ? "Flash" : "Send") : "Repeat";
+      if (first && p.tagList.some(t => !G.ticks.some(x => D.problems[x.p] && D.problems[x.p].tagList.includes(t)))) noticed("n:ade", "new", i);   // a style you've never sent (Ade)
       const pal = partnerNow();
       G.ticks.push({ p: i, date: G.date, day: G.dayNo, style, att: st.att, stars: null, ...(pal ? { with: pal } : {}) });
       if (pal) bond(pal, "sendWith", i);
@@ -668,6 +669,7 @@
       (G.day.brushed = G.day.brushed || {})[i] = true;
       if (dirty) st.clean = true;
       noticed("n:gus", "brush", i);                           // Gus notices you looking after the park
+      if (dirty) noticed("n:juno", "clean", i);              // and Juno, a line nobody's climbed yet
       G.day.last = { kind: "info", title: `Brushing ${titleOf(i)}`, p: i, text: dirty && rainNow()
         ? "You scrub the lichen and grit off the holds in the drizzle. It'll be clean and ready when it dries."
         : dirty ? pick(["You scrub the grit and lichen off every hold you can reach and blow the dust out of the cracks. It's climbable rock now.",
@@ -811,6 +813,7 @@
     const n = G.day.rests || 0;
     G.player.energy = Math.min(G.day.startEnergy, G.player.energy + Mech.restGain(n));
     G.day.rests = n + 1;
+    noticed("n:mags", "rest");                                  // Mags approves of a proper rest
     G.day.last = { kind: "info", title: "Twenty minutes on the pad", text: ["You eat a snack, retape a finger, and watch someone flail on a warm-up. Energy recovers a little; skin doesn't.",
       "You lie back on the pad and watch the clouds. Your forearms stop buzzing.", "A drink, a stretch, a look at the holds from below. Energy comes back; skin doesn't."][n % 3] };
     const pal = partnerNow();
@@ -844,7 +847,6 @@
     if (now.sector && now.sector !== prev.sector) {
       G.day.encounter = null;
       G.day.last = { kind: "info", title: now.sector, text: sectorBlurb(now.sector) };
-      maybeEncounter(now.sector);
     } else if (now.boulder != null && now.boulder !== prev.boulder) G.day.last = null;
     if (now.boulder !== prev.boulder) UI.fresh = null;
     checkAchievements();
@@ -869,19 +871,6 @@
   }
 
   // ============================================================== encounters
-  function maybeEncounter(sector) {
-    if (G.day.met.filter(x => typeof x === "number").length >= (G.day.busy ? 5 : 3)) return;      // strangers: three a day at most (five on a busy day)
-    if (v2()) { const w = regularFor(sector); if (w) { G.day.met.push(w); G.day.encounter = buildRegular(w, sector); return; } }
-    if (Math.random() > (G.day.busy || eventToday() ? 0.8 : 0.55)) return;
-    const pool = D.npcsBySector.get(sector).filter(ci => !G.day.met.includes(ci) && (!v2() || G.world.npc["c" + ci]));
-    if (!pool.length) return;
-    const weight = ci => ({ local_hero: 4, regular: 2.5, occasional: 1, tourist: 1 })[D.climbers[ci][2]] || 1;
-    const total = d3.sum(pool, weight);
-    let r = Math.random() * total, ci = pool[0];
-    for (const c of pool) { r -= weight(c); if (r <= 0) { ci = c; break; } }
-    G.day.met.push(ci);
-    G.day.encounter = buildEncounter(ci, sector);
-  }
   function playerFit(i) {
     const p = D.problems[i];
     if (G.ps[i]?.sent) return -Infinity;
@@ -900,45 +889,6 @@
     if ((p.stars || 0) >= 3.2) out.push("it's one of the best lines in the park");
     return out;
   }
-  function buildEncounter(ci, sector) {
-    const [name, h, type] = D.climbers[ci];
-    const w = G.day.weather;
-    const greet = {
-      local_hero: [`Hey, I'm ${name}. I'm out here most days.`, `Morning. ${name}. I've probably climbed everything in this sector twice.`],
-      regular: [`Hey! ${name}. Nice day for it.`, `Oh hi, I'm ${name}. Come here most weekends.`],
-      occasional: [`Hi, I'm ${name}. First time in this sector in a while.`, `${name}. Trying to get out more this season.`],
-      tourist: [`Hi! ${name}. Visiting from out of state. This granite is sharp!`, `${name}, just passing through. Any good warm-ups?`],
-    }[type];
-    let line = pick(greet);
-    if (w.cond >= 0.3) line += " Friction's amazing today."; else if (w.cond <= -0.3) line += " Pretty greasy out here though.";
-    const { rec, recLine } = recommend("c" + ci, sector, D.liked[ci], h, { tell: false });
-    return { ci, who: "c" + ci, sector, line, rec, recLine, beta: betaFor(sector, "c" + ci), accepted: false, betaTaken: false, open: true, idx: 0, used: [], beats: [{ t: line, mood: "happy" }] };
-  }
-  // A recommendation: something they liked that suits you (or the best fit here).
-  function recommend(who, sector, liked, h, opts = {}) {
-    const documented = i => !v2() || !!G.world.est[i];        // under the new rules, only what's been climbed
-    let ranked = (liked || []).filter(i => !G.ps[i]?.sent && documented(i)).map(i => [i, playerFit(i)]).filter(x => x[1] > -4).sort((a, b) => b[1] - a[1]);
-    let theirs = ranked.length > 0;
-    if (!ranked.length) ranked = D.sectorProblems.get(sector).filter(i => !G.ps[i]?.sent && documented(i)).map(i => [i, playerFit(i)]).sort((a, b) => b[1] - a[1]);
-    const rec = ranked.length ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))][0] : null;
-    let recLine = "";
-    if (rec != null) {
-      if (opts.tell !== false) K.tell(rec, who, G.date);     // they've told you about it, so now you know (in a conversation, once you ask)
-      const p = D.problems[rec], why = whyFor(rec);
-      const where = p.sector === sector ? `right here on ${p.boulder.name}` : `over at ${p.sector}`;
-      recLine = `You should try ${titleOf(rec)}, ${where}. ${theirs ? "One of my favorites. " : ""}I think ${why.slice(0, 2).join(" and ")}.`;
-      if (h != null && Math.abs(h - G.player.height) <= 5) recLine += " We're about the same height, so trust me.";
-    }
-    return { rec, recLine };
-  }
-  // A stranger's hint for a project you're working in this sector (Phase 4, Stage 3: a
-  // hint, on the crux; once per person per line). The words come when you ask.
-  function betaFor(sector, who) {
-    const projects = D.sectorProblems.get(sector).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && !(G.ps[i].tips && G.ps[i].tips[who]));
-    if (!projects.length || Math.random() >= 0.7) return null;
-    return { p: projects.sort((a, b) => G.ps[b].att - G.ps[a].att)[0] };
-  }
-
   // ---- beta from people (Phase 4, Stage 3) ------------------------------------------------
   // Everyone can tell you something once per line: what depends on how well they know it
   // (climbed it, working it, or it's their style: World.knowsLine), how well they know you,
@@ -1405,7 +1355,8 @@
         if (!bs.length) continue;
         b = bs[Math.floor(pb * bs.length)].id;
       } else { s = World.sessionOn(G, w, G.date); if (!s) continue; b = s.b; t = World.ROUTINES[key2] ? World.routineOn(key2, G.date).t : s.t; }   // their hours as the routine has them now
-      list.push({ who: w, name: n.name.replace(/^the /, "The "), b, side: ps < .5 ? -1 : 1, look: LOOKS[key2] || {}, from: t[0], to: Math.min(t[1], G.day.weather.dusk), s });
+      const group = key2 === "ade" && ([0, 6].includes(toDate(G.date).getUTCDay()) || eventToday()) ? 3 : 0;   // Ade's gym group, at weekends (after Phase 4)
+      list.push({ who: w, name: n.name.replace(/^the /, "The "), b, side: ps < .5 ? -1 : 1, look: LOOKS[key2] || {}, from: t[0], to: Math.min(t[1], G.day.weather.dusk), s, ...(group ? { group } : {}) });
     }
     peopleCache = { key, list };
     return list;
@@ -1424,6 +1375,9 @@
     rowan: { proj: "Working a project, sketchbook on the pad", mileage: "Sketching the boulders between burns", wet: "Sketching in the rain" },
     bea: { proj: "Throwing for a project, over and over", mileage: "Jumping for things", wet: "Practising dynos on a log while the rock dries" },
     dez: { proj: "Quietly working something hard", mileage: "Climbing, quietly", wet: "Sitting under the trees, waiting it out" },
+    mags: { proj: "Working a slab, with a flask of tea on the pad", mileage: "Climbing the easy ones, slowly and happily", wet: "Reading under the hemlocks" },
+    ade: { proj: "Working a project between coaching", mileage: "Coaching, and climbing a bit", wet: "Running balance drills on a log" },
+    juno: { proj: "Working a line Juno cleaned", mileage: "Brushing a line nobody's climbed yet", wet: "Scouting for new lines in the rain" },
   };
   function activity(p) {
     if (p.who === "n:bishop") return "Telling anyone who'll listen about 1977";
@@ -1624,7 +1578,7 @@
   // remembers (tick.with). Never required, never XP: climbing alone loses nothing.
   // Good vibes: a small, hidden lift to the send chance (Mech.vibes), only ever
   // put in words.
-  const CLIMB_WITH = ["n:gus", "n:hollis", "n:otis", "n:rowan", "n:bea", "n:dez"];
+  const CLIMB_WITH = ["n:gus", "n:hollis", "n:otis", "n:rowan", "n:bea", "n:dez", "n:mags", "n:ade", "n:juno"];
   const partnerNow = () => (v2() && G.day && !G.day.over && G.day.partner && G.day.partner.who) || null;
   const firstName = w => World.whoName(D, w).replace(/^Ranger /, "").split(" ")[0];
   const PARTNER = {
@@ -1644,6 +1598,12 @@
       cheer: ["Bea screams with joy. Somewhere, a crow takes off.", "“That was SICK,” Bea says. “Do it again!”"] },
     dez: { yes: "“Sure.”", allDay: "“All day, if you like.”", bye: "Dez nods, shoulders a pad and walks off into the trees. “Good session.”",
       cheer: ["Dez nods, once. From Dez, that's a standing ovation.", "“Nice,” Dez says, and means it."] },
+    mags: { yes: "“Lovely. I'll go first on the easy one, and you can show me how it's done on the rest.”", allDay: "“I've nothing on until the grandchildren on Sunday.”", bye: "Mags packs up her flask. “That was a lovely session, dear. Rest those fingers.”",
+      cheer: ["“Well done!” Mags claps. “Gold star.”", "Mags puts down her tea to applaud."] },
+    ade: { yes: "“Yes! I'll spot. Quiet feet, remember.”", allDay: "“The group can warm up without me. Probably.”", bye: "Ade jogs back to the group. “Great session. Rest day tomorrow!”",
+      cheer: ["“YES! Textbook!” Ade shouts.", "Ade whoops, and the whole group joins in."] },
+    juno: { yes: "“Sure! Then I'm showing you a line nobody's touched. Well. I've touched it. With a brush.”", allDay: "“All day? Great. Bring a brush.”", bye: "Juno heads off into the trees with a brush. “Don't put up anything without me.”",
+      cheer: ["“Nice! Clean, too,” Juno says.", "Juno whoops, then checks the holds you used for moss."] },
   };
   // A partner's line: Rowan's are different once you're together (Stage 6).
   const partnerSays = (w, k) => { const P = PARTNER[w.slice(2)] || {}; return (w === "n:rowan" && togetherNow() && P[k + "Us"]) || P[k]; };
@@ -1714,15 +1674,6 @@
     else if (vb.v >= 0.12) bits.push("Good vibes at the crag today.");
     return bits.join(" ");
   }
-  // A stranger's hint (regulars' beta is askBeta).
-  function takeBeta() {
-    const e = G.day.encounter; if (!e || !e.beta || e.betaTaken) return "";
-    const w = e.ci != null ? "c" + e.ci : e.who, i = e.beta.p, [, h] = e.ci != null ? D.climbers[e.ci] || [] : [];
-    const r = takeBetaFrom(w, i, { knows: "hint", tier: "met", reach: h || null }); e.betaTaken = true;
-    save(); renderAll();
-    return `Saw you working ${pref(i)}. ${upFirst(Talk.moveWord(r))}: ${betaHow(i, r)}`;
-  }
-
   // ---- conversations (Phase 4, Stage 2): a box over the map, with a portrait ----------------
   // G.day.encounter is the conversation: its beats (what's been said, { t, mood,
   // narr }), which one you're on (idx), the replies you've used, and what they can
@@ -1751,7 +1702,6 @@
     if (n && key !== "bishop" && mine != null && !used("tell")) out.push(["tell", `I'm working on ${pname(mine)}`, "data-tell"]);
     if (canPartner(e) && !e.partnered) out.push(["together", "Climb together?", "data-together"]);
     for (const i of e.asks || []) if (!used("beta:" + i)) out.push(["beta:" + i, `Any beta for ${pname(i)}?`, "data-beta"]);
-    if (e.beta && !e.betaTaken) out.push(["beta", `Any tips for ${pname(e.beta.p)}?`, "data-beta"]);
     if (e.dir && !e.dirTaken) out.push(["dir", key === "bishop" ? "Ask where else is worth a look" : "Know any other good spots?", "data-dir"]);
     if (e.dir && e.dirTaken && !G.day.over) out.push(["go-sector", `Walk to ${e.dir}`, "data-go-sector"]);
     if (e.reveal != null && !e.revealTaken) out.push(["reveal", "Seen any lines I'd miss?", "data-reveal"]);
@@ -1773,7 +1723,6 @@
       case "ask": use(); talkAdd(e, Talk.reply(env, e.who, "ask")); break;
       case "tell": { use(); const p = currentProject(); if (p != null) bond(e.who, "proj", p); talkAdd(e, Talk.reply(env, e.who, "tell")); break; }
       case "together": climbTogether(); if (e.partnered) { talkAdd(e, [{ t: e.partnered.replace(/^“|”$/g, ""), mood: "happy" }]); closerNow(e); } break;
-      case "beta": { const t = takeBeta(); if (t) talkAdd(e, [{ t, mood: "thoughtful" }]); break; }
       case "dir": { const line = e.dirLine; askWay(); talkAdd(e, [{ t: line, mood: "thoughtful", narr: e.who === "n:bishop" }, { t: `${e.who === "n:bishop" ? "He draws" : who + " draws"} you a little map to ${e.dir} on the back of a receipt.`, mood: "happy", narr: true }]); break; }
       case "reveal": { const line = e.revealLine; hearLine(); talkAdd(e, [{ t: line, mood: "thoughtful", narr: e.who === "n:bishop" }]); break; }
       case "rec": use(); if (e.rec != null) K.tell(e.rec, e.who, G.date); talkAdd(e, [{ t: e.recLine, mood: "happy" }]); break;
@@ -3345,7 +3294,6 @@
     on("[data-reveal]", hearLine);
     on("[data-pet]", petDog);
     on("[data-chat]", sitChat);
-    on("[data-beta]", takeBeta);
     on("[data-together]", climbTogether);
     on("[data-dismiss]", () => closeTalk());
     on("[data-rate]", n => { const t = G.ticks[G.day.last.tick]; t.stars = +n.dataset.rate; save(); renderPanel(); });
@@ -4098,6 +4046,8 @@
     learnedFor(g);
     if (g.v === 2 && g.world) { World.ensureReg(D, g, { date: g.date, wet: !!(g.day && g.day.rainedOut) }); Social.ensure(g, D.problems.length); }
     // A partner only for today, someone who climbs; sends together only with them (Stage 4).
+    // Strangers no longer pop up (after Phase 4): a save mid-conversation with one just ends it.
+    if (g.day && g.day.encounter && !(typeof g.day.encounter.who === "string" && g.day.encounter.who.startsWith("n:"))) g.day.encounter = null;
     if (g.day && g.day.partner != null && !(g.day.partner && CLIMB_WITH.includes(g.day.partner.who) && typeof g.day.partner.until === "number" && isFinite(g.day.partner.until))) g.day.partner = null;
     if (g.day && g.day.partner && g.day.partner.b != null && !(Number.isInteger(g.day.partner.b) && g.day.partner.b >= 0 && g.day.partner.b < D.boulders.length)) delete g.day.partner.b;
     for (const t of g.ticks || []) if (t && t.with != null && !CLIMB_WITH.includes(t.with)) delete t.with;
