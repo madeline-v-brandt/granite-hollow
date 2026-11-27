@@ -4,7 +4,8 @@
 //   Portraits.svg(key, mood, { look, seed })   key: "gus", "rowan", …, "pickles", or
 //                                              "stranger" (looks from seed)
 //   Portraits.MOODS   neutral, happy, excited, thoughtful, frustrated, embarrassed
-//                     (Pickles also has sleepy)
+//                     (Pickles also has sleepy; Rowan also has smitten, shy and laugh,
+//                     Stage 6, which anyone else draws as happy, embarrassed and happy)
 //   Portraits.LOOKS   each regular's colours and clothes (the map's figures use these too)
 //
 // The look: inked like the map (warm dark lines, flat watercolour fills, a paper
@@ -34,6 +35,8 @@
     dez: { hair: "temples", wide: 1, wash: "#d9d4e6", extras: ["earring"] },
   };
   const MOODS = ["neutral", "happy", "excited", "thoughtful", "frustrated", "embarrassed"];
+  const SWEET = ["smitten", "shy", "laugh"];                       // Rowan's own (Stage 6)
+  const SWEET_AS = { smitten: "happy", shy: "embarrassed", laugh: "happy" };
   const f = v => Math.round(v * 10) / 10;
   const shade = (hex, k) => {                     // darker (k < 0) or lighter (k > 0)
     const m = /^#?([0-9a-f]{6})$/i.exec(hex || ""); if (!m) return hex;
@@ -55,6 +58,10 @@
       case "frustrated": return dot(52, 61, 1.7, 1.6) + dot(68, 61, 1.7, 1.6) + L("M49,59.4 L55,59.8", 1.3) + L("M65,59.8 L71,59.4", 1.3);
       case "embarrassed": return L("M49,59.5 Q52,62.6 55,59.5") + L("M65,59.5 Q68,62.6 71,59.5");
       case "sleepy": return L("M49,61 Q52,62.5 55,61") + L("M65,61 Q68,62.5 71,61");
+      // Rowan's: soft and a little heavy-lidded; looking down and away; laughing, eyes shut.
+      case "smitten": return dot(52, 60.4, 2.2, 2.6) + dot(68, 60.4, 2.2, 2.6) + `<circle cx="52.8" cy="59.3" r=".9" fill="#fff"/><circle cx="68.8" cy="59.3" r=".9" fill="#fff"/><circle cx="51.3" cy="61.5" r=".45" fill="#fff"/><circle cx="67.3" cy="61.5" r=".45" fill="#fff"/>`;
+      case "shy": return dot(50.2, 61.6, 1.7, 2) + dot(66.2, 61.6, 1.7, 2);
+      case "laugh": return L("M48.6,60.6 Q52,56.6 55.4,60.6", 1.6) + L("M64.6,60.6 Q68,56.6 71.4,60.6", 1.6);
       default: return dot(52, 60) + dot(68, 60);
     }
   }
@@ -68,6 +75,9 @@
       case "frustrated": return b("M48,51.4 L56,54.6", "M64,54.6 L72,51.4");
       case "embarrassed": return b("M48,54.4 L56,51.8", "M64,51.8 L72,54.4");
       case "sleepy": return b("M48,54 Q52,53.4 56,54", "M64,54 Q68,53.4 72,54");
+      case "smitten": return b("M48,52.6 Q52,50.2 56,52", "M64,52 Q68,50.2 72,52.6");
+      case "shy": return b("M48,53.6 Q52,51 56,51.8", "M64,51.8 Q68,51 72,53.6");
+      case "laugh": return b("M48,51.6 Q52,49 56,51.2", "M64,51.2 Q68,49 72,51.6");
       default: return b("M48,53.5 Q52,52 56,53.5", "M64,53.5 Q68,52 72,53.5");
     }
   }
@@ -79,13 +89,18 @@
       case "frustrated": return L("M54,72.6 Q57,70.4 60,72.4 Q63,74.4 66,72.2", 1.4);
       case "embarrassed": return L("M56,71.2 Q60,74 64,71.2", 1.4);
       case "sleepy": return L("M57,71.8 Q60,72.6 63,71.8", 1.3);
+      case "smitten": return L("M54.6,70.6 Q60,75 65.4,70.6", 1.5);
+      case "shy": return L("M56.6,71.6 Q59,73.6 62.4,72.4", 1.4);
+      case "laugh": return P("M52.6,68.6 Q60,81 67.4,68.6 Q60,70.6 52.6,68.6 Z", "#7a3b32") + `<path d="M56,74.2 Q60,72.2 64,74.2 Q60,77.6 56,74.2 Z" fill="#c76b6b"/>`;
       default: return L("M55,71 Q60,72.8 65,71", 1.4);
     }
   }
   const blush = mood => {
-    const o = mood === "embarrassed" ? .5 : mood === "happy" || mood === "excited" ? .28 : 0;
+    const o = mood === "smitten" || mood === "shy" ? .62 : mood === "embarrassed" ? .5 : mood === "happy" || mood === "excited" || mood === "laugh" ? .28 : 0;
     return o ? `<ellipse cx="46.5" cy="66" rx="4.2" ry="2.4" fill="#d9665a" fill-opacity="${o}"/><ellipse cx="73.5" cy="66" rx="4.2" ry="2.4" fill="#d9665a" fill-opacity="${o}"/>` : "";
   };
+  // A little pink heart by Rowan's cheek when smitten (understated: one, small).
+  const heart = mood => (mood === "smitten" ? `<path d="M89,40 C89,36.6 93.6,36.2 94.2,39.4 C94.8,36.2 99.4,36.6 99.4,40 C99.4,43.4 94.2,46.6 94.2,46.6 C94.2,46.6 89,43.4 89,40 Z" fill="#e7849a" stroke="${INK}" stroke-width="1"/>` : "");
   const sweat = mood => (mood === "embarrassed" || mood === "frustrated" ? P("M83,46 Q86,51 83.6,53 Q80.6,52 83,46 Z", "#cfe3ef", `stroke-width="1"`) : "");
 
   // ---- hair, hats and what's theirs. The head: centre (60, 58), 20 × 23.
@@ -170,7 +185,7 @@
       + (face.extras.includes("beard") ? extras(["beard"], { hair }, mood) : "")
       + mouth(mood)
       + extras(face.extras.filter(x => x !== "beard"), { ...look, hair }, mood)
-      + `</g>` + sweat(mood);
+      + `</g>` + sweat(mood) + heart(mood);
   }
   // Pickles: a scruffy grey dog with a pale muzzle and one floppy ear.
   function pickles(mood) {
@@ -199,10 +214,11 @@
       + L("M60,70.4 L60,74 M53,74 Q56.6,77.6 60,74 Q63.4,77.6 67,74", 1.3) + tongue + `</g>` + zz;
   }
   function svg(key, mood = "neutral", opts = {}) {
-    const m = key === "pickles" ? (["sleepy", ...MOODS].includes(mood) ? mood : "neutral") : MOODS.includes(mood) ? mood : "neutral";
+    const m = key === "pickles" ? (["sleepy", ...MOODS].includes(mood) ? mood : SWEET_AS[mood] || "neutral")
+      : MOODS.includes(mood) || (key === "rowan" && SWEET.includes(mood)) ? mood : SWEET_AS[mood] || "neutral";
     const inner = key === "pickles" ? pickles(m) : person(key, m, opts);
     return `<svg class="portrait" viewBox="0 0 120 120" role="img" aria-label="${esc(opts.label || "")}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
   }
-  const Portraits = { svg, MOODS, LOOKS, FACES };
+  const Portraits = { svg, MOODS, SWEET, LOOKS, FACES };
   if (typeof module !== "undefined") module.exports = Portraits; else root.Portraits = Portraits;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -176,6 +176,15 @@
     c.dogMode = env.dogMode || "rock";
     c.dogWith = c.dogMode === "with" || c.dogMode === "follow";
     c.yours = c.dog.n >= 4;
+    // Rowan (Stage 6): how things stand (Social.romance), whether Rowan's asking you to stay
+    // for the sunset (env.sunset), and, for everyone else, whether there's gossip to be had.
+    c.ro = Social.romance ? Social.romance(G) : { n: 0 };
+    c.sweet = c.ro.n === 2 || c.ro.n === 3;                         // sweet on each other
+    c.us = c.ro.n === 4;                                           // together
+    c.usDays = c.us ? c.ro.days : -1;
+    c.sunsetAsk = !!env.sunset;
+    c.rowanSweet = key !== "rowan" && c.sweet && K.met("n:rowan");
+    c.rowanUs = key !== "rowan" && c.us && c.usDays <= 45 && K.met("n:rowan");
     return c;
   }
 
@@ -192,6 +201,8 @@
         l("gus.h.dog", "thoughtful", c => c.dog && c.dog.n === 3, () => "I see Pickles has found himself a new favourite. He's not my dog, you understand. But I'll be keeping an eye on you.", { w: 3 }),
         l("gus.h.yours", "happy", c => c.yours, () => "How's my— your dog? Our dog. The dog. He looks happy. That's all I wanted.", { w: 3 }),
         l("gus.h.gap", "happy", c => c.gap >= 21, c => `Well, look who it is! ${c.gap >= 45 ? "I was about to put up a missing poster." : "Thought you'd found another park."} Good to have you back.`, { w: 6 }),
+        l("gus.h.ro", "happy", c => c.rowanSweet, () => "Rowan's asked me what time the park closes twice this week. Looking at you, both times. Just an observation.", { w: 3, story: true }),
+        l("gus.h.us", "happy", c => c.rowanUs, () => "So. You and Rowan. Pickles told me. Well, Pickles and everyone else in the lot. About time, if you ask me.", { w: 5, story: true }),
         l("gus.h.drill", "happy", T, () => "Pack it in, pack it out. You know the drill."),
         l("gus.h.early", "happy", c => c.part === "morning", () => "Morning! You're out early. Pickles was up before both of us."),
         l("gus.h.geese", "thoughtful", T, () => "If you see anyone feeding the geese, tell them Gus said no."),
@@ -283,6 +294,8 @@
       hello: [
         l("hol.h.dog", "happy", c => c.yours && c.dogWith, () => "Hello, Pickles. I've added him to the binder, you know. Under “Dogs, notable”. It's a short section.", { w: 3 }),
         l("hol.h.gap", "excited", c => c.gap >= 21, c => `There you are! I'd marked you as “whereabouts unknown”. ${c.gap >= 45 ? "With a question mark." : "In pencil."} Welcome back.`, { w: 6 }),
+        l("hol.h.ro", "thoughtful", c => c.rowanSweet, () => "Rowan asked me whether the binder has a section for “people who climb nicely”. It doesn't. I'm thinking of adding one.", { w: 3, story: true }),
+        l("hol.h.us", "happy", c => c.rowanUs, () => "I've updated the index. You and Rowan are cross-referenced now. It's the most romantic thing I know how to do.", { w: 5, story: true }),
         l("hol.h.witness", "thoughtful", T, () => "Ah, good. I need a witness. Does the Billboard traverse go left to right, or did I make that up?"),
         l("hol.h.twice", "happy", T, () => "Back again! I've updated the notes. Twice."),
         l("hol.h.prime", "happy", c => c.prime, () => "Prime conditions. I've written that down. I write the weather down every day. It'll matter one day.", { w: 2 }),
@@ -371,6 +384,8 @@
       hello: [
         l("oti.h.dog", "excited", c => c.yours && c.dogWith, () => "Pickles! Perfect dog weather. Here, he can have the crust.", { w: 3 }),
         l("oti.h.gap", "excited", c => c.gap >= 21, () => "Look who it is! You picked a perfect day to come back. Every day's perfect, but still.", { w: 6 }),
+        l("oti.h.ro", "happy", c => c.rowanSweet, () => "Rowan's been drawing the same crash pad all morning. Your crash pad. Perfect drawing weather, I suppose.", { w: 3, story: true }),
+        l("oti.h.us", "excited", c => c.rowanUs, () => "You and Rowan! Perfect. Perfect weather for it. Every weather is, really, but especially this one.", { w: 5, story: true }),
         l("oti.h.perfect", "happy", T, () => "Perfect sending weather!"),
         l("oti.h.wet", "happy", c => c.wx.wet, () => "Perfect sending weather! Well. Perfect sandwich weather.", { w: 3 }),
         l("oti.h.greasy", "happy", c => c.greasy || c.hot, () => "Bit warm. Perfect for… rest days. And sandwiches.", { w: 3 }),
@@ -457,7 +472,21 @@
       first: [l("row.hi1", "embarrassed", T, () => "Oh! Hi. Sorry, I was sketching. I'm Rowan. This boulder has the best shadows in the morning."),
         l("row.hi2", "happy", T, () => "Hi, I'm Rowan. I come up here to draw the rocks and occasionally climb one.")],
       hello: [
-        l("row.h.dog", "happy", c => c.yours && c.dogWith, () => "I've been drawing Pickles curled up by your pad. He's a very good model. He never moves.", { w: 3 }),
+        l("row.h.dog", "happy", c => c.yours && c.dogWith, () => "I've been drawing Pickles curled up by your pad. Such a good model. Never moves.", { w: 3 }),
+        // Sweet on each other (Stage 6): Rowan flirts back, a little.
+        l("row.h.sw1", "shy", c => c.sweet, () => "Oh, it's you. Good. I mean, hi. I'd hoped it would be you.", { w: 3, sweet: true }),
+        l("row.h.sw2", "shy", c => c.sweet, () => "Rowan sees you coming down the trail and tries very hard to look busy with the sketchbook.", { w: 3, narr: true, sweet: true }),
+        l("row.h.sw3", "shy", c => c.sweet, () => "I drew you into the corner of this one. For scale. Mostly for scale.", { w: 3, sweet: true }),
+        l("row.h.sw4", "smitten", c => c.sweet && c.part === "morning", () => "I brought two pencils today, in case you wanted one. You don't draw. I know. I brought it anyway.", { w: 2, sweet: true }),
+        // Together.
+        l("row.h.us1", "smitten", c => c.us, () => "Hi, you.", { w: 3, sweet: true }),
+        l("row.h.us2", "smitten", c => c.us, () => "There you are. I saved you the flat bit of the pad. And half a sandwich.", { w: 3, sweet: true }),
+        l("row.h.us3", "shy", c => c.us && c.part === "morning", () => "Good morning. The light's lovely. You're lovely. I'm going to go back to drawing now.", { w: 3, sweet: true }),
+        l("row.h.us4", "laugh", c => c.us && c.wx.wet, () => "It's pouring and I'm completely happy about it. That's your fault, I think.", { w: 3, sweet: true }),
+        l("row.h.us5", "smitten", c => c.us && c.gap >= 5 && c.gap < 21, () => "You're back! I've got a whole week of drawings to show you. Most of them are rocks. Some of them aren't.", { w: 5, sweet: true }),
+        l("row.h.after", "laugh", c => c.us && c.usDays >= 1 && c.usDays <= 4, () => "Hi. So. The sunset happened. I haven't stopped smiling. Gus asked if I'd hurt my face.", { w: 9, sweet: true, story: true }),
+        l("row.h.month", "smitten", c => c.us && c.usDays >= 28 && c.usDays <= 40, () => "It's been a month since the sunset. I drew it from memory and got the colours wrong on purpose. They were better than that.", { w: 9, sweet: true, story: true }),
+        l("row.h.year", "smitten", c => c.us && c.usDays >= 365 && c.usDays <= 380, () => "A year since the sunset. I've filled four sketchbooks since then. You're in most of them.", { w: 9, sweet: true, story: true }),
         l("row.h.gap", "happy", c => c.gap >= 21, () => "Oh! You're back. I kept looking up whenever someone came down the trail. Anyway. Hi.", { w: 6 }),
         l("row.h.back", "happy", T, () => "Hey, you're back! I was hoping someone would come up here."),
         l("row.h.light", "thoughtful", c => c.part === "morning", () => "The light's doing something lovely on the rock this morning. I've drawn it three times and it's still wrong.", { w: 2 }),
@@ -477,6 +506,8 @@
         l("row.t.send", "excited", c => c.sentToday, c => `I did it. ${cap(c.sentToday.full)}. I've been drawing it for weeks, and today I finally climbed it.`, { w: 5 }),
         l("row.t.sketch", "happy", c => c.today && c.today.out === "mileage", () => "I've mostly been sketching today. And climbing a bit, between drawings. Or the other way round.", { w: 2 }),
         l("row.t.wet", "happy", c => c.today && c.today.out === "wet", () => "Too wet to climb, so I'm drawing the drips."),
+        l("row.t.usfell", "frustrated", c => c.us && c.today && c.today.out === "fell" && c.proj, c => `Fell off ${c.proj.full} again. Tell me something nice, and then I'll try it once more.`, { w: 4, sweet: true }),
+        l("row.t.ussend", "laugh", c => c.us && c.sentToday, c => `I did it! ${cap(c.sentToday.full)}! I wanted you to be the first to know. Well, second. Pickles was there.`, { w: 6, sweet: true }),
       ],
       theirs: [l("row.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `I finally sent ${c.done.full}. The drawing of it is pinned up at the library now. Nobody knows it's a boulder.`, { w: 3 })],
       mine: [
@@ -523,9 +554,24 @@
       ],
       note: [
         l("row.v.1", "happy", c => c.invite, c => `I'll be ${c.invite.where} ${c.invite.when}, drawing and maybe climbing. Come by? —R.`),
-        l("row.v.2", "happy", c => c.invite, c => `${cap(c.invite.where)}, ${c.invite.when}. The light should be lovely. It'd be nice to climb together. —Rowan`),
+        l("row.v.2", "happy", c => c.invite && !c.us, c => `${cap(c.invite.where)}, ${c.invite.when}. The light should be lovely. It'd be nice to climb together. —Rowan`),
+        l("row.v.sw", "shy", c => c.invite && c.sweet, c => `${cap(c.invite.where)}, ${c.invite.when}. Come and climb? I'll save you the flat bit of the pad. —R.`, { w: 3 }),
+        l("row.v.sun", "shy", c => c.invite && c.invite.sunset, c => `${cap(c.invite.where)}, ${c.invite.when}. Stay for the sunset? I know a spot. —R.`),
+        l("row.v.us1", "smitten", c => c.invite && c.us, c => `${cap(c.invite.where)}, ${c.invite.when}. I'll bring the good sandwiches. —R`, { w: 3 }),
+        l("row.v.us2", "smitten", c => c.invite && c.us, c => `Come and find me ${c.invite.where} ${c.invite.when}. I've drawn you something. —R`, { w: 3 }),
       ],
-      invited: [l("row.i.1", "happy", c => c.invited, () => "You came. I was hoping the note didn't blow away.", { w: 3 })],
+      invited: [l("row.i.1", "happy", c => c.invited && !c.us, () => "You came. I was hoping the note didn't blow away.", { w: 3 }),
+        l("row.i.us", "shy", c => c.invited && c.us, () => "You found the note! I drew a little heart on it, then panicked and nearly rubbed it out.", { w: 3, sweet: true })],
+      // Stay for the sunset? (Once it's ready: Social.romance's canAsk.)
+      sunset: [
+        l("row.u.ask1", "shy", c => c.sunsetAsk && !c.ro.declined, () => "Are you staying till dusk? I know a spot where the whole valley goes pink at sunset. It's not a— well. It might be. Do you want to come?", { sweet: true }),
+        l("row.u.ask2", "shy", c => c.sunsetAsk && !c.ro.declined, () => "Stay for the sunset? There's a boulder up the hill with the best view in the park. I've been saving it.", { sweet: true }),
+        l("row.u.again", "smitten", c => c.sunsetAsk && c.ro.declined > 0, () => "The sunset's meant to be good tonight. Same spot? No pressure. It's a very good spot either way.", { sweet: true }),
+      ],
+      sunsetNo: [
+        l("row.u.no1", "happy", T, () => "Another time, then. The sun's not going anywhere. Well. It is. But it'll be back."),
+        l("row.u.no2", "embarrassed", T, () => "That's all right! Honestly. I'll draw it for you instead."),
+      ],
       story: [
         l("row.s.why", "thoughtful", c => c.close, () => "Rowan tells you why the drawing started: a year when everything felt too fast, and an art teacher who said “draw what's in front of you, slowly”. “Boulders are very good at staying still.”", { narr: true, story: true }),
         l("row.s.library", "happy", c => c.close, () => "Rowan tells you about the regulars at the library: a man who reads every bus timetable, a girl working through the encyclopedia, a cat nobody owns. “It's a bit like here, really.”", { narr: true, story: true }),
@@ -535,7 +581,10 @@
         l("row.s.nothing", "happy", T, () => "You talk about nothing much for twenty minutes: the light on the rock, the best sandwich in the village, a song you both half remember. It's nice.", { narr: true, story: true }),
         l("row.s.winter", "thoughtful", T, () => "Rowan shows you a drawing of the Hollow in winter, all snow and dark rock. “I've never actually seen it in winter. I'm guessing.”", { narr: true, story: true }),
       ],
-      bye: [l("row.b.see", "happy", T, () => "See you around? I'll be here. Probably drawing."), l("row.b.careful", "happy", T, () => "Climb well. Not that you need me to say that.")],
+      bye: [l("row.b.see", "happy", c => !c.us, () => "See you around? I'll be here. Probably drawing."), l("row.b.careful", "happy", c => !c.us, () => "Climb well. Not that you need me to say that."),
+        l("row.b.sw", "shy", c => c.sweet, () => "Bye. I mean, see you soon. I mean— bye!", { w: 2, sweet: true }),
+        l("row.b.us1", "smitten", c => c.us, () => "See you later? Don't fall off anything. Or do, and I'll draw it.", { sweet: true }),
+        l("row.b.us2", "smitten", c => c.us, () => "Rowan squeezes your hand. “Go on, then. Go and climb something.”", { narr: true, sweet: true })],
       again: [l("row.g.again", "happy", T, () => "Oh, hi again. I was just drawing your pad. Is that weird?"), l("row.g.more", "embarrassed", T, () => "Back already? Good. I mean, hi.")],
     },
     bea: {
@@ -545,6 +594,8 @@
       hello: [
         l("bea.h.dog", "excited", c => c.yours && c.dogWith, () => "PICKLES!! Oh, and hi. Hi. But PICKLES.", { w: 3 }),
         l("bea.h.gap", "excited", c => c.gap >= 21, () => "WHERE HAVE YOU BEEN. Okay, sorry. Hi. I've learned SO many dynos since.", { w: 6 }),
+        l("bea.h.ro", "excited", c => c.rowanSweet, () => "Rowan drew you AGAIN. I saw. Are you two— no. Never mind. Forget I said anything. (Are you, though?)", { w: 3, story: true }),
+        l("bea.h.us", "excited", c => c.rowanUs, () => "OH MY GOD. You and ROWAN? I KNEW it. I called it weeks ago. Nobody ever listens to me.", { w: 5, story: true }),
         l("bea.h.almost", "excited", T, () => "Did you see that? I almost stuck it! Almost!"),
         l("bea.h.school", "excited", c => !c.weekend && c.part !== "morning" && c.season !== "summer", () => "School was SO long today. I've got till my mom gets here. Go go go.", { w: 3 }),
         l("bea.h.nine", "happy", c => c.weekend && c.part === "morning", () => "My mom dropped me off at nine. I've already done like forty dynos.", { w: 3 }),
@@ -630,6 +681,8 @@
       hello: [
         l("dez.h.dog", "happy", c => c.yours && c.dogWith, () => "Hey, Pickles. …And you.", { w: 3 }),
         l("dez.h.gap", "happy", c => c.gap >= 21, () => "Hey. Been a while. Good to see you.", { w: 6 }),
+        l("dez.h.ro", "thoughtful", c => c.rowanSweet, () => "Rowan keeps looking over here. Not at me.", { w: 3, story: true }),
+        l("dez.h.us", "happy", c => c.rowanUs, () => "Heard about you and Rowan. …Good. Really.", { w: 5, story: true }),
         l("dez.h.mm", "neutral", T, () => "Mm. Good conditions."),
         l("dez.h.prime", "happy", c => c.prime, () => "Good day.", { w: 2 }),
         l("dez.h.wet", "thoughtful", c => c.wx.wet, () => "Wet.", { w: 2 }),
@@ -720,6 +773,7 @@
       l("bis.h.first", "happy", T, () => "You know who put up the first problem in this park? Me. Well. Me and Dot. Mostly me."),
       l("bis.h.name", "thoughtful", T, () => "They call me the Bishop. Don't ask why. It's a long story, and most of it's true."),
       l("bis.h.gap", "happy", c => c.gap >= 21, c => `Thought you'd given up! Back in '${c.yy}, people gave up all the time. You're made of sterner stuff.`, { w: 5 }),
+      l("bis.h.us", "happy", c => c.rowanUs, () => "You and the one with the sketchbook, eh? Dot and I used to watch the sunset from up on the hill. Best seat in the park, that.", { w: 5, story: true }),
     ],
     story: [
       l("bis.s.name", "happy", T, () => "The Bishop tells you how the crag got its name. The story takes nineteen minutes, involves a mule, and doesn't seem to be about the crag.", { narr: true, story: true }),
@@ -793,6 +847,77 @@
     again: [l("pic.g.again", "happy", T, () => "Pickles' tail thumps. You again! Excellent.", { narr: true })],
   };
 
+  // ---- something playful, to Rowan (Stage 6) ----------------------------------------------
+  // What you can say (label: your words, or what you do), and how Rowan takes it: early (a
+  // little flirting), sweet (sweet on each other) and us (together). Before you're together
+  // it's flirting; after, it's affection. One is offered per conversation, once a day.
+  const q = t => `“${t}”`;
+  const PLAYFUL = [
+    { id: "draw", when: T, label: () => q("Is that a drawing of me?"),
+      early: ["shy", "What? No. It's the boulder. You're… in the corner. For scale."], sweet: ["smitten", "Maybe. You're very hard to draw, you know. You never stand still."] },
+    { id: "nose", when: T, label: () => q("You've got charcoal on your nose. No, the other side."),
+      early: ["laugh", "Here? …You're making it worse on purpose, aren't you."], sweet: ["laugh", "Leave it. You've got chalk on yours. Now we match."] },
+    { id: "view", when: T, label: () => q("I only come up here for the view."),
+      early: ["shy", "The view's lovely from— oh. Oh. Right."], sweet: ["smitten", "“Me too,” Rowan says, and doesn't look at the view at all.", true] },
+    { id: "pad", when: T, label: () => q("Save me the flat bit of the pad?"),
+      early: ["embarrassed", "I always do. I mean, it's the best bit. Everyone wants it."], sweet: ["smitten", "It's already yours. I've been sitting on the lumpy bit for weeks."] },
+    { id: "spot", when: c => c.proj, label: () => q("Want a spotter? I'll catch you."),
+      early: ["laugh", "You'd better. I'm told I fall very dramatically."], sweet: ["shy", "I know you will. That's sort of the problem."] },
+    { id: "light", when: c => c.part !== "morning", label: () => q("The light's lovely. So's the company."),
+      early: ["shy", "Ha! That's— thank you. The light really is lovely, though."], sweet: ["smitten", "I was going to say that. I've been trying to say that all afternoon."] },
+    { id: "coffee", when: c => c.part === "morning", label: () => q("I brought you a coffee. Don't read into it."),
+      early: ["shy", "I'm reading into it a little bit. Thank you."], sweet: ["smitten", "Too late. I've read into it completely."] },
+    { id: "cold", when: c => c.cold, label: () => "Warm Rowan's hands in yours",
+      early: ["shy", "Rowan hesitates, laughs, and holds on a moment longer than strictly necessary.", true], sweet: ["smitten", "Rowan's hands are freezing. Neither of you lets go for quite a while.", true] },
+    { id: "rain", when: c => c.wx.wet, label: () => q("Rain, a boulder and you. I can think of worse days."),
+      early: ["laugh", "Can you? Name one. …Actually, this one's pretty good."], sweet: ["smitten", "This is my favourite kind of day now. I've decided."] },
+    { id: "showoff", when: c => c.sentToday, label: () => q("Show-off."),
+      early: ["laugh", "Says you! I've watched you climb. Show-off yourself."], sweet: ["smitten", "Only when you're watching."] },
+    { id: "pose", when: T, label: () => q("Draw me like one of your boulders."),
+      early: ["laugh", "Very still, then? And mostly grey? …I'll see what I can do."], sweet: ["shy", "I already have. Lots of times. Don't look in the back of the sketchbook."] },
+    // Together: affection.
+    { id: "hug", us: true, when: T, label: () => "Give Rowan a hug",
+      say: ["laugh", "Rowan hugs you back, chalk and all. You both come away with handprints.", true] },
+    { id: "missed", us: true, when: T, label: () => q("I missed you."),
+      say: ["smitten", "It's been a day. Maybe two. …I missed you too."] },
+    { id: "pencil", us: true, when: T, label: () => "Steal Rowan's pencil",
+      say: ["laugh", "Rowan chases you twice round the boulder for it, laughing, and wins by cheating.", true] },
+    { id: "hands", us: true, when: T, label: () => "Sit with Rowan for a bit",
+      say: ["smitten", "You sit on the pad holding hands, chalky and warm, and watch someone fall off the warm-up.", true] },
+    { id: "drawn", us: true, when: T, label: () => q("Can I see what you drew today?"),
+      say: ["shy", "It's you again. Rowan shrugs, going pink. “You're my favourite thing to draw. Sorry. You'll have to get used to it.”", true] },
+    { id: "cheer", us: true, when: c => c.proj, label: () => q("I'll spot you on your project."),
+      say: ["smitten", "Good. I fall better when you're there. That makes no sense. It's true, though."] },
+    { id: "proud", us: true, when: c => c.sentToday, label: () => q("I'm so proud of you."),
+      say: ["laugh", "I kept thinking about telling you. Are you? Good. I am too, a bit."] },
+  ];
+  // Today's playful line for this conversation, one you haven't used lately: { id, label }, or null.
+  function playful(env) {
+    const c = ctxFor(env, "n:rowan"), r = env.rng || Math.random;
+    const ok = PLAYFUL.filter(x => !!x.us === c.us && (() => { try { return !!x.when(c); } catch (e) { return false; } })());
+    if (!ok.length) return null;
+    const age = x => { const d = env.Social.saidOn(env.G, "n:rowan", "row.f." + x.id); return d ? days(d, c.date) : 999; };
+    const fresh = ok.filter(x => age(x) >= AVOID), pool = fresh.length ? fresh : ok.slice().sort((a, b) => age(b) - age(a)).slice(0, 1);
+    const x = pool[Math.floor(r() * pool.length)];
+    return { id: x.id, label: x.label(c) };
+  }
+  // Rowan's answer, from how things stood before you said it (stage: Social.romance's n).
+  function flirtBack(env, id, stage) {
+    const x = PLAYFUL.find(y => y.id === id); if (!x) return null;
+    const c = ctxFor(env, "n:rowan");
+    const [mood, t, narr] = x.us ? x.say : stage >= 2 ? x.sweet : x.early;
+    env.Social.say(env.G, "n:rowan", "row.f." + x.id, c.date);
+    return { id: "row.f." + x.id, t: cap(t), mood, narr: !!narr, sweet: true };
+  }
+  // The sunset (a scene of its own): how it starts, and how it ends, whatever you say.
+  const SUNSET = {
+    start: "Rowan leads you up a faint path to a flat-topped boulder above the trees. You sit side by side with your legs dangling over the edge. The whole valley goes pink, then gold, then a deep, slow orange.",
+    tell: "You tell Rowan how you feel. Rowan goes very quiet, then laughs, and bumps your shoulder. “I was hoping you'd say that. I've been hoping for weeks. Did you not notice? I drew you into every boulder.”",
+    after: "You watch the last of the sun go down together, and walk out by headlamp, holding hands.",
+    watch: "You watch the sun go down. Neither of you says much. It's nice, sitting up here. Rowan hums the whole way back down the hill.",
+    friends: "You watch the sun go down together. On the walk out, Rowan says, “I'm really glad we're friends. I mean that.” You can tell Rowan does.",
+  };
+
   // ---- choosing ------------------------------------------------------------------------------
   const AVOID = 12, STORY = 45;
   const GENDERED = /\b(he|she|him|her|his|hers|himself|herself)\b/i;
@@ -821,7 +946,7 @@
     let u = rng() * total, it = pool[0];
     for (const x of pool) { u -= x.ln.w || 1; if (u <= 0) { it = x; break; } }
     Social.say(G, who, it.ln.id, c.date);
-    return { id: it.ln.id, t: it.t, mood: it.ln.mood || "neutral", narr: !!it.ln.narr };
+    return { id: it.ln.id, t: it.t, mood: it.ln.mood || "neutral", narr: !!it.ln.narr, ...(it.ln.sweet ? { sweet: true } : {}) };
   }
   function ctxFor(env, who) {
     const c = context(env, who), r = env.rng || Math.random;
@@ -840,10 +965,13 @@
     }
     const hi = c.firstMeeting ? choose(env, who, ["first"], c, r)
       : c.invited ? choose(env, who, ["invited"], c, r)
-      : (c.gap >= 21 && choose(env, who, ["hello"].filter(() => true), { ...c }, r, true, ln => /\.gap$/.test(ln.id))) || choose(env, who, ["hello"], c, r, true) || choose(env, who, ["nod"], c, r, true);
+      : (c.us && choose(env, who, ["hello"], c, r, true, ln => /\.h\.(after|month|year)$/.test(ln.id)))     // the day after the sunset, and anniversaries (Stage 6)
+        || (c.gap >= 21 && choose(env, who, ["hello"].filter(() => true), { ...c }, r, true, ln => /\.gap$/.test(ln.id))) || choose(env, who, ["hello"], c, r, true) || choose(env, who, ["nod"], c, r, true);
     if (hi) out.push(hi);
     // A friendship that's just deepened: they say so (once).
     if (c.up && !c.firstMeeting) { const b = choose(env, who, ["closer"], c, r); if (b) { out.push(b); env.Social.heard(env.G, who); return out; } }
+    // Rowan asks you to stay for the sunset (Stage 6): that's the news.
+    if (c.sunsetAsk && c.key === "rowan") { const b = choose(env, who, ["sunset"], c, r); if (b) { out.push(b); return out; } }
     if (c.key === "pickles" || c.key === "bishop") { if (!out.length) { const h = choose(env, who, ["hello"], c, r); if (h) out.push(h); } return out; }
     const news = choose(env, who, c.firstMeeting ? ["today"] : ["mine", "theirs", "today", "others"], c, r, true);
     if (news) out.push(news);
@@ -862,14 +990,22 @@
       let ok = false; try { ok = !ln.when || !!ln.when(c); } catch (e) { ok = false; }
       if (ok) out.push({ id: ln.id, topic: tp, t: render(ln, c), mood: ln.mood });
     }
+    if (c.key === "rowan") for (const x of PLAYFUL) {             // the playful lines: yours, and Rowan's answers
+      let ok = false; try { ok = !!x.when(c); } catch (e) { ok = false; }
+      if (!ok) continue;
+      out.push({ id: "row.f." + x.id + ".label", topic: "playful", t: x.label(c), mood: "neutral" });
+      for (const [k, v] of Object.entries({ early: x.early, sweet: x.sweet, us: x.say })) if (v) out.push({ id: `row.f.${x.id}.${k}`, topic: "playful", t: cap(v[1]), mood: v[0] });
+    }
+    if (c.key === "rowan") for (const [k, t] of Object.entries(SUNSET)) out.push({ id: "row.sunset." + k, topic: "sunset", t, mood: "smitten" });
     return out;
   }
   // An invitation, written on a note left on your windscreen (Stage 4): env.invite = { who, where, when }.
   function note(env, who) {
     const c = ctxFor(env, who), r = env.rng || Math.random;
-    const b = choose(env, who, ["note"], c, r);
+    const sun = ln => !!(c.invite && c.invite.sunset) === /\.sun$/.test(ln.id);     // a sunset note, or an ordinary one
+    const b = choose(env, who, ["note"], c, r, false, sun);
     return b ? b.t : null;
   }
-  const Talk = { context, opening, reply, note, everyLine, LINES, GENDERED, how, moveWord, ALT_HOW, STYLE_HOW, HOLD_HOW, mentions: (t, c) => t.includes("Rowan") || !!(c && c.me && t.includes(c.me)) };
+  const Talk = { context, opening, reply, note, everyLine, LINES, PLAYFUL, SUNSET, playful, flirtBack, GENDERED, how, moveWord, ALT_HOW, STYLE_HOW, HOLD_HOW, mentions: (t, c) => /rowan/i.test(t) || !!(c && c.me && t.includes(c.me)) };
   if (typeof module !== "undefined") module.exports = Talk; else root.Talk = Talk;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -216,6 +216,51 @@ test("portraits: every regular, Pickles and strangers, in every mood, as valid S
   assert(Portraits.svg("stranger", "happy", { seed: "a" }) !== Portraits.svg("stranger", "happy", { seed: "b" }), "strangers differ");
   assert(Portraits.svg("stranger", "happy", { seed: "a" }) === Portraits.svg("stranger", "happy", { seed: "a" }), "and are stable");
 });
+// ---- Rowan (Stage 6) ----
+const withRomance = (g, R, fn) => { const keep = JSON.stringify(g.social), keepR = g.romance; try { g.romance = R.romance; if (R.flirts) { const e = g.social.npc["n:rowan"]; e.k.flirt = R.flirts; e.last.flirt = g.date; e.k.climb = Math.max(e.k.climb || 0, 6); } return fn(); } finally { g.social = JSON.parse(keep); g.romance = keepR; } };
+const STAGES = { none: {}, spark: { flirts: 1, romance: { since: "2025-09-07" } }, sweet: { flirts: 5, romance: { since: "2025-09-07" } },
+  ready: { flirts: 12, romance: { since: "2025-09-07" } }, together: { flirts: 12, romance: { since: "2025-09-07", together: "2025-09-20" } } };
+test("Rowan: every romance line, in every stage, renders with no gendered pronoun; Rowan's moods have portraits", () => {
+  let n = 0;
+  for (const { g, K } of saves.slice(1)) for (const [st, R] of Object.entries(STAGES)) withRomance(g, R, () => {
+    for (const extra of [{}, { sunset: true }, { invite: { who: "n:rowan", where: "at The Billboard", when: "today", sunset: true } }, { minute: 900, wet: true }]) {
+      const e = env(g, K, extra), xs = Talk.everyLine(e, "n:rowan").filter(x => x.t);
+      for (const x of xs) { n++; assert(x.t.length < 330 && !/undefined|null|NaN/.test(x.t), `${st} ${x.id}`); assert(!Talk.GENDERED.test(x.t), `${st} ${x.id}: "${x.t}"`); }
+      for (const w of WHO) for (const x of Talk.everyLine(e, w).filter(x => x.t && x.t.includes("Rowan"))) assert(!Talk.GENDERED.test(x.t), `${st} ${x.id}: "${x.t}"`);
+      for (const x of xs) assert(Portraits.svg("rowan", x.mood || "neutral").includes("<svg"), x.mood);
+    }
+  });
+  assert(n > 200, `${n} lines`);
+  for (const m of Portraits.SWEET) { const s = Portraits.svg("rowan", m); assert(s !== Portraits.svg("rowan", "neutral") && !/undefined|NaN/.test(s), m); assert(Portraits.svg("bea", m) === Portraits.svg("bea", m === "shy" ? "embarrassed" : "happy"), "only Rowan's: " + m); }
+});
+test("Rowan: playful lines by stage (flirting before, affection once together); the sunset ask; the others notice", () => {
+  const { g, K } = saves[2];
+  withRomance(g, STAGES.spark, () => {
+    const p = Talk.playful(env(g, K)); assert(p && p.label && !Talk.PLAYFUL.find(x => x.id === p.id).us, "a flirt " + JSON.stringify(p));
+    const b = Talk.flirtBack(env(g, K), p.id, 1); assert(b && b.sweet && b.t && Portraits.SWEET.concat(Portraits.MOODS).includes(b.mood), JSON.stringify(b));
+    const b2 = Talk.flirtBack(env(g, K), p.id, 2), x = Talk.PLAYFUL.find(y => y.id === p.id);
+    assert(b2.t.replace(/^.\s*/, "") !== b.t.replace(/^.\s*/, "") || x.early[1] === x.sweet[1], "sweet answers differ from early ones");
+    const o = Talk.opening(env(g, K, { sunset: false }), "n:rowan"); assert(o.length >= 1);
+  });
+  withRomance(g, { ...STAGES.together, romance: { since: "2025-09-07", together: World.addDays(g.date, -6) } }, () => {
+    for (let k = 0; k < 10; k++) { const p = Talk.playful(env(g, K)); assert(p && Talk.PLAYFUL.find(x => x.id === p.id).us, "together: affection, not flirting " + JSON.stringify(p)); }
+    const xs = Talk.everyLine(env(g, K), "n:rowan").filter(x => /row\.h\.us\d$/.test(x.id)); assert(xs.length >= 2, "together hellos");
+    for (const w of ["n:gus", "n:hollis", "n:otis", "n:bea", "n:dez", "n:bishop"]) assert(Talk.everyLine(env(g, K), w).some(x => /\.h\.us$/.test(x.id) && (w === "n:bishop" || /rowan/i.test(x.t))), `${w} notices you and Rowan`);
+  });
+  withRomance(g, STAGES.ready, () => {
+    const o = Talk.opening(env(g, K, { sunset: true }), "n:rowan");
+    assert(o.some(b => /^row\.u\./.test(b.id) && b.sweet), "Rowan asks you to stay for the sunset: " + o.map(b => b.id));
+    const note = Talk.note(env(g, K, { invite: { who: "n:rowan", where: "at The Billboard", when: "from about 3 PM", sunset: true } }), "n:rowan");
+    assert(/sunset/.test(note), note);
+    const plain = Talk.note(env(g, K, { invite: { who: "n:rowan", where: "at The Billboard", when: "today" } }), "n:rowan");
+    assert(plain && !/sunset/.test(plain), plain);
+  });
+  withRomance(g, STAGES.none, () => { assert(Talk.everyLine(env(g, K), "n:rowan").every(x => !/^row\.h\.(sw|us)/.test(x.id)), "no sweet hellos without a romance"); });
+});
+test("Bea is only ever a friend: nobody but Rowan has anything playful or sweet", () => {
+  for (const [k, lib] of Object.entries(Talk.LINES)) if (k !== "rowan") for (const [tp, ls] of Object.entries(lib)) for (const ln of ls) assert(!ln.sweet && tp !== "sunset" && tp !== "playful", `${k} ${ln.id}`);
+  assert(Talk.PLAYFUL.every(x => !/Bea/.test(x.label({ proj: 1, part: "morning", cold: true, wx: {}, sentToday: 1 }))), "the playful lines are Rowan's");
+});
 if (process.argv.includes("--show")) {
   const { g, K } = saves[2];
   for (const w of WHO) {
@@ -223,6 +268,9 @@ if (process.argv.includes("--show")) {
     for (const b of Talk.opening(env(g, K), w)) console.log(`  [${b.mood}] ${b.t}`);
     for (const t of ["ask", "tell", "story", "bye"]) for (const b of Talk.reply(env(g, K), w, t)) console.log(`  ${t}: [${b.mood}] ${b.t}`);
   }
+  console.log("\nRowan: something playful (yours, then Rowan's answer: a little flirting / sweet on each other / together)");
+  for (const x of Talk.PLAYFUL) console.log(`  ${x.label({ proj: 1, part: "morning", cold: true, wx: {}, sentToday: 1 })}\n    ${x.us ? `together: [${x.say[0]}] ${x.say[1]}` : `early: [${x.early[0]}] ${x.early[1]}\n    sweet: [${x.sweet[0]}] ${x.sweet[1]}`}`);
+  console.log("\nThe sunset"); for (const [k, t] of Object.entries(Talk.SUNSET)) console.log(`  ${k}: ${t}`);
 }
 console.log(`\n${passed} passed${failed ? `, ${failed} FAILED` : ""}`);
 process.exit(failed ? 1 : 0);

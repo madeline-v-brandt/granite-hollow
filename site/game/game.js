@@ -388,7 +388,7 @@
       if (fa) text += " Nobody had documented an ascent of it. It's your first ascent, and it's yours to name.";
       else if (first && v2() && G.world.est[i] && G.world.est[i].by !== "you") text += " " + ascentLine(i);
       if (tip && first) text += ` Good beta from ${whoOf(tip.from)}.`;
-      if (pal) text += " " + pick(PARTNER[pal.slice(2)].cheer);
+      if (pal) text += " " + pick(partnerSays(pal, "cheer"));
       G.day.last = { kind: "send", title: fa ? `First ascent on ${p.boulder.name}, V${p.grade}` : `${style === "Repeat" ? "Repeat" : "Sent"}: ${titleOf(i)}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
       note(`${fa ? "First ascent:" : style} ${pname(i)}${vg(i) ? ` (${vg(i)})` : ""}, +${fmt(xp)} XP.`);
       if (fa) UI.faNote = G.feed[0];                        // renamed along with the problem
@@ -518,7 +518,8 @@
   let scenePal, sceneDog;                              // who's drawn by your pad in the scene (and Pickles, Stage 5)
   function refreshClimb() {
     if (!SC || !climbing()) return;
-    if (scenePal !== partnerNow()) { scenePal = partnerNow(); SC.setPartner(scenePal ? LOOKS[scenePal.slice(2)] || {} : null); }
+    const palKey = partnerNow() && partnerNow() + (partnerNow() === "n:rowan" && togetherNow() ? "♥" : "");
+    if (scenePal !== palKey) { scenePal = palKey; SC.setPartner(palKey ? LOOKS[partnerNow().slice(2)] || {} : null, { sweet: /♥$/.test(palKey || "") }); }
     if (sceneDog !== dogWithYou()) { sceneDog = dogWithYou(); if (SC.setDog) SC.setDog(sceneDog); }
     const i = G.day.climb.p, p = D.problems[i], st = G.ps[i] || { att: 0, beta: 0 }, w = G.day.weather, L = levelNow(), left = w.dusk - G.day.minute;
     SC.setCards({
@@ -717,7 +718,7 @@
     const w = G.day.weather, d = G.day;
     if (d.over) return;
     safely("Pickles", dogClock);
-    if (partnerNow() && d.minute >= d.partner.until) partWays(PARTNER[partnerNow().slice(2)].bye);
+    if (partnerNow() && d.minute >= d.partner.until) partWays(partnerSays(partnerNow(), "bye"));
     if (rainNow() && !d.rainedOut && !d.rainStarted) {
       d.rainStarted = true;
       const what = w.precip === "Snow" ? "snowing" : "raining";
@@ -730,6 +731,14 @@
       d.rainWarned = true; toast("Clouds rolling in", `${w.precip === "Snow" ? "Snow" : "Rain"} is on its way, due around ${clock(Mech.rainStart(w))}. Get your last burns in.`, "info");
     } else if (w.pop && w.rainFrom && Mech.rainStart(w) == null && !d.rainWarned && d.minute >= w.rainFrom) {
       d.rainWarned = true; toast("The rain held off", "Clear skies after all. Keep climbing until dusk.", "info");
+    }
+    // Rowan and the sunset (Stage 6): your partner asks; or Rowan's note said to stay.
+    if (!d.sunsetHint && d.minute >= w.dusk - 90 && sunsetDue()) {
+      d.sunsetHint = true;
+      if (partnerNow() === "n:rowan" && !d.encounter && !climbing() && !UI.busy) {
+        d.encounter = buildRegular("n:rowan", G.loc.sector || START_AREA, { again: d.met.includes("n:rowan") });
+        if (!d.met.includes("n:rowan")) d.met.push("n:rowan");
+      } else if (d.invite && d.invite.who === "n:rowan" && d.invite.sunset) toast("The light's turning gold", "Rowan's note said to stay for the sunset.", "sweet");
     }
     const out = M && M.minutesToLot ? M.minutesToLot() : 0;
     if (!d.warned && d.minute >= w.dusk - 45 - out) {
@@ -833,6 +842,7 @@
 
   function endDay(reason) {
     let dogLine = ""; safely("Pickles", () => { dogLine = dogAtCar(); });
+    if (partnerNow() === "n:rowan" && togetherNow()) dogLine = " Rowan walks you to your car." + dogLine;   // (Stage 6)
     G.day.over = true; G.day.reason = reason + dogLine;
     note(`Headed home: ${G.day.sends.filter(s => s.style !== "Repeat").length} new sends, +${fmt(G.day.xp)} XP.`);
     save(); renderAll();
@@ -999,11 +1009,15 @@
   function bond(w, kind, p = null) {
     if (!v2() || typeof w !== "string" || !w.startsWith("n:")) return null;
     const up = Social.befriend(G, w, kind, G.date, p);
+    deepened(w, up);
+    return up;
+  }
+  // A friendship deepened: you're told.
+  function deepened(w, up) {
     if (up && w !== "n:pickles" && TIER_SAY[up.key]) {
       toast(up.key === "know" ? "Getting to know people" : "A friendship", TIER_SAY[up.key](w), "info");
       note(TIER_SAY[up.key](w));
     }
-    return up;
   }
   // Something a regular especially values, if they're out today and you've met (Social.LIKES).
   const outToday = w => peopleToday().some(x => x.who === w);
@@ -1017,6 +1031,90 @@
     if (b.length) { talkAdd(e, b); Social.heard(G, e.who); }
   }
 
+  // ---- Rowan (Phase 4, Stage 6; docs/phase4/stage6-romance.md) --------------------------------
+  // A slow-burn romance, only if you want one (Social.romance). It moves when you say something
+  // playful to Rowan (a reply in the conversation, once a day, once you know each other); once
+  // you're sweet on each other Rowan flirts back; and when it's ready, on a dry evening, Rowan
+  // asks you to stay for the sunset, where you can say how you feel. Never XP; never required.
+  // G.day.sunset: "asked" (Rowan's asked today), "no", or "yes" (you're watching it).
+  const romanceNow = () => (v2() ? Social.romance(G) : { n: 0 });
+  const togetherNow = () => romanceNow().n === 4;
+  function sunsetDue() {
+    if (!v2() || G.day.over || rainNow() || G.day.rainedOut || (G.day.sunset && G.day.sunset !== "asked")) return false;
+    const ro = Social.romance(G), w = G.day.weather, m = G.day.minute;
+    if (!(ro.canAsk || (ro.n === 3 && G.day.sunset === "asked"))) return false;
+    if (m < w.dusk - 180 || m > w.dusk - 10) return false;
+    return partnerNow() === "n:rowan" || peopleNow().some(x => x.who === "n:rowan" && x.to >= w.dusk);
+  }
+  // How it's going, when it changes (in words: never a number).
+  function romanceNews(before, after) {
+    if (after.n === 1 && before.n === 0 && before.flirts === 0) note("You said something playful to Rowan. Rowan went a bit pink.");
+    if (after.n === 2 && before.n < 2) {
+      toast("Rowan", "You're fairly sure Rowan's been hanging around your projects on purpose.", "sweet");
+      note("You and Rowan are sweet on each other.");
+    }
+  }
+  function sayPlayful(e) {
+    if (!e.flirt || !Social.canFlirt(G)) return;
+    const before = Social.romance(G), r = Social.flirt(G, G.date);
+    deepened("n:rowan", r.up);
+    const b = Talk.flirtBack(talkEnv(), e.flirt.id, before.n);
+    if (b) talkAdd(e, [b]);
+    romanceNews(before, r.after);
+    closerNow(e);
+  }
+  // The sunset: a scene of its own, and the end of the day.
+  function sunsetArt() {
+    const heart = (x, y, k, d) => `<path class="ss-heart" style="animation-delay:${d}s" d="M${x},${y} c0,-${3 * k} ${4.4 * k},-${3.4 * k} ${5 * k},-${.4 * k} c.6,-${3 * k} ${5 * k},-${2.6 * k} ${5 * k},${.4 * k} c0,${3.2 * k} -${5 * k},${6 * k} -${5 * k},${6 * k} c0,0 -${5 * k},-${2.8 * k} -${5 * k},-${6 * k} z"/>`;
+    const trees = Array.from({ length: 22 }, (_, i) => { const x = 150 + i * 9.6 + (i % 3) * 2, h = 9 + (i * 7 % 5) * 2.2; return `M${x - 3.4},112 L${x},${112 - h} L${x + 3.4},112 Z`; }).join(" ");
+    return `<svg class="sunset-art" viewBox="0 0 360 150" role="img" aria-label="You and Rowan sitting on a boulder, watching the sun go down over the valley" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="ss-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a6aa6"/><stop offset=".42" stop-color="#e48ba2"/><stop offset=".78" stop-color="#f3b06c"/><stop offset="1" stop-color="#f7d68c"/></linearGradient></defs>
+      <rect width="360" height="150" fill="url(#ss-sky)"/>
+      <circle cx="236" cy="103" r="21" fill="#fde6a6" fill-opacity=".95"/>
+      <path d="M0,99 C40,88 84,93 124,86 C172,78 204,92 252,88 C300,84 332,91 360,86 V150 H0 Z" fill="#b0678a" fill-opacity=".7"/>
+      <path d="M0,112 C52,104 108,110 160,104 C222,97 282,108 360,101 V150 H0 Z" fill="#7a4a6e"/>
+      <path d="${trees}" fill="#5a3756"/>
+      <path d="M0,150 C2,130 30,121 82,119 C130,117 160,123 176,150 Z" fill="#3b2a3e"/>
+      <g fill="#2a1d2c"><g transform="rotate(5 93 119)"><circle cx="93" cy="99" r="5.6"/><path d="M85.4,120 C85,111.6 87.6,105.8 93,105.8 C98.4,105.8 101,111.6 100.6,120 Z"/></g>
+        <g transform="rotate(-6 106 119)"><circle cx="106.4" cy="99.6" r="5.4"/><path d="M99,120 C98.6,111.8 101.2,106.2 106.4,106.2 C111.6,106.2 114.2,111.8 113.8,120 Z"/></g></g>
+      <g fill="#ef8fa6" stroke="#5a2a3e" stroke-width=".8">${heart(96, 84, 1, 0)}${heart(104, 76, .8, .5)}${heart(90, 70, .7, 1)}</g></svg>`;
+  }
+  // Back to the lot, and the day's over (G.day.sunset: "told" or "watched", once you've chosen).
+  function sunsetEnd() {
+    const tell = G.day.sunset === "told";
+    if (M && M.toLot) M.toLot();
+    endDay(tell ? "You watched the sunset with Rowan from the top of a boulder above the trees, and walked out together by headlamp." : "You watched the sunset with Rowan, then walked out in the last of the light.");
+  }
+  function watchSunset() {
+    const w = G.day.weather;
+    G.day.sunset = "yes"; G.day.encounter = null; UI.talkKey = "";
+    if (partnerNow()) G.day.partner = null;                                 // you're off up the hill together
+    G.day.minute = Math.max(G.day.minute, w.dusk - 5);
+    save(); renderAll();
+    const finish = sunsetEnd;
+    openModal(() => modal(`<div class="sunset">${sunsetArt()}</div><span class="label-sm">Rowan</span><h2>The sunset</h2>
+      <p class="lede" data-sun-text>${esc(Talk.SUNSET.start)}</p>
+      <div class="acts" data-sun-acts><button type="button" class="btn primary sweet" data-tell>Tell Rowan how you feel</button><button type="button" class="btn" data-watch>Just watch the sunset</button></div>`, (root, close) => {
+      const done = (text, tell) => {
+        root.querySelector("[data-sun-text]").insertAdjacentHTML("afterend", text.map(t => `<p class="lede">${esc(t)}</p>`).join(""));
+        root.querySelector("[data-sun-acts]").innerHTML = `<button type="button" class="btn primary" data-close>Walk out${tell ? " together" : ""}</button>`;
+        const b = root.querySelector("[data-close]"); b.onclick = () => { close(); finish(); }; b.focus();
+      };
+      root.querySelector("[data-tell]").onclick = () => {
+        const r = Social.sunset(G, G.date, true); deepened("n:rowan", r.up); G.day.sunset = "told";
+        root.querySelector(".sunset").classList.add("hearts"); root.querySelector(".modal").classList.add("sweet");
+        note("You told Rowan how you feel. You and Rowan are together.");
+        toast("Together", "You and Rowan are together.", "sweet");
+        save(); done([Talk.SUNSET.tell, Talk.SUNSET.after], true);
+      };
+      root.querySelector("[data-watch]").onclick = () => {
+        const r = Social.sunset(G, G.date, false); deepened("n:rowan", r.up); G.day.sunset = "watched";
+        note(r.key === "friends" ? "You watched the sunset with Rowan. You're good friends, and that's lovely." : "You watched the sunset with Rowan.");
+        save(); done([r.key === "friends" ? Talk.SUNSET.friends : Talk.SUNSET.watch], false);
+      };
+    }));
+  }
+
   // ---- invitations (Stage 4): a friend who's out today leaves a note on your windscreen ----
   // At most one a day, from someone who's at least a friend, in an area you know, and
   // never the same person two days running. Ignoring one costs nothing.
@@ -1025,15 +1123,19 @@
     const last = G.lastInvite || {};
     const cand = peopleToday().filter(x => CLIMB_WITH.includes(x.who) && x.s && K.met(x.who) && K.area(D.boulders[x.b].sector) >= 1
       && !(last.who === x.who && last.date === addDays(G.date, -1)) && x.to - Math.max(x.from, G.day.minute) >= 120 && x.to <= G.day.weather.dusk);
-    for (const x of cand.sort(() => Math.random() - 0.5)) {
-      const t = Social.tier(G, x.who);
-      if (!t || t.n < 2 || Math.random() >= (t.n >= 3 ? 0.3 : 0.18)) continue;
+    const ro = Social.romance(G), dusk = G.day.weather.dusk;
+    // Rowan, once it's time to ask about the sunset, and out till dusk: always (Stage 6).
+    const sunsetNote = x => x.who === "n:rowan" && ro.canAsk && x.to >= dusk && !rainNow() && !(Mech.rainStart(G.day.weather) != null && Mech.rainStart(G.day.weather) < dusk);
+    for (const x of cand.sort((a, b) => (sunsetNote(b) ? 1 : 0) - (sunsetNote(a) ? 1 : 0) || Math.random() - 0.5)) {
+      const t = Social.tier(G, x.who), sun = sunsetNote(x);
+      const p = x.who === "n:rowan" && ro.n === 4 ? 0.45 : x.who === "n:rowan" && ro.n >= 2 ? 0.3 : t && t.n >= 3 ? 0.3 : 0.18;
+      if (!t || t.n < 2 || (!sun && Math.random() >= p)) continue;
       const b = x.b, sec = D.boulders[b].sector;
       const where = K.boulder(b) >= 1 ? `at ${D.boulders[b].name}` : `at ${sec}`;
       const when = x.from <= G.day.minute + 30 ? (x.to <= 800 ? "this morning" : "today") : `from about ${clock(x.from)}`;
-      const text = Talk.note({ ...talkEnv(), invite: { who: x.who, where, when } }, x.who);
+      const text = Talk.note({ ...talkEnv(), invite: { who: x.who, where, when, sunset: sun } }, x.who);
       if (!text) continue;
-      G.day.invite = { who: x.who, b, from: x.from, to: x.to, text };
+      G.day.invite = { who: x.who, b, from: x.from, to: x.to, text, ...(sun ? { sunset: true } : {}) };
       G.lastInvite = { who: x.who, date: G.date };
       G.day.last.text += ` There's a note tucked under your windscreen wiper: “${text}”`;
       note(`A note from ${firstName(x.who)}: “${text}”`);
@@ -1140,7 +1242,8 @@
       const w = whereIs(p.b), now = p.who === pal || (m >= p.from && m < p.to), later = m < p.from;
       const sub = p.who === pal ? "Climbing with you" : now ? `${w.text} · until about ${about(p.to)}` : later ? `${w.text}, from about ${about(p.from)}` : `Was out ${p.to <= 780 ? "this morning" : "earlier"}, ${w.text}`;
       const find = now && w.go && p.who !== pal;
-      return `<li><${find ? `button type="button" class="rowbtn" data-find="${esc(p.who)}"` : `div class="rowbtn" style="cursor:default"`}><span><span class="t">${esc(callName(p.who))}</span>
+      const heart = p.who === "n:rowan" && togetherNow() ? ` <span class="ro-heart" aria-label="(together)">♥</span>` : "";
+      return `<li><${find ? `button type="button" class="rowbtn" data-find="${esc(p.who)}"` : `div class="rowbtn" style="cursor:default"`}><span><span class="t">${esc(callName(p.who))}${heart}</span>
         <span class="s">${esc(sub)}${now && p.who !== pal ? ` · ${esc(activity(p).toLowerCase())}` : ""}</span></span><span class="v">${find ? "Find" : now ? "" : later ? "Later" : "Gone"}</span></${find ? "button" : "div"}></li>`;
     });
     if (dog) {
@@ -1207,7 +1310,10 @@
     if (proj != null) bond(w, "proj", proj);
     const e = { who: w, sector, line: "", rec: null, recLine: "", beta: null, accepted: false, betaTaken: false, open: true, idx: 0, used: [] };
     // What they say: a hello and their news (talk.js), or, back again today, a short hello.
-    e.beats = ctx.again && !(key === "pickles" && dogWithYou()) ? Talk.reply(talkEnv(), w, "again") : Talk.opening({ ...talkEnv(), gap }, w);
+    const sunset = key === "rowan" && sunsetDue();                        // Rowan asks you to stay for the sunset (Stage 6)
+    e.beats = ctx.again && !sunset && !(key === "pickles" && dogWithYou()) ? Talk.reply(talkEnv(), w, "again") : Talk.opening({ ...talkEnv(), gap, sunset }, w);
+    if (sunset) { e.sunset = true; if (G.day.sunset !== "asked") { Social.asked(G, G.date); G.day.sunset = "asked"; note("Rowan asked you to stay for the sunset."); } }
+    if (key === "rowan" && Social.canFlirt(G)) e.flirt = Talk.playful(talkEnv());
     if (G.day.invite && G.day.invite.who === w) G.day.invite.seen = G.day.invite.met = true;
     if (!e.beats.length) e.beats = [{ t: "Hello again.", mood: "happy" }];
     e.line = e.beats.map(b => b.t).join(" ");
@@ -1306,12 +1412,18 @@
     otis: { yes: "“Perfect partner weather! I'll spot.”", allDay: "“I've got sandwiches for the whole day.”", bye: "Otis packs up his pad. “Perfect day. Same time next week?”",
       cheer: ["Otis cheers loud enough to scare the chickadees.", "“PERFECT sending weather!” Otis shouts."] },
     rowan: { yes: "“I'd like that. I'll bring my sketchbook, in case you do something worth drawing.”", allDay: "“Honestly, I've got nowhere else I'd rather be today.”", bye: "Rowan closes the sketchbook. “Thanks for today. Really.”",
-      cheer: ["Rowan laughs and claps. “I'm drawing that one.”", "“You made that look easy,” Rowan says. “It didn't look easy.”"] },
+      cheer: ["Rowan laughs and claps. “I'm drawing that one.”", "“You made that look easy,” Rowan says. “It didn't look easy.”"],
+      // Together (Stage 6).
+      yesUs: "“Always. I'll bring the sketchbook, and the good sandwiches.”", allDayUs: "“I've got all day. I made sure.”",
+      byeUs: "Rowan closes the sketchbook and squeezes your hand. “See you soon. Not soon enough, but soon.”",
+      cheerUs: ["Rowan runs over and hugs you, chalk everywhere.", "“That's my favourite climber,” Rowan tells nobody in particular."] },
     bea: { yes: "“YES. Can we try something dynamic? We should try something dynamic.”", allDay: "“My mom's not picking me up till dark!”", bye: "Bea's mom is waiting in the lot. “Bye! Try jumping for it!”",
       cheer: ["Bea screams with joy. Somewhere, a crow takes off.", "“That was SICK,” Bea says. “Do it again!”"] },
     dez: { yes: "“Sure.”", allDay: "“All day, if you like.”", bye: "Dez nods, shoulders a pad and walks off into the trees. “Good session.”",
       cheer: ["Dez nods, once. From Dez, that's a standing ovation.", "“Nice,” Dez says, and means it."] },
   };
+  // A partner's line: Rowan's are different once you're together (Stage 6).
+  const partnerSays = (w, k) => { const P = PARTNER[w.slice(2)] || {}; return (w === "n:rowan" && togetherNow() && P[k + "Us"]) || P[k]; };
   function canPartner(e) {
     if (!e || !CLIMB_WITH.includes(e.who) || partnerNow() || G.day.over || UI.busy || rainNow()) return false;
     return G.day.weather.dusk - G.day.minute >= 60;
@@ -1322,7 +1434,7 @@
     const w = G.day.weather, allDay = Math.random() < (e.who === "n:rowan" ? 0.35 : 0.2), stay = 120 + 10 * Math.floor(Math.random() * 13);
     const iv = G.day.invite && G.day.invite.who === e.who ? G.day.invite : null;     // they asked you: the rest of their session
     G.day.partner = { who: e.who, until: allDay ? w.dusk : iv ? Math.min(w.dusk, Math.max(iv.to, G.day.minute + 60)) : Math.min(w.dusk, G.day.minute + stay), ...(allDay ? { allDay: true } : {}), ...(G.loc.boulder != null ? { b: G.loc.boulder } : {}) };
-    e.partnered = PARTNER[e.who.slice(2)].yes + (allDay ? ` ${PARTNER[e.who.slice(2)].allDay}` : "");
+    e.partnered = partnerSays(e.who, "yes") + (allDay ? ` ${partnerSays(e.who, "allDay")}` : "");
     bond(e.who, "climb");
     if (G.day.invite && G.day.invite.who === e.who) bond(e.who, "invite");
     note(`Climbing with ${World.whoName(D, e.who).replace(/^the /, "the ")}.`);
@@ -1367,7 +1479,8 @@
     if (vb.v < 0.08) return "";
     const known = vb.crowdWho.filter(w => K.met(w));
     const bits = [];
-    if (vb.rowan) bits.push(pick(["Rowan drops a pad beside yours, and somehow everything feels a little lighter.", "Rowan sets the sketchbook down by your pad and grins at you. You feel like you could climb anything."]));
+    if (vb.rowan && togetherNow()) bits.push(pick(["Rowan drops a pad beside yours and squeezes your hand. Everything feels a little lighter.", "Rowan's sitting by your pad, drawing you, pretending not to. You feel like you could climb anything."]));
+    else if (vb.rowan) bits.push(pick(["Rowan drops a pad beside yours, and somehow everything feels a little lighter.", "Rowan sets the sketchbook down by your pad and grins at you. You feel like you could climb anything."]));
     else if (vb.partner) bits.push(`${firstName(partnerNow())} drops a pad beside yours.`);
     else if (known.length) bits.push(`${firstName(known[0])} is climbing nearby${known.length > 1 ? `, and ${firstName(known[1])}` : ""}.`);
     else if (vb.crowd) bits.push("There are a few climbers around.");
@@ -1410,6 +1523,7 @@
       return out;
     }
     const mine = currentProject();
+    if (e.sunset && !e.sunsetDone) { out.push(["sunset", "Watch the sunset with Rowan", "data-sunset"]); out.push(["sunset-no", "Not tonight", "data-sunset-no"]); }
     if (n && key !== "bishop" && !used("ask")) out.push(["ask", "What are you working on?", "data-ask"]);
     if (n && key !== "bishop" && mine != null && !used("tell")) out.push(["tell", `I'm working on ${pname(mine)}`, "data-tell"]);
     if (canPartner(e) && !e.partnered) out.push(["together", "Climb together?", "data-together"]);
@@ -1422,6 +1536,7 @@
     if (e.rec != null && !used("rec")) out.push(["rec", "What should I try?", "data-rec"]);
     if (e.rec != null && used("rec") && !e.accepted) out.push(["accept", "Add it to my list", "data-accept"]);
     if (n && !e.chatted) out.push(["chat", key === "bishop" ? "Ask about the old days · 20 min" : "Sit and chat · 20 min", "data-chat", UI.busy || G.day.over]);
+    if (e.flirt && !used("flirt") && Social.canFlirt(G)) out.push(["flirt", e.flirt.label, "data-flirt"]);   // something playful (Rowan: Stage 6)
     out.push(["bye", "Bye!", "data-bye"]);
     return out;
   }
@@ -1441,6 +1556,9 @@
       case "rec": use(); if (e.rec != null) K.tell(e.rec, e.who, G.date); talkAdd(e, [{ t: e.recLine, mood: "happy" }]); break;
       case "accept": acceptTip(); talkAdd(e, [{ t: "You add it to your list.", mood: "happy", narr: true }]); break;
       case "chat": sitChat(); return;
+      case "flirt": use(); sayPlayful(e); break;
+      case "sunset": if (!e.sunset || e.sunsetDone) break; e.sunsetDone = true; watchSunset(); return;
+      case "sunset-no": if (!e.sunset || e.sunsetDone) break; e.sunsetDone = true; G.day.sunset = "no"; talkAdd(e, Talk.reply(env, e.who, "sunsetNo")); break;
       case "pet": petDog(); return;
       case "stick": use(); talkAdd(e, Talk.reply(env, e.who, "stick")); break;
       case "bye": {
@@ -1561,7 +1679,7 @@
       name = nm; sub = `${{ local_hero: "local", regular: "regular", occasional: "weekend climber", tourist: "visiting" }[type] || "climber"} · climbs around V${Math.round(lvl)}`;
     }
     const choices = last ? talkChoices(e) : [];
-    const sig = JSON.stringify([e.who, idx, e.beats.length, b.mood, choices.map(c => c[0] + (c[3] ? "!" : ""))]);
+    const sig = JSON.stringify([e.who, idx, e.beats.length, b.mood, !!b.sweet, choices.map(c => c[0] + (c[3] ? "!" : ""))]);
     if (sig === UI.talkKey && !root.hidden) return;
     const fresh = UI.talkKey === "" || JSON.parse(UI.talkKey || "[]")[0] !== e.who;
     UI.talkKey = sig;
@@ -1569,7 +1687,8 @@
     const text = b.narr ? `<p class="talk-text narr">${esc(b.t)}</p>` : `<p class="talk-text"><q>${esc(b.t.replace(/^“|”$/g, ""))}</q></p>`;
     const btns = last && !e.closing ? choices.map(([k, label, attr, off], j) => `<button type="button" class="talk-choice" data-act="${k}" ${attr} ${off ? "disabled" : ""}><span class="talk-k" aria-hidden="true">${j + 1}</span>${esc(label)}</button>`).join("")
       : `<button type="button" class="talk-next" data-act="next" data-next aria-label="${last ? "Close" : "Next"}">${last ? "Bye" : "Next"} <span aria-hidden="true">▸</span></button>`;
-    root.innerHTML = `<div class="talk npc${n ? " regular" : ""}${fresh ? " arrive" : ""}" role="dialog" aria-label="Talking with ${esc(name)}">
+    const hearts = b.sweet && b.mood === "smitten" ? `<span class="talk-hearts" aria-hidden="true"><i></i><i></i><i></i></span>` : "";
+    root.innerHTML = `<div class="talk npc${n ? " regular" : ""}${fresh ? " arrive" : ""}${b.sweet ? " sweet" : ""}" role="dialog" aria-label="Talking with ${esc(name)}">${hearts}
       <div class="talk-portrait">${portrait}</div>
       <div class="talk-body"><div class="nm">${esc(name)}<small>${esc(sub)}</small></div>
         <div class="talk-say" aria-live="polite">${text}</div>
@@ -2426,8 +2545,12 @@
         sh.climbs ? `climbed together on ${plural(sh.climbs, "day", "days")}` : "", sh.sends ? plural(sh.sends, "send together", "sends together") : "",
         sh.beta ? `beta on ${plural(sh.beta, "day", "days")}` : "", sh.chats ? plural(sh.chats, "long chat", "long chats") : ""].filter(Boolean);
       const likes = t.n >= 1 && Social.LIKES[w] ? `<div class="pp-likes">${esc(Social.LIKES[w].words)}</div>` : "";
-      return `<li><div class="pp-face">${Portraits.svg(key, t.n >= 2 ? "happy" : "neutral", { seed: w, label: callName(w) })}</div>
-        <div><div class="pp-name">${esc(callName(w))} <span class="pp-tier t${t.n}">${esc(t.words)}</span></div>
+      // Rowan (Stage 6): how things stand, in words, if there's anything to say.
+      const ro = w === "n:rowan" ? Social.romance(G) : null, roWords = ro && ro.n > 0 ? ro.words : null;
+      if (ro && ro.together) bits.unshift(`together since ${new Date(ro.together + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })}`);
+      const roChip = roWords ? ` <span class="pp-tier ro">${ro.n === 4 ? `<span aria-hidden="true">♥</span> ` : ""}${esc(roWords)}</span>` : "";
+      return `<li><div class="pp-face">${Portraits.svg(key, ro && ro.n === 4 ? "smitten" : t.n >= 2 ? "happy" : "neutral", { seed: w, label: callName(w) })}</div>
+        <div><div class="pp-name">${esc(callName(w))} <span class="pp-tier t${t.n}">${esc(t.words)}</span>${roChip}</div>
         <div class="meta" style="margin:0">${esc(bits.join(" · "))}</div>${likes}</div></li>`;
     }).join("");
     const dg = Social.dog(G);
@@ -2988,7 +3111,7 @@
   }
   function toast(title, text, kind) {
     const el = document.createElement("div");
-    el.className = "toast" + (kind === "find" ? " find" : ""); if (kind === "info") el.style.borderLeftColor = "var(--energy)";
+    el.className = "toast" + (kind === "find" ? " find" : kind === "sweet" ? " sweet" : ""); if (kind === "info") el.style.borderLeftColor = "var(--energy)";
     el.innerHTML = `<b>${esc(title)}</b>${esc(text)}`;
     $("#toasts").appendChild(el);
     setTimeout(() => el.remove(), 4200);
@@ -3554,6 +3677,8 @@
     if (justMigrated.has(G)) { justMigrated.delete(G); openModal(showWelcomeBack); }
     if (justRegraded.has(G)) { const info = justRegraded.get(G); justRegraded.delete(G); openModal(() => showRegraded(info)); }
     if (G.day.climb && !G.day.over) safely("the climbing scene", showClimb); else if (G.day.climb) G.day.climb = null;   // reloaded mid-climb
+    if (v2() && !G.day.over && G.day.sunset === "yes") safely("the sunset", watchSunset);                                   // reloaded mid-sunset
+    else if (v2() && !G.day.over && (G.day.sunset === "told" || G.day.sunset === "watched")) safely("the sunset", sunsetEnd);
     if (UI.kiosk) { UI.kiosk = false; openModal(showKiosk); }
     if (G.day.over) openModal(showSummary);
   }
@@ -3696,6 +3821,10 @@
       && num_(g.day.invite.from) && num_(g.day.invite.to) && typeof g.day.invite.text === "string" && g.day.invite.text.length <= 400)) delete g.day.invite;
     // Pickles (Stage 5): the day you became his human, and where he is today.
     if (g.dog != null && !(g.dog && typeof g.dog === "object" && (g.dog.adopted == null || day_(g.dog.adopted)))) delete g.dog;
+    // Rowan (Stage 6): G.romance checked and cleaned; today's sunset state only if it's one we know.
+    if (g.romance != null) { const r = Social.cleanRomance(g.romance); if (r) g.romance = r; else delete g.romance; }
+    if (g.day && g.day.sunset != null && !["asked", "no", "yes", "told", "watched"].includes(g.day.sunset)) delete g.day.sunset;
+    if (g.day && g.day.invite && g.day.invite.sunset != null && g.day.invite.sunset !== true) delete g.day.invite.sunset;
     if (g.day && g.day.dog != null && !(g.day.dog && ["rock", "lot", "follow", "home", "with"].includes(g.day.dog.mode) && (g.day.dog.until == null || num_(g.day.dog.until)))) delete g.day.dog;
     if (g.day && g.day.dog) g.day.dog = { mode: g.day.dog.mode, ...(num_(g.day.dog.until) ? { until: g.day.dog.until } : {}), ...(g.day.dog.followed === true ? { followed: true } : {}), ...(g.day.dog.adopting === true ? { adopting: true } : {}), ...(g.day.dog.wentHome === true ? { wentHome: true } : {}) };
     if (g.day && g.day.dog && g.day.dog.mode === "with" && !g.day.dog.adopting && !(g.dog && g.dog.adopted)) g.day.dog = { mode: "rock" };

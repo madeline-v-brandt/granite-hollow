@@ -32,6 +32,8 @@
   <h1>Dialogue portraits</h1>
   <p class="lede">For review (Phase 4, Stage 2). Every regular, Pickles and two strangers, in each expression, drawn in SVG from the same colours and clothes as the figures on the map. Dark mode at the end, and a sample of the dialogue box.</p>
   <div id="grid"></div>
+  <p class="lede">Rowan's own three (Phase 4, Stage 6), for the sweeter moments: smitten, shy and laughing.</p>
+  <div id="rowan" class="row"></div>
   <div class="dark" id="dark"></div>
   <div class="box" id="box"></div>
 </main>
@@ -46,6 +48,7 @@
       + rows.map(([k, n, s, seed]) => `<div class="row"><h2>${n}<small>${s}</small></h2>${moods.map(m => `<figure>${Portraits.svg(k, m, { seed, label: n + ", " + m })}</figure>`).join("")}${k === "pickles" ? `<figure>${Portraits.svg(k, "sleepy", { label: "Pickles, sleepy" })}<figcaption>sleepy</figcaption></figure>` : "<span></span>"}</div>`).join("");
   };
   grid(who, document.getElementById("grid"));
+  document.getElementById("rowan").innerHTML = `<h2>Rowan Ellery<small>Stage 6</small></h2>` + Portraits.SWEET.map(m => `<figure>${Portraits.svg("rowan", m, { label: "Rowan, " + m })}<figcaption>${m}</figcaption></figure>`).join("");
   grid(who.slice(0, 7), document.getElementById("dark"));
   document.getElementById("box").innerHTML = `${Portraits.svg("bea", "excited", { label: "Bea, excited" })}<div><div class="nm">Bea</div><p>“I stuck the dyno on Rocket Science again this morning! Then I spent forty minutes on my slab project and got absolutely nowhere. Slab is fake.”</p></div>`;
 </script>

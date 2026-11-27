@@ -23,6 +23,7 @@
 // yours while Hollis was out, for the binder), wet (Otis: you came out to see him
 // on a wet or greasy day), dyno (Bea: you tried a dyno near her), hard (Dez: you
 // tried something hard near Dez), quiet (Rowan: you sat and talked on a quiet day).
+// Rowan only (Stage 6): flirt (you said something playful), sunset (you watched the sunset together).
 //   up  { key, date }  a friendship that's just deepened, for them to mention next
 //       time you talk (cleared once they have)
 // Saves from before Phase 4 start from what they already record: the days you've
@@ -31,7 +32,7 @@
 (function (root) {
   "use strict";
   const KINDS = { met: 1, chat: 2, climb: 3, sendWith: 3, beta: 1, proj: 0, pet: 1, lesson: 2, invite: 2, walk: 0,
-    brush: 0, fa: 0, wet: 0, dyno: 0, hard: 0, quiet: 0 };
+    brush: 0, fa: 0, wet: 0, dyno: 0, hard: 0, quiet: 0, flirt: 1, sunset: 2 };
   // Each regular's own: what's worth more to them (added to KINDS), and how you'd notice.
   const LIKES = {
     "n:gus": { kinds: { brush: 3, lesson: 1 }, words: "Gus notices when you look after the park: brushing the holds, leaving it better than you found it." },
@@ -167,6 +168,94 @@
     const n = adopted ? 4 : pets >= DOG.follows ? 3 : pets >= DOG.greets ? 2 : pets >= DOG.knows ? 1 : 0;
     return { ...DOG_STAGES[n], n, pets, walks, adopted, ready: !adopted && pets >= DOG.adopt && walks >= DOG.walks };
   }
+  // ---- Rowan (Phase 4, Stage 6) ------------------------------------------------------------
+  // A slow-burn romance, only ever if you want one: it moves only when you say something
+  // playful (flirt: once a day at most), and grows from the time you spend together.
+  //   0  nothing (or it's cooled: no flirting for a month; or you're just friends)
+  //   1  a little flirting
+  //   2  sweet on each other: Rowan flirts back (4 days of flirting, and friends)
+  //   3  the same, and Rowan will ask you to stay for the sunset (10 days of flirting, 5 days
+  //      climbing together, five weeks since the first): where you can say how you feel
+  //   4  together (G.romance.together, the date)
+  // G.romance = { since, base, asked: [dates], declined, friends, together }: since is the day
+  // of the first flirt; base, flirts that no longer count (from before you were just friends);
+  // asked, the days Rowan asked you to stay for the sunset; declined, how many times you just
+  // watched it; friends, the day it settled into friendship (Rowan stops asking).
+  const ROMANCE = { sweet: 4, ready: 10, climbs: 5, days: 35, cool: 30, again: 14, declines: 2 };
+  const ROMANCE_STAGES = [
+    { key: "none", words: null },
+    { key: "spark", words: "A little flirting" },
+    { key: "sweet", words: "Sweet on each other" },
+    { key: "sweet", words: "Sweet on each other" },
+    { key: "together", words: "Together" },
+  ];
+  const dayDiff = (a, b) => Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 864e5);
+  function romance(G) {
+    const R = (G && G.romance && typeof G.romance === "object") ? G.romance : {};
+    const e = G && G.social && G.social.npc && G.social.npc["n:rowan"], k = (e && e.k) || {}, last = (e && e.last) || {};
+    const flirts = Math.max(0, (k.flirt || 0) - (count(R.base) || 0)), date = G && G.date;
+    const base = { flirts, climbs: k.climb || 0, since: isDay(R.since) ? R.since : null, asked: Array.isArray(R.asked) ? R.asked.filter(isDay) : [], declined: count(R.declined) };
+    if (isDay(R.together)) return { ...ROMANCE_STAGES[4], n: 4, ...base, together: R.together, days: date ? dayDiff(R.together, date) : 0 };
+    if (isDay(R.friends)) return { ...ROMANCE_STAGES[0], key: "friends", n: 0, ...base, friends: R.friends };
+    const t = tierIndex(G, "n:rowan");
+    let n = flirts >= 1 ? 1 : 0;
+    if (n && flirts >= ROMANCE.sweet && t >= 2) n = 2;
+    if (n === 2 && flirts >= ROMANCE.ready && base.climbs >= ROMANCE.climbs && base.since && date && dayDiff(base.since, date) >= ROMANCE.days) n = 3;
+    const cooled = n > 0 && !(isDay(last.flirt) && date && dayDiff(last.flirt, date) <= ROMANCE.cool);
+    if (cooled) return { ...ROMANCE_STAGES[0], key: "cooled", n: 0, ...base, was: n };
+    const lastAsk = base.asked.length ? base.asked[base.asked.length - 1] : null;
+    return { ...ROMANCE_STAGES[n], n, ...base, canAsk: n === 3 && (!lastAsk || (date && dayDiff(lastAsk, date) >= ROMANCE.again)) };
+  }
+  // Can you say something playful to Rowan today? (Once you know each other; not after a
+  // month of being just friends, unless you want to start again.)
+  function canFlirt(G) {
+    const e = G && G.social && G.social.npc && G.social.npc["n:rowan"];
+    if (!e || tierIndex(G, "n:rowan") < 1 || (e.last && e.last.flirt === G.date)) return false;
+    const R = G.romance || {};
+    return !(isDay(R.friends) && dayDiff(R.friends, G.date) < ROMANCE.cool);
+  }
+  // You said something playful. Returns the stage before and after.
+  function flirt(G, date) {
+    const before = romance(G);
+    G.romance = G.romance && typeof G.romance === "object" ? G.romance : {};
+    const R = G.romance;
+    if (isDay(R.friends)) {                                // starting again, from the beginning
+      const e = G.social && G.social.npc["n:rowan"];
+      G.romance = { base: (e && e.k && e.k.flirt) || 0, since: date };
+    } else if (!isDay(R.since)) R.since = date;
+    moment(G, "n:rowan", "flirt", date);
+    return { before, after: romance(G) };
+  }
+  // Rowan asks you to stay for the sunset (recorded whatever you say).
+  function asked(G, date) {
+    G.romance = G.romance && typeof G.romance === "object" ? G.romance : {};
+    const a = Array.isArray(G.romance.asked) ? G.romance.asked.filter(isDay) : [];
+    if (a[a.length - 1] !== date) a.push(date);
+    G.romance.asked = a.slice(-12);
+  }
+  // At the sunset: you tell Rowan how you feel (together), or you just watch it (after two of
+  // those, it settles into friendship).
+  function sunset(G, date, tell) {
+    G.romance = G.romance && typeof G.romance === "object" ? G.romance : {};
+    moment(G, "n:rowan", "sunset", date);
+    if (tell) { G.romance.together = date; delete G.romance.friends; return romance(G); }
+    G.romance.declined = count(G.romance.declined) + 1;
+    if (G.romance.declined >= ROMANCE.declines) G.romance.friends = date;
+    return romance(G);
+  }
+  // A save's romance, checked (save files are untrusted): returns a clean copy or null.
+  function cleanRomance(R) {
+    if (!R || typeof R !== "object" || Array.isArray(R)) return null;
+    const out = {};
+    if (isDay(R.since)) out.since = R.since;
+    if (count(R.base)) out.base = count(R.base);
+    if (Array.isArray(R.asked)) { const a = R.asked.filter(isDay).slice(-12); if (a.length) out.asked = a; }
+    if (count(R.declined)) out.declined = Math.min(9, count(R.declined));
+    if (isDay(R.friends)) out.friends = R.friends;
+    if (isDay(R.together)) { out.together = R.together; delete out.friends; }
+    return Object.keys(out).length ? out : null;
+  }
+
   // Record a moment and see whether the friendship deepened: returns the new tier
   // ({ key, words, n }) if it did, else null. A deepening is kept (up) until they've
   // mentioned it.
@@ -203,6 +292,6 @@
     const ks = Object.keys(s); if (ks.length > SAID) for (const k of ks.slice(0, ks.length - SAID)) delete s[k];
   }
 
-  const Social = { KINDS, LIKES, TIERS, MEMORY, DOG, DOG_STAGES, dog, ensure, seed, moment, befriend, heard, shared, bond, tier, remembers, saidOn, say };
+  const Social = { KINDS, LIKES, TIERS, MEMORY, DOG, DOG_STAGES, dog, ROMANCE, ROMANCE_STAGES, romance, canFlirt, flirt, asked, sunset, cleanRomance, ensure, seed, moment, befriend, heard, shared, bond, tier, remembers, saidOn, say };
   if (typeof module !== "undefined") module.exports = Social; else root.Social = Social;
 })(typeof window !== "undefined" ? window : globalThis);

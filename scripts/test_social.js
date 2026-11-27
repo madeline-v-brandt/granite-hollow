@@ -138,5 +138,71 @@ test("Pickles: an old save's pets count", () => {
   Social.ensure(g);
   assert(Social.dog(g).key === "follows", Social.dog(g).key);
 });
+// ---- Rowan (Stage 6) ----
+const addD = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+// A save where you and Rowan are friends (tier 2) as of `date`.
+function friendsWithRowan(date = "2025-10-10") {
+  const g = save(); g.date = date; Social.ensure(g);
+  for (let k = 1; k <= 12; k++) { Social.moment(g, "n:rowan", "met", addD(date, -k)); Social.moment(g, "n:rowan", "chat", addD(date, -k)); }
+  return g;
+}
+test("Rowan: nothing unless you flirt; then a little flirting, sweet on each other, ready for the sunset", () => {
+  const g = friendsWithRowan();
+  assert(Social.tier(g, "n:rowan").n >= 2, "friends");
+  assert(Social.romance(g).n === 0 && Social.romance(g).words === null, "no romance unless you want one");
+  assert(Social.canFlirt(g), "you can say something playful");
+  Social.flirt(g, g.date);
+  assert(Social.romance(g).n === 1 && Social.romance(g).key === "spark" && g.romance.since === g.date, JSON.stringify(Social.romance(g)));
+  assert(!Social.canFlirt(g), "once a day");
+  let d = g.date;
+  for (let k = 0; k < 3; k++) { d = addD(d, 2); g.date = d; Social.flirt(g, d); }
+  assert(Social.romance(g).n === 2 && Social.romance(g).words === "Sweet on each other", "four days of flirting, and friends: sweet");
+  for (let k = 0; k < 6; k++) { d = addD(d, 2); g.date = d; Social.flirt(g, d); }
+  assert(Social.romance(g).n === 2, "ten flirts, but you haven't climbed together enough yet");
+  for (let k = 1; k <= 5; k++) Social.moment(g, "n:rowan", "climb", addD(d, -k));
+  assert(Social.romance(g).n === 2, "and it's not five weeks since the first: " + Social.romance(g).n);
+  d = addD(g.romance.since, Social.ROMANCE.days); g.date = d; Social.flirt(g, d);
+  const r = Social.romance(g);
+  assert(r.n === 3 && r.canAsk, "ready: Rowan will ask you to stay for the sunset " + JSON.stringify(r));
+  Social.asked(g, d);
+  assert(!Social.romance(g).canAsk, "asked: not again for a fortnight");
+  g.date = addD(d, Social.ROMANCE.again);
+  assert(Social.romance(g).canAsk, "two weeks later, again");
+});
+test("Rowan: the sunset: say how you feel and you're together; just watch it twice and you're friends", () => {
+  const ready = () => { const g = friendsWithRowan("2025-09-10"); let d = g.date; for (let k = 0; k < 10; k++) { Social.flirt(g, d); d = addD(d, 4); g.date = d; } for (let k = 1; k <= 5; k++) Social.moment(g, "n:rowan", "climb", addD(d, -k)); Social.flirt(g, d); return g; };
+  const a = ready(); assert(Social.romance(a).n === 3, "ready " + JSON.stringify(Social.romance(a)));
+  Social.asked(a, a.date); const r = Social.sunset(a, a.date, true);
+  assert(r.n === 4 && r.key === "together" && a.romance.together === a.date && r.words === "Together", JSON.stringify(r));
+  a.date = addD(a.date, 90);
+  assert(Social.romance(a).n === 4 && Social.romance(a).days === 90, "together for good (no cooling off)");
+  const b = ready(); Social.asked(b, b.date); Social.sunset(b, b.date, false);
+  assert(Social.romance(b).n === 3 && Social.romance(b).declined === 1, "once: Rowan will ask again");
+  b.date = addD(b.date, 14); Social.flirt(b, b.date); Social.asked(b, b.date); Social.sunset(b, b.date, false);
+  const f = Social.romance(b);
+  assert(f.n === 0 && f.key === "friends" && f.words === null, "twice: just friends " + JSON.stringify(f));
+  assert(Social.tier(b, "n:rowan").n >= 2, "and still friends: friendship never goes down");
+  b.date = addD(b.date, 5); assert(!Social.canFlirt(b), "no flirting for a month after");
+  b.date = addD(b.date, 30); assert(Social.canFlirt(b), "then, if you want, it can start again");
+  Social.flirt(b, b.date);
+  const s = Social.romance(b); assert(s.n === 1 && s.flirts === 1 && !b.romance.friends && b.romance.since === b.date, "from the beginning " + JSON.stringify([s, b.romance]));
+});
+test("Rowan: a month without flirting and it cools back to friendship (until you pick it up again)", () => {
+  const g = friendsWithRowan(); let d = g.date;
+  for (let k = 0; k < 5; k++) { g.date = d; Social.flirt(g, d); d = addD(d, 2); }
+  g.date = addD(d, 10); assert(Social.romance(g).n === 2, "sweet");
+  g.date = addD(d, Social.ROMANCE.cool + 2);
+  const r = Social.romance(g); assert(r.n === 0 && r.key === "cooled" && r.was === 2, JSON.stringify(r));
+  Social.flirt(g, g.date); assert(Social.romance(g).n === 2, "picked up where it left off");
+});
+test("Rowan: only Rowan; a bad romance record in a save file is cleaned", () => {
+  const g = friendsWithRowan(); for (let k = 1; k <= 12; k++) { Social.moment(g, "n:bea", "met", addD(g.date, -k)); Social.moment(g, "n:bea", "chat", addD(g.date, -k)); }
+  Social.flirt(g, g.date);
+  assert(!g.social.npc["n:bea"].k.flirt && g.social.npc["n:rowan"].k.flirt === 1, "flirting is with Rowan alone");
+  assert(Social.cleanRomance({ together: "<b>", since: "2025-01-01", asked: ["x", "2025-02-02"], declined: -3, base: 2.7 }) && JSON.stringify(Social.cleanRomance({ together: "<b>", since: "2025-01-01", asked: ["x", "2025-02-02"], declined: -3, base: 2.7 })) === JSON.stringify({ since: "2025-01-01", base: 2, asked: ["2025-02-02"] }));
+  assert(Social.cleanRomance("yes") === null && Social.cleanRomance({}) === null && Social.cleanRomance([1]) === null);
+  assert(JSON.stringify(Social.cleanRomance({ together: "2025-11-01", friends: "2025-10-01" })) === JSON.stringify({ together: "2025-11-01" }), "together wins");
+  const h = save(); assert(Social.romance(h).n === 0 && !Social.canFlirt(h), "a new climber: nothing, and nobody to flirt with");
+});
 console.log(`\n${passed} passed${failed ? `, ${failed} FAILED` : ""}`);
 process.exit(failed ? 1 : 0);

@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=52">
+<link rel="stylesheet" href="scene.css?v=53">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -782,6 +782,29 @@ svg#map:active { cursor: grabbing; }
 .talk-x { position: absolute; top: 4px; right: 6px; border: 0; background: none; font-size: 22px; line-height: 1; color: var(--muted); cursor: pointer; padding: 4px 7px; border-radius: 8px; }
 .talk-x:hover, .talk-x:focus-visible { color: var(--ink); background: var(--hover); }
 .map-wrap.talking .map-hint, .map-wrap.talking .map-prompt { display: none; }
+/* Rowan (Phase 4, Stage 6): a warm pink accent for sweet moments, and a few hearts when Rowan's smitten. Understated. */
+.talk.npc.sweet { border-color: color-mix(in oklab, #d9668a 70%, var(--ink)); box-shadow: 0 4px 0 color-mix(in oklab, #d9668a 35%, transparent), 0 12px 30px rgba(42, 37, 29, .2);
+  background: linear-gradient(color-mix(in oklab, #f2a7bd 12%, var(--raised)), var(--raised) 70%); }
+.talk-hearts { position: absolute; left: 92px; top: 6px; width: 30px; height: 40px; pointer-events: none; }
+.talk-hearts i { position: absolute; bottom: 0; width: 10px; height: 10px; opacity: 0; }
+.talk-hearts i::before { content: "\2665"; position: absolute; inset: 0; font: 700 12px/10px var(--body); color: #e7849a; font-style: normal; }
+.talk-hearts i:nth-child(1) { left: 2px; animation: talk-heart 2.2s ease-out .1s forwards; }
+.talk-hearts i:nth-child(2) { left: 13px; animation: talk-heart 2.2s ease-out .55s forwards; }
+.talk-hearts i:nth-child(3) { left: 6px; animation: talk-heart 2.2s ease-out 1s forwards; }
+@keyframes talk-heart { 0% { opacity: 0; transform: translateY(6px) scale(.6); } 20% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-26px) scale(.9); } }
+@media (prefers-reduced-motion: reduce) { .talk-hearts i { animation: none; } .talk-hearts i:nth-child(1) { opacity: .9; } }
+.toast.sweet { border-left-color: #d9668a; }
+.pp-tier.ro { background: color-mix(in oklab, #e7849a 30%, var(--panel)); color: var(--ink); }
+.ro-heart { color: #d9668a; font-weight: 700; }
+.sunset { margin: -2px 0 12px; border-radius: 12px; overflow: hidden; border: 2px solid var(--ink); line-height: 0; }
+.sunset-art { width: 100%; height: auto; display: block; }
+.sunset .ss-heart { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.sunset.hearts .ss-heart { animation: ss-heart 3s ease-out forwards; }
+@keyframes ss-heart { 0% { opacity: 0; transform: translateY(8px) scale(.5); } 25% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: .9; transform: translateY(-10px) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .sunset.hearts .ss-heart { animation: none; opacity: .9; } }
+.modal.sweet { border-color: color-mix(in oklab, #d9668a 70%, var(--ink)); }
+.btn.sweet { background: #c9577c; border-color: #a8405f; color: #fff; }
+.btn.sweet:hover, .btn.sweet:focus-visible { background: #b84a6e; }
 @media (max-width: 640px) {
   .talk-root { left: 6px; right: 6px; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); max-height: calc(100% - 12px); }
   .talk.npc { grid-template-columns: 72px minmax(0, 1fr); gap: 10px; padding: 10px 30px 10px 10px; }
@@ -1125,16 +1148,16 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=52"></script>
-<script src="art.js?v=52"></script>
-<script src="world.js?v=52"></script>
-<script src="knowledge.js?v=52"></script>
-<script src="social.js?v=52"></script>
-<script src="portraits.js?v=52"></script>
-<script src="talk.js?v=52"></script>
-<script src="illustrate.js?v=52"></script>
-<script src="paint.js?v=52"></script>
-<script src="paper.js?v=52"></script>
-<script src="travel.js?v=52"></script>
-<script src="scene.js?v=52"></script>
-<script src="game.js?v=52"></script>
+<script src="mechanics.js?v=53"></script>
+<script src="art.js?v=53"></script>
+<script src="world.js?v=53"></script>
+<script src="knowledge.js?v=53"></script>
+<script src="social.js?v=53"></script>
+<script src="portraits.js?v=53"></script>
+<script src="talk.js?v=53"></script>
+<script src="illustrate.js?v=53"></script>
+<script src="paint.js?v=53"></script>
+<script src="paper.js?v=53"></script>
+<script src="travel.js?v=53"></script>
+<script src="scene.js?v=53"></script>
+<script src="game.js?v=53"></script>

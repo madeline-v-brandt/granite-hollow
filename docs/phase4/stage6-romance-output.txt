@@ -1,0 +1,9 @@
+Social.ROMANCE {"sweet":4,"ready":10,"climbs":5,"days":35,"cool":30,"again":14,"declines":2}, tiers 8/22/55
+
+keen (40 players, up to 240 climbing days)
+  climbing day (median): playful 7, sweet on each other 14, sunset ready 34, together 35 (40/40)
+  calendar: sweet 2.7 weeks, ready 7.0 weeks, together 7.3 weeks
+
+relaxed (40 players, up to 240 climbing days)
+  climbing day (median): playful 15, sweet on each other 33, sunset ready 99, together 99 (40/40)
+  calendar: sweet 6.9 weeks, ready 21.0 weeks, together 21.0 weeks

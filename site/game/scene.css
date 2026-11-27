@@ -146,3 +146,8 @@ body.climbing { overflow: hidden; }
 @keyframes sc-dog-wag { from { transform: rotate(-25deg); } to { transform: rotate(25deg); } }
 @keyframes sc-dog-up { to { translate: 0 -.25px; } }
 @media (prefers-reduced-motion: reduce) { .sc-dog.cheer .sc-dog-curl, .sc-dog.cheer .sc-dog-tail { animation: none; } }
+
+/* Rowan, once you're together (Phase 4, Stage 6): a small heart rises when you top out. */
+.sc-heart { fill: #ef8fa6; stroke: #5a2a3e; stroke-width: .05; opacity: 0; animation: sc-heart-up 2.4s ease-out forwards; transform-box: fill-box; transform-origin: center; }
+@keyframes sc-heart-up { 0% { opacity: 0; transform: translateY(0) scale(.6); } 18% { opacity: 1; transform: translateY(-.3px) scale(1); } 100% { opacity: 0; transform: translateY(-1.8px) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .sc-heart { animation: none; opacity: .95; } }

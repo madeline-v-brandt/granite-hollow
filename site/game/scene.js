@@ -14,7 +14,8 @@
 //   sc.show({ park, bo, problem, line: { index, count }, seq, outfit, seen });
 //   sc.setAtmosphere({ date, minute, dusk, sky });
 //   sc.setCards({ prob: {...}, me: {...} }); sc.setMenu([...]); sc.say(text);
-//   sc.setPartner(look | null);         // a partner by your pad (Stage 4)
+//   sc.setPartner(look | null, { sweet }); // a partner by your pad (Stage 4); sweet: Rowan, once
+//                                       // you're together (a little heart when you top out: Phase 4, Stage 6)
 //   sc.setDog(on);                      // Pickles, curled up beside your pad (Phase 4, Stage 5)
 //   await sc.play("burn", { fallAt });   // "burn" | "work" | "rest" | "ready"
 //   sc.destroy();
@@ -377,17 +378,26 @@
     }
     // He wakes for a send: lifts his head and wags (a CSS class for a moment).
     function dogCheer() { if (!dogOn || !geo_dogL) return; const n = geo_dogL.node(); n.classList.remove("cheer"); void n.getBoundingClientRect(); n.classList.add("cheer"); setTimeout(() => n.classList.remove("cheer"), 2600); }
-    function setPartner(look) {
+    function setPartner(look, opts = {}) {
       if (!geo || !geo_palL) return;
       geo_palL.selectAll("*").remove(); pal = null;
       if (!look) return;
+      const sweet = !!(opts && opts.sweet);
       const mid = (subject[0] + subject[2]) / 2, side = geo.padX > mid ? -1 : 1, x = geo.padX + side * 3.9, y = geo.padTop + .45;
       const pw = 2.2, pd = 1.2, th = .36;
       geo_palL.append("path").attr("class", "sc-pad-shadow").attr("d", ell(x, y + pd / 2 + .15, pw * .6, .28));
       geo_palL.append("path").attr("class", "sc-pad-side").attr("fill", look.pad || "#5a7d5a").attr("d", `M${f2(x - pw / 2)},${f2(y + .1)}h${f2(pw)}v${f2(th)}h${f2(-pw)}Z`);
       geo_palL.append("path").attr("class", "sc-pad-top").attr("fill", look.pad || "#5a7d5a").attr("d", `M${f2(x - pw / 2 + .2)},${f2(y - pd / 2 + .1)}h${f2(pw - .4)}l.2,${f2(pd / 2)}h${f2(-pw)}Z`);
-      pal = { fig: makeFigure(geo_palL, look), x, y: y + .1, side };
+      pal = { fig: makeFigure(geo_palL, look), x, y: y + .1, side, sweet };
       partnerPose("stand");
+    }
+    // A small heart rises from your partner and fades (Rowan, together; CSS, so reduced motion just shows it).
+    function partnerHeart() {
+      if (!pal || !pal.sweet) return;
+      const x = pal.x, y = pal.y - 5.9, k = .16;
+      const h = geo_palL.append("path").attr("class", "sc-heart")
+        .attr("d", `M${f2(x - 5 * k)},${f2(y)}c0,${f2(-3 * k)} ${f2(4.4 * k)},${f2(-3.4 * k)} ${f2(5 * k)},${f2(-.4 * k)}c${f2(.6 * k)},${f2(-3 * k)} ${f2(5 * k)},${f2(-2.6 * k)} ${f2(5 * k)},${f2(.4 * k)}c0,${f2(3.2 * k)} ${f2(-5 * k)},${f2(6 * k)} ${f2(-5 * k)},${f2(6 * k)}c0,0 ${f2(-5 * k)},${f2(-2.8 * k)} ${f2(-5 * k)},${f2(-6 * k)}z`);
+      setTimeout(() => h.remove(), 2600);
     }
     function partnerPose(kind) {
       if (!pal) return;
@@ -434,7 +444,7 @@
             await tween(poses.on(k), k === 0 ? 420 : fall ? 520 : 330 + (geo.seq.moves[k].kind === "crux" ? 260 : 0), EASE.inOut);
             if (fall) { await wait(260); await tumble(); break; }
           }
-          if (data.fallAt < 0) { await tween(poses.topRide(), 420); partnerPose("cheer"); dogCheer(); await tween(poses.top(), 520, EASE.out); }
+          if (data.fallAt < 0) { await tween(poses.topRide(), 420); partnerPose("cheer"); partnerHeart(); dogCheer(); await tween(poses.top(), 520, EASE.out); }
           else partnerPose("stand");
         } else if (kind === "work") {
           const k = data.at;
