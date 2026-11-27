@@ -79,6 +79,11 @@
     if (m.kind === "start") return p.sit ? "You couldn't even get off the ground from the sit start." : `You slipped off ${an(m.hold)} on the first move.`;
     return [`You came off ${an(m.hold)} on the way up.`, `A foot slipped on an easy move to ${an(m.hold)}.`, `You fumbled the ${m.hold} and dropped.`][k % 3];
   }
+  // Pickles at the crag with you (Phase 4, Stage 5): no help at all, and the best company.
+  const DOG_FALL = ["Pickles lifts his head, checks you're all right, and goes back to sleep.", "Pickles has moved onto your pad while you weren't looking. You land next to him.",
+    "Pickles watches the whole thing with deep concern, then yawns.", "Pickles barks once, encouragingly. Or at a squirrel. Hard to say.", "Pickles is lying on the spot you were going to put your foot."];
+  const DOG_SEND = ["Pickles wakes up and wags at you from the pad.", "Pickles trots round the boulder to meet you at the top of the walk-off.", "Pickles barks, delighted, at nothing in particular. It feels like it's for you.",
+    "Pickles brings you a stick to celebrate."];
   const LEVEL_LINES = [
     "", "The holds are starting to make sense.", "You've stopped over-gripping the jugs.",
     "Most people who try bouldering never get here.", "You're reading sequences before you pull on.",
@@ -230,6 +235,7 @@
       }
     });
     if (v2()) safely("an invitation", makeInvite);
+    if (v2()) safely("Pickles", startDogDay);
     // (Pickles used to be "waiting by the car" here while the map drew him asleep at
     // his rock. He's only ever where he's drawn now: go and find him. Phase 4, Stage 0.)
   }
@@ -415,6 +421,8 @@
       G.day.last = { kind: "fall", title: `${titleOf(i)}: attempt ${st.att}`, text, gains, p: i };
     }
     if (brushed) G.day.last.text = `You brush the grit and lichen off the holds first. ${G.day.last.text}`;
+    // Pickles, if he's with you (Stage 5): now and then, a word about what he's up to.
+    if (v2() && dogWithYou() && G.day.last && Math.random() < 0.22) G.day.last.text += " " + pick(r.sent ? DOG_SEND : DOG_FALL);
     // Sharp granite and thin skin: flappers happen (not through tape). A flapper gets
     // taped, for the rest of the day, and if you didn't know how, someone shows you.
     if (G.player.skin < 30 && !G.day.tape && Mech.frictionSensitivity(p) >= 0.6 && Math.random() < 0.07) {
@@ -482,7 +490,7 @@
     const probs = p.boulder.problems.map(k => { const e = v2() ? G.world.est[k] : null; return { ...D.problems[k], sends: v2() ? (e && !e.old ? e.reps + 1 : 0) * 25 : D.problems[k].sends }; });
     SC.show({ park: S, bo: S.boulders[p.b], probs, problem: p, line: { index: ids.indexOf(i), count: ids.length }, seq: p.seq, outfit: outfitFor(),
       seen: st ? Mech.seenOf(p, st) : 0, known: (st && st.mk) || [] });
-    scenePal = undefined;
+    scenePal = undefined; sceneDog = undefined;
     const ls = lessonAt(i);                    // a regular teaches you something new
     if (ls) { G.day.climb.say = `${G.day.climb.say || climbIntro(i)}\n\n${ls}`; save(); }
     climbAtmosphere(); refreshClimb();
@@ -507,10 +515,11 @@
   }
   // The cards, through K (so an unclimbed line has no grade), and the menu with what
   // each choice would do to your chance of sending.
-  let scenePal;                                        // who's drawn by your pad in the scene
+  let scenePal, sceneDog;                              // who's drawn by your pad in the scene (and Pickles, Stage 5)
   function refreshClimb() {
     if (!SC || !climbing()) return;
     if (scenePal !== partnerNow()) { scenePal = partnerNow(); SC.setPartner(scenePal ? LOOKS[scenePal.slice(2)] || {} : null); }
+    if (sceneDog !== dogWithYou()) { sceneDog = dogWithYou(); if (SC.setDog) SC.setDog(sceneDog); }
     const i = G.day.climb.p, p = D.problems[i], st = G.ps[i] || { att: 0, beta: 0 }, w = G.day.weather, L = levelNow(), left = w.dusk - G.day.minute;
     SC.setCards({
       prob: { name: pname(i), grade: vg(i), where: `${K.boulderName(p.b) || "Unfamiliar boulder"} · ${p.sector}`, tags: p.tagList, strip: moveStrip(i),
@@ -707,6 +716,7 @@
   function timeChecks() {
     const w = G.day.weather, d = G.day;
     if (d.over) return;
+    safely("Pickles", dogClock);
     if (partnerNow() && d.minute >= d.partner.until) partWays(PARTNER[partnerNow().slice(2)].bye);
     if (rainNow() && !d.rainedOut && !d.rainStarted) {
       d.rainStarted = true;
@@ -822,7 +832,8 @@
   }
 
   function endDay(reason) {
-    G.day.over = true; G.day.reason = reason;
+    let dogLine = ""; safely("Pickles", () => { dogLine = dogAtCar(); });
+    G.day.over = true; G.day.reason = reason + dogLine;
     note(`Headed home: ${G.day.sends.filter(s => s.style !== "Repeat").length} new sends, +${fmt(G.day.xp)} XP.`);
     save(); renderAll();
     if (UI.levelPending || modalOpen()) UI.summaryPending = true;   // it opens once the naming and level-up have closed
@@ -1101,8 +1112,11 @@
   // The card when you hover over (or tap) someone on the map.
   function personTipHtml(who) {
     if (!v2()) return "";
-    if (who === "n:pickles") return isKnown(who) ? `<strong>Pickles</strong><div class="sub">Napping in the shade of his rock</div>${G.day.met.includes(who) ? "You've said hello today." : "Walk over and say hello."}`
-      : `<strong>A scruffy dog</strong><div class="sub">Napping in the shade of a boulder</div>Walk over and say hello.`;
+    if (who === "n:pickles") {
+      const m = dogMode(), what = { lot: "Waiting by your car", follow: "Following you around", with: "Your dog", home: "Heading back to his rock" }[m] || "Napping in the shade of his rock";
+      return isKnown(who) ? `<strong>Pickles</strong><div class="sub">${what}</div>${dogWithYou() ? "Click him to say hello." : G.day.met.includes(who) ? "You've said hello today." : "Walk over and say hello."}`
+        : `<strong>A scruffy dog</strong><div class="sub">${m === "rock" ? "Napping in the shade of a boulder" : what}</div>Walk over and say hello.`;
+    }
     const p = peopleToday().find(x => x.who === who); if (!p) return "";
     const pal = partnerNow() === who, met = isKnown(who);
     const when = pal ? `Climbing with you${G.day.partner.allDay ? " today" : ` until about ${about(G.day.partner.until)}`}` : `Around until about ${about(p.to)}`;
@@ -1132,7 +1146,9 @@
     if (dog) {
       const rock = D.boulders.find(b => b.name === "Pickles' Rock");
       const by = rock && K.boulder(rock.id) >= 1 ? `by ${rock.name}` : "by his rock";
-      rows.push(`<li><button type="button" class="rowbtn" data-find="n:pickles"><span><span class="t">Pickles</span><span class="s">Napping ${esc(by)}, ${esc(START_AREA)}</span></span><span class="v">Find</span></button></li>`);
+      const m = dogMode();
+      if (m === "follow" || m === "with") rows.push(`<li><div class="rowbtn" style="cursor:default"><span><span class="t">Pickles</span><span class="s">${m === "with" ? "Your dog, right here with you" : "Following you around"}</span></span><span class="v">With you</span></div></li>`);
+      else rows.push(`<li><button type="button" class="rowbtn" data-find="n:pickles"><span><span class="t">Pickles</span><span class="s">${m === "lot" ? "Waiting by your car" : m === "home" ? "Heading back to his rock" : `Napping ${esc(by)}, ${esc(START_AREA)}`}</span></span><span class="v">Find</span></button></li>`);
     }
     const others = strangers ? `<p class="meta">${strangers === 1 ? "Someone you haven't met is" : `${strangers} people you haven't met are`} out too. Look for them on the map.</p>` : "";
     return `<h3 class="out-h">Out today</h3>${rows.length ? `<ul class="rowlist out-today">${rows.join("")}</ul>` : ""}${others}`;
@@ -1141,9 +1157,10 @@
   function meetNearby(pos) {
     if (!v2() || G.day.over) return false;
     // Pickles, napping by Pickles' Rock.
-    const dog = M.paint && M.paint.scene.landmarks.find(l => l.kind === "dog");
+    const dm = dogMode(), dp = dm === "rock" || dm === "lot" ? dogPos() : null;
     const again = w => UI.talkTo === w && !(G.day.encounter && G.day.encounter.who === w);
-    if (dog && isAround("n:pickles") && Math.hypot(pos[0] - dog.x, pos[1] - dog.y) < 6) {
+    const dog = dp && { x: dp[0], y: dp[1] };
+    if (dog && Math.hypot(pos[0] - dog.x, pos[1] - dog.y) < 6) {
       if (!G.day.met.includes("n:pickles")) { G.day.met.push("n:pickles"); G.day.encounter = buildRegular("n:pickles", "The Tailgate", { napping: true }); UI.talkTo = null; return true; }
       if (again("n:pickles")) { UI.talkTo = null; G.day.encounter = buildRegular("n:pickles", "The Tailgate", { again: true }); return true; }
     }
@@ -1190,7 +1207,7 @@
     if (proj != null) bond(w, "proj", proj);
     const e = { who: w, sector, line: "", rec: null, recLine: "", beta: null, accepted: false, betaTaken: false, open: true, idx: 0, used: [] };
     // What they say: a hello and their news (talk.js), or, back again today, a short hello.
-    e.beats = ctx.again ? Talk.reply(talkEnv(), w, "again") : Talk.opening({ ...talkEnv(), gap }, w);
+    e.beats = ctx.again && !(key === "pickles" && dogWithYou()) ? Talk.reply(talkEnv(), w, "again") : Talk.opening({ ...talkEnv(), gap }, w);
     if (G.day.invite && G.day.invite.who === w) G.day.invite.seen = G.day.invite.met = true;
     if (!e.beats.length) e.beats = [{ t: "Hello again.", mood: "happy" }];
     e.line = e.beats.map(b => b.t).join(" ");
@@ -1260,6 +1277,7 @@
     const b = Talk.reply(talkEnv(), e.who, "pet");
     e.petted = b.length ? b[0].t : "He leans into your hand.";
     talkAdd(e, b.length ? b : [{ t: e.petted, mood: "happy", narr: true }]);
+    const f = dogAfterPet(); if (f && f.length) talkAdd(e, f);          // he comes along (Stage 5)
     save(); renderAll();
   }
   function acceptTip() {
@@ -1376,7 +1394,7 @@
   // Words come from talk.js; actions are the same as before. Walking away ends it.
   function talkEnv() {
     const pr = v2() ? K.met("n:pickles") : null;
-    return { G, D, K, World, Social, minute: G.day.minute, wet: rainNow(), rng: Math.random, playerName: G.player.name, pets: (pr && pr.pets) || 0, gusOut: peopleNow().some(x => x.who === "n:gus") };
+    return { G, D, K, World, Social, minute: G.day.minute, wet: rainNow(), rng: Math.random, playerName: G.player.name, pets: (pr && pr.pets) || 0, gusOut: peopleNow().some(x => x.who === "n:gus"), dogMode: dogMode() || "rock" };
   }
   function talkAdd(e, beats) {
     if (!e || !beats || !beats.length) return;
@@ -1388,7 +1406,7 @@
     if (e.pet) {
       if (!e.petted) out.push(["pet", "Pet him", "data-pet"]);
       if (!used("stick")) out.push(["stick", "Throw his stick", "data-stick"]);
-      out.push(["bye", "Leave him to his nap", "data-bye"]);
+      out.push(["bye", dogWithYou() ? "Good boy" : dogMode() === "lot" ? "See you later, Pickles" : "Leave him to his nap", "data-bye"]);
       return out;
     }
     const mine = currentProject();
@@ -1434,12 +1452,93 @@
     }
     save(); renderAll();
   }
-  function closeTalk() { G.day.encounter = null; UI.talkKey = ""; save(); renderAll(); }
+  function closeTalk() {
+    const e = G.day.encounter;
+    if (e && e.who === "n:pickles" && G.day.dog && G.day.dog.mode === "lot") G.day.dog.mode = "home";   // he's said hello; back to his rock
+    G.day.encounter = null; UI.talkKey = ""; save(); renderAll();
+  }
   const dogSpot = () => (M && M.paint && M.paint.scene.landmarks.find(l => l.kind === "dog")) || null;
+  // Where he is on the map now ([x, y] metres), or null.
+  function dogPos() {
+    const m = dogMode(); if (!m || m === "car") return null;
+    if (m === "rock") { const d = dogSpot(); return d ? [d.x, d.y] : null; }
+    return M && M.dogLive ? M.dogLive() : null;
+  }
+  // ---- Pickles (Phase 4, Stage 5) ------------------------------------------------------------
+  // Where he is, the one answer everything uses (the map, the conversation box, Out today,
+  // the paper map, the climbing scene):
+  //   rock    napping by his rock (always, until he knows you well enough to come and meet you)
+  //   lot     waiting by your car when you arrive (some mornings, once he greets you)
+  //   follow  trotting along behind you for an hour or two (once he follows you)
+  //   home    trotting back to his rock
+  //   with    your dog: with you all day, and home in the car with you at the end
+  // G.day.dog = { mode, until, followed, adopting, wentHome }; G.dog = { adopted: date }.
+  function dogMode() {
+    if (!v2() || !isAround("n:pickles")) return null;
+    const yours = !!Social.dog(G).adopted;
+    if (G.day.over) return yours ? "car" : "rock";
+    const d = G.day.dog;
+    return (d && d.mode) || (yours ? "with" : "rock");
+  }
+  const dogWithYou = () => ["follow", "with"].includes(dogMode());
+  // Some mornings, once he greets you, he's waiting by your car; your dog comes with you.
+  function startDogDay() {
+    if (!v2() || !isAround("n:pickles")) return;
+    const d = Social.dog(G);
+    if (d.adopted) { G.day.dog = { mode: "with" }; return; }
+    if (d.n >= 2 && Math.random() < (G.day.rainedOut ? 0.3 : 0.5)) G.day.dog = { mode: "lot", until: G.day.minute + 45 };
+  }
+  // After a pet: once he follows you, he comes along for an hour or two (once a day).
+  function dogAfterPet() {
+    const d = Social.dog(G), cur = G.day.dog || {};
+    if (d.adopted || d.n < 3 || cur.wentHome || cur.mode === "follow") return null;
+    G.day.dog = { mode: "follow", until: Math.min(G.day.weather.dusk, G.day.minute + 90 + 10 * Math.floor(Math.random() * 7)), followed: true };
+    bond("n:pickles", "walk");
+    note("Pickles is following you around.");
+    return Talk.reply(talkEnv(), "n:pickles", "follow");
+  }
+  // The clock moved: he gives up waiting at the car, or has had enough and goes home
+  // (unless he's ready to decide you're his human: then he stays, and rides home with you).
+  function dogClock() {
+    const d = G.day.dog; if (!d || G.day.over) return;
+    if (d.mode === "lot" && G.day.minute >= d.until && !(G.day.encounter && G.day.encounter.who === "n:pickles")) { d.mode = "home"; }
+    else if (d.mode === "follow" && G.day.minute >= d.until && !(G.day.encounter && G.day.encounter.who === "n:pickles")) {
+      if (Social.dog(G).ready) {
+        d.mode = "with"; d.adopting = true;
+        toast("Pickles isn't going home", "He's had plenty of chances to go back to his rock. He hasn't. He's sticking with you.", "info");
+        note("Pickles didn't go back to his rock.");
+      } else {
+        d.mode = "home"; d.wentHome = true;
+        const b = Talk.reply(talkEnv(), "n:pickles", "home");
+        toast("Pickles heads home", b.length ? b[0].t : "Pickles trots back to his rock.", "info");
+      }
+    }
+  }
+  // The end of the day: he decides you're his human (once), or rides home with you.
+  function dogAtCar() {
+    const d = G.day.dog;
+    if (!v2() || !d) return "";
+    if (d.adopting && !Social.dog(G).adopted) {
+      G.dog = { adopted: G.date };
+      note("Pickles has decided you're his human.");
+      const gus = K.met("n:gus") && outToday("n:gus");
+      openModal(() => modal(`<div class="adopt-face">${Portraits.svg("pickles", "excited", { label: "Pickles" })}</div>
+        <span class="label-sm">Pickles</span><h2>Pickles has decided you're his human</h2>
+        <p class="lede">When you open the car door at the end of the day, Pickles hops into the back seat, turns round three times, and lies down as if he's always ridden there.</p>
+        ${gus ? `<p class="lede">Gus watches from the kiosk. “Well,” he says. “Looks like he's picked.” He doesn't quite manage to sound gruff about it.</p>` : `<p class="lede">You'll have to tell Gus. Somehow you think Gus already knows.</p>`}
+        <p class="meta">From now on Pickles comes climbing with you: he's at the car every morning, follows you round the park, naps by your pad, and rides home with you at the end of the day.</p>
+        <div class="acts"><button type="button" class="btn primary" data-close>Good boy</button></div>`, (root, close) => { root.querySelector("[data-close]").onclick = close; }));
+      return " Pickles hops into the back seat with you.";
+    }
+    if (Social.dog(G).adopted && d.mode === "with") return " Pickles hops into the back seat, and is asleep before you reach the road.";
+    return "";
+  }
   // More than 16 m from who you're talking to (not a partner, who comes along).
   function walkedAway(e) {
     const n = typeof e.who === "string" && e.who.startsWith("n:"), key = n ? e.who.slice(2) : null;
-    const at = key === "pickles" ? dogSpot() : n && e.who !== partnerNow() && M && M.paint ? M.paint.personAt(e.who) : null;
+    if (key === "pickles" && dogWithYou()) return false;                // he's with you
+    const dp = key === "pickles" ? dogPos() : null;
+    const at = key === "pickles" ? (dp && { x: dp[0], y: dp[1] }) : n && e.who !== partnerNow() && M && M.paint ? M.paint.personAt(e.who) : null;
     return !!(at && G.pos && Math.hypot(G.pos[0] - at.x, G.pos[1] - at.y) > 16);
   }
   function renderTalk() {
@@ -1519,6 +1618,16 @@
         goToPoint(p);
       },
       personTipHtml,
+      // Pickles off his rock (Stage 5): when he's with you, a click says hello right there;
+      // waiting by the car, a click walks you over.
+      onDog: () => {
+        if (G.day.over || climbing()) return;
+        if (dogWithYou()) { if (G.day.encounter && G.day.encounter.who === "n:pickles") return; UI.talkTo = null; G.day.encounter = buildRegular("n:pickles", G.loc.sector || START_AREA, { again: G.day.met.includes("n:pickles") }); if (!G.day.met.includes("n:pickles")) G.day.met.push("n:pickles"); save(); renderAll(); return; }
+        const p = dogLive(); if (!p) return;
+        UI.talkTo = "n:pickles";
+        if (G.pos && Math.hypot(G.pos[0] - p[0], G.pos[1] - p[1]) < 5) { if (meetNearby(G.pos)) { save(); renderAll(); } return; }
+        goToPoint([p[0] + 2.5, p[1] - .8]);
+      },
       onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
         const mins0 = minutesTo({ sector: b.sector, boulder: b.id }, true);
@@ -1821,7 +1930,7 @@
       });
       const hidden = D.sectors.some(s => K.area(s.name) < 1);
       // The regulars you know who are out now, where you know the area (never a place you haven't found).
-      const people = G.day.over ? [] : [...peopleNow(), ...(isAround("n:pickles") ? [{ who: "n:pickles", b: (D.boulders.find(x => x.name === "Pickles' Rock") || {}).id }] : [])]
+      const people = G.day.over ? [] : [...peopleNow(), ...(dogMode() === "rock" ? [{ who: "n:pickles", b: (D.boulders.find(x => x.name === "Pickles' Rock") || {}).id }] : [])]
         .filter(x => isKnown(x.who) && x.b != null && K.area(D.boulders[x.b].sector) >= 1).map(x => {
           const at = P.personAt(x.who) || { x: D.boulders[x.b].x, y: D.boulders[x.b].y }, key = x.who.slice(2);
           return { who: x.who, name: x.who === "n:pickles" ? "Pickles" : firstName(x.who), x: at.x, y: at.y, color: key === "pickles" ? "#c9a46a" : (LOOKS[key] || {}).shirt, where: x.who === partnerNow() ? "with you" : whereIs(x.b).text.replace(/^at /, "") };
@@ -1846,14 +1955,15 @@
       const palB = pal ? (G.loc.boulder != null ? G.loc.boulder : G.day.partner.b) : null;
       // Who's around at this hour (they come and go: Phase 4, Stage 1), with a name tag
       // over anyone you've met.
-      const now = G.day.over ? [] : peopleNow(), dog = v2() && !G.day.over && isAround("n:pickles");
-      const pk = [G.date, ...now.map(x => x.who + (isKnown(x.who) ? "+" : "")), dog && isKnown("n:pickles"), pal, palB].join("|");
+      const now = G.day.over ? [] : peopleNow(), dog = v2() && !G.day.over && dogMode() === "rock";
+      const pk = [G.date, ...now.map(x => x.who + (isKnown(x.who) ? "+" : "")), dog, dog && isKnown("n:pickles"), pal, palB].join("|");
       if (pk !== peopleKey) {
         peopleKey = pk;
         const list = now.map(x => ({ ...x, ...(x.who === pal && palB != null ? { b: palB, side: 1 } : {}), name: isKnown(x.who) ? x.name : "Someone you haven't met", tag: isKnown(x.who) ? firstName(x.who) : null }));
         P.setPeople([...list, ...(dog ? [{ who: "n:pickles", name: isKnown("n:pickles") ? "Pickles" : "A dog", dog: true, tag: isKnown("n:pickles") ? "Pickles" : null }] : [])]);
       }
       if (!walk && !keys.size) P.setMe(G.pos, pose(false));
+      syncDog();
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
       P.setMarks({
         here: G.loc.boulder ?? null, sector: G.loc.sector ?? null, tip: tipBoulders,
@@ -1867,8 +1977,66 @@
     P.setFollow(true, 0);
     UI.recenter = false;
     // Walk over to someone (Out today's Find): the map follows you there.
-    const findPerson = who => { const p = personSpot(who); if (!p) return; lookAtMe(400); goToPoint(p); };
-    return { update, paint: P, togglePaper, lookAtMe, goTo, minutesTo, findPerson, minutesToLot, toLot, walking: () => !!walk, locAt: p => locAt(p, G.loc), approach,
+    // ---- Pickles off his rock (Stage 5): where he is, moved a frame at a time ----
+    // Waiting by your car; trotting along behind you, following the way you went (a trail
+    // of where you've been), then sitting beside you and, after a while, curling up asleep;
+    // or trotting home to his rock. Only his own small layer changes (P.setDog).
+    const LOT_DOG = (() => { for (const q of [[LOT[0] + 2.6, LOT[1] - 1.2], [LOT[0] - 2.6, LOT[1] - 1.2], [LOT[0], LOT[1] - 2.6]]) if (!solid(q)) return q; return freeSpot([LOT[0] + 2.6, LOT[1] - 1.2]); })();
+    const DG = { pos: null, trail: [], phase: 0, facing: 1, idle: 0, last: 0, raf: 0, mode: null };
+    const dogLive = () => (DG.pos ? DG.pos.slice() : null);
+    function syncDog() {
+      const m = dogMode();
+      const off = m && m !== "rock" && m !== "car";
+      if (!off) { if (DG.raf) cancelAnimationFrame(DG.raf); DG.raf = 0; DG.pos = null; DG.mode = m; DG.trail = []; P.setDog(null); return; }
+      if (!DG.pos || DG.mode !== m) {
+        // Where he starts: at the car, beside you (your dog, or he's just started following), or where he was.
+        if (m === "lot") DG.pos = LOT_DOG.slice();
+        else if (!DG.pos) DG.pos = G.pos ? [G.pos[0] - 2.2, G.pos[1] - .6] : LOT_DOG.slice();
+        if (m !== DG.mode && (m === "with" || m === "follow")) DG.trail = [];
+      }
+      DG.mode = m;
+      if (!DG.raf) { DG.last = performance.now(); DG.raf = requestAnimationFrame(dogFrame); }
+    }
+    function dogFrame(now) {
+      DG.raf = 0;
+      const m = dogMode(); if (!m || m === "rock" || m === "car") return syncDog();
+      const dt = Math.min(.1, (now - DG.last) / 1000); DG.last = now;
+      let target, pose = "sit", wag = false, speed = 0;
+      const me = G.pos || LOT;
+      if (m === "lot") { target = LOT_DOG; wag = true; pose = "stand"; }
+      else if (m === "home") { const r = dogSpot(); target = r ? [r.x, r.y] : LOT_DOG; }
+      else {
+        // Behind you along the way you came, or beside you when you've stopped.
+        const tr = DG.trail, lastPt = tr[tr.length - 1];
+        if (!lastPt || Math.hypot(me[0] - lastPt[0], me[1] - lastPt[1]) > .5) { tr.push(me.slice()); if (tr.length > 80) tr.shift(); }
+        let need = 2.8, tgt = null;
+        for (let i = tr.length - 1, prev = me; i >= 0; i--) { const q = tr[i], d = Math.hypot(prev[0] - q[0], prev[1] - q[1]); if (d >= need) { const u = need / d; tgt = [prev[0] + (q[0] - prev[0]) * u, prev[1] + (q[1] - prev[1]) * u]; break; } need -= d; prev = q; }
+        target = tgt || [me[0] - 2.2, me[1] - .6];
+        if (!solid(target)) {} else target = [me[0] - 2.2, me[1] - .6];
+      }
+      const dx = target[0] - DG.pos[0], dy = target[1] - DG.pos[1], dist = Math.hypot(dx, dy);
+      if (dist > 45 || reduceMotion) { DG.pos = target.slice(); }                      // a long trip (you faded there): he's there too
+      else if (dist > .15) {
+        const v = m === "home" ? 6 : Math.max(5, dist * 5);                            // trots to keep up; home at a trot
+        const step = Math.min(dist, v * dt); DG.pos = [DG.pos[0] + dx / dist * step, DG.pos[1] + dy / dist * step]; speed = step / Math.max(dt, 1e-3);
+        DG.phase += step * 1.6;
+        if (Math.abs(dx) > .05) DG.facing = dx > 0 ? 1 : -1;
+      }
+      const moving = speed > .6;
+      if (moving) { pose = "walk"; DG.idle = 0; }
+      else if (m === "home") { if (dist <= .3) { G.day.dog.mode = "rock"; save(); peopleKey = ""; update(); renderAll(); return; } }
+      else if (m !== "lot") {
+        DG.idle += dt; DG.facing = me[0] >= DG.pos[0] ? 1 : -1;
+        pose = DG.idle > 9 ? "sleep" : "sit"; wag = DG.idle < 2.5 || !!(G.day.encounter && G.day.encounter.who === "n:pickles");
+      }
+      P.setDog({ pos: DG.pos, pose, phase: DG.phase, facing: DG.facing, wag, t: now });
+      DG.raf = requestAnimationFrame(dogFrame);
+    }
+    const findPerson = who => {
+      if (who === "n:pickles") { const d = dogLive() || (dogSpot() && [dogSpot().x, dogSpot().y]); if (!d) return; UI.talkTo = who; lookAtMe(400); goToPoint([d[0] + 3, d[1] - 1]); return; }
+      const p = personSpot(who); if (!p) return; lookAtMe(400); goToPoint(p);
+    };
+    return { update, paint: P, togglePaper, lookAtMe, goTo, minutesTo, findPerson, minutesToLot, toLot, walking: () => !!walk, locAt: p => locAt(p, G.loc), approach, dogLive,
       teleport: to => { stop(); G.pos = pointOf(to); G.loc = { sector: to.sector, boulder: to.boulder }; P.setMe(G.pos, pose(false)); P.setFollow(true, 0); } };
   }
   const validPos = p => Array.isArray(p) && p.length === 2 && p.every(v => typeof v === "number" && isFinite(v) && Math.abs(v) < 5000);
@@ -2250,7 +2418,7 @@
     const MONTH = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const who = [...World.REG, "n:bishop"].filter(w => K.met(w)).map(w => ({ w, t: Social.tier(G, w) || { n: 0, words: "You've met", bond: 0 } }))
       .sort((a, b) => b.t.n - a.t.n || b.t.bond - a.t.bond);
-    if (!who.length) return "";
+    if (!who.length && !K.met("n:pickles")) return "";
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     const rows = who.map(({ w, t }) => {
       const sh = Social.shared(G, w), m = K.met(w), key = w.slice(2), first = m && m.first;
@@ -2262,7 +2430,12 @@
         <div><div class="pp-name">${esc(callName(w))} <span class="pp-tier t${t.n}">${esc(t.words)}</span></div>
         <div class="meta" style="margin:0">${esc(bits.join(" · "))}</div>${likes}</div></li>`;
     }).join("");
-    return `<h3>Your people</h3><p class="meta">Friendships grow from time together: talking, climbing together, sharing beta, and the things each of them cares about. They never fade.</p><ul class="your-people">${rows}</ul>`;
+    const dg = Social.dog(G);
+    const pk = K.met("n:pickles") ? `<li><div class="pp-face">${Portraits.svg("pickles", dg.n >= 2 ? "happy" : "sleepy", { label: "Pickles" })}</div>
+        <div><div class="pp-name">Pickles <span class="pp-tier t${Math.min(3, dg.n)}">${esc(dg.words)}</span></div>
+        <div class="meta" style="margin:0">${esc([dg.adopted ? `yours since ${dg.adopted.slice(5) ? new Date(dg.adopted + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" }) : ""}` : "", dg.pets ? `petted on ${plural(dg.pets, "day", "days")}` : "", dg.walks ? `walked with you on ${plural(dg.walks, "day", "days")}` : ""].filter(Boolean).join(" · "))}</div>
+        ${dg.n >= 1 && !dg.adopted ? `<div class="pp-likes">Pickles loves a good scratch behind the ears, and a walk. He's at his rock most days.</div>` : ""}</div></li>` : "";
+    return `<h3>Your people</h3><p class="meta">Friendships grow from time together: talking, climbing together, sharing beta, and the things each of them cares about. They never fade.</p><ul class="your-people">${rows}${pk}</ul>`;
   }
   function climberHtml() {
     const pl = G.player, L = levelNow(), sends = firstSends();
@@ -3521,6 +3694,11 @@
     const day_ = s => typeof s === "string" && /^\d{4}-\d\d-\d\d$/.test(s), num_ = x => typeof x === "number" && isFinite(x);
     if (g.day && g.day.invite != null && !(g.day.invite && CLIMB_WITH.includes(g.day.invite.who) && Number.isInteger(g.day.invite.b) && g.day.invite.b >= 0 && g.day.invite.b < D.boulders.length
       && num_(g.day.invite.from) && num_(g.day.invite.to) && typeof g.day.invite.text === "string" && g.day.invite.text.length <= 400)) delete g.day.invite;
+    // Pickles (Stage 5): the day you became his human, and where he is today.
+    if (g.dog != null && !(g.dog && typeof g.dog === "object" && (g.dog.adopted == null || day_(g.dog.adopted)))) delete g.dog;
+    if (g.day && g.day.dog != null && !(g.day.dog && ["rock", "lot", "follow", "home", "with"].includes(g.day.dog.mode) && (g.day.dog.until == null || num_(g.day.dog.until)))) delete g.day.dog;
+    if (g.day && g.day.dog) g.day.dog = { mode: g.day.dog.mode, ...(num_(g.day.dog.until) ? { until: g.day.dog.until } : {}), ...(g.day.dog.followed === true ? { followed: true } : {}), ...(g.day.dog.adopting === true ? { adopting: true } : {}), ...(g.day.dog.wentHome === true ? { wentHome: true } : {}) };
+    if (g.day && g.day.dog && g.day.dog.mode === "with" && !g.day.dog.adopting && !(g.dog && g.dog.adopted)) g.day.dog = { mode: "rock" };
     if (g.lastInvite != null && !(g.lastInvite && CLIMB_WITH.includes(g.lastInvite.who) && day_(g.lastInvite.date))) delete g.lastInvite;
     if (g.lvlOn != null) { const l = {}; if (typeof g.lvlOn === "object") for (const [k, v] of Object.entries(g.lvlOn)) if (/^\d{1,2}$/.test(k) && day_(v)) l[k] = v; g.lvlOn = l; }
     // Beta from people (Phase 4, Stage 3): { who: [date, move, "alt" | "move" | "none"] } per line;

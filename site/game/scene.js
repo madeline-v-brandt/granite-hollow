@@ -15,6 +15,7 @@
 //   sc.setAtmosphere({ date, minute, dusk, sky });
 //   sc.setCards({ prob: {...}, me: {...} }); sc.setMenu([...]); sc.say(text);
 //   sc.setPartner(look | null);         // a partner by your pad (Stage 4)
+//   sc.setDog(on);                      // Pickles, curled up beside your pad (Phase 4, Stage 5)
 //   await sc.play("burn", { fallAt });   // "burn" | "work" | "rest" | "ready"
 //   sc.destroy();
 //
@@ -119,6 +120,7 @@
       const rock = svg.append("g").attr("class", "sc-rock"), holdL = svg.append("g").attr("class", "sc-holds");
       const padL = svg.append("g").attr("class", "sc-padL"), palL = svg.append("g").attr("class", "sc-pal-fig"), meL = svg.append("g").attr("class", "sc-me-fig");
       geo_palL = palL; pal = null;
+      geo_dogL = svg.insert("g", () => meL.node()).attr("class", "sc-dog"); dogOn = false;
       const before = svg.append("g").attr("class", "sc-before"), light = svg.append("g").attr("class", "sc-light");
       // Wide enough for any window shape.
       const W0 = subject[0] - 60, W1 = subject[2] + 60, H0 = subject[1] - 40, H1 = subject[3] + 30, skyline = Math.min(...ys) + (geo.yb - Math.min(...ys)) * .18;
@@ -354,6 +356,27 @@
     // own pad. They spot while you climb and cheer when you top out. look: the map's
     // colours for them (LOOKS in game.js), or null for nobody.
     let geo_palL = null;
+    // ---- Pickles (Phase 4, Stage 5): curled up asleep beside your pad, on the other side
+    // from a partner; he sits up and wags when you top out. One outlined shape, like the map's.
+    let geo_dogL = null, dogOn = false;
+    const DOG_CURL = "M-.7,0C-.75,-.35 -.4,-.55 0,-.55C.26,-.55 .42,-.51 .52,-.44C.61,-.5 .72,-.51 .83,-.48C.99,-.43 1.05,-.28 1.01,-.13C.98,-.02 .87,.04 .72,.04H-.5C-.62,.05 -.7,.03 -.7,0Z";
+    function setDog(on) {
+      if (!geo || !geo_dogL) return;
+      geo_dogL.selectAll("*").remove(); dogOn = !!on;
+      if (!on) return;
+      const mid = (subject[0] + subject[2]) / 2, side = geo.padX > mid ? 1 : -1, x = geo.padX + side * 2.35, y = geo.padTop + .5;
+      const g = geo_dogL.append("g").attr("class", "sc-dog-curl").attr("transform", `translate(${f2(x)},${f2(y)}) scale(${side > 0 ? -1.15 : 1.15},1.15)`);
+      g.append("path").attr("class", "sc-dog-shadow").attr("d", ell(.15, .05, .95, .16));
+      g.append("path").attr("class", "sc-dog-tail").attr("d", "M-.68,-.05C-.85,-.1 -.9,.02 -.75,.08");
+      g.append("path").attr("class", "sc-dog-ink").attr("d", DOG_CURL); g.append("path").attr("class", "sc-dog-fur").attr("d", DOG_CURL);
+      g.append("path").attr("class", "sc-dog-line").attr("d", "M.53,-.43C.47,-.32 .47,-.15 .56,-.03");
+      g.append("path").attr("class", "sc-dog-ear").attr("d", "M.6,-.47L.68,-.64L.79,-.48Z");
+      g.append("path").attr("class", "sc-dog-patch").attr("d", ell(-.2, -.3, .22, .14));
+      g.append("path").attr("class", "sc-dog-line").attr("d", "M.76,-.3Q.81,-.27 .86,-.3");
+      g.append("path").attr("class", "sc-dog-nose").attr("d", ell(1, -.24, .045, .04));
+    }
+    // He wakes for a send: lifts his head and wags (a CSS class for a moment).
+    function dogCheer() { if (!dogOn || !geo_dogL) return; const n = geo_dogL.node(); n.classList.remove("cheer"); void n.getBoundingClientRect(); n.classList.add("cheer"); setTimeout(() => n.classList.remove("cheer"), 2600); }
     function setPartner(look) {
       if (!geo || !geo_palL) return;
       geo_palL.selectAll("*").remove(); pal = null;
@@ -411,7 +434,7 @@
             await tween(poses.on(k), k === 0 ? 420 : fall ? 520 : 330 + (geo.seq.moves[k].kind === "crux" ? 260 : 0), EASE.inOut);
             if (fall) { await wait(260); await tumble(); break; }
           }
-          if (data.fallAt < 0) { await tween(poses.topRide(), 420); partnerPose("cheer"); await tween(poses.top(), 520, EASE.out); }
+          if (data.fallAt < 0) { await tween(poses.topRide(), 420); partnerPose("cheer"); dogCheer(); await tween(poses.top(), 520, EASE.out); }
           else partnerPose("stand");
         } else if (kind === "work") {
           const k = data.at;
@@ -490,7 +513,7 @@
     }
     el.addEventListener("keydown", e => { if (e.key === "Escape" && opts.onAction && !busy) { e.preventDefault(); opts.onAction("leave"); } });
     function destroy() { if (ro) ro.disconnect(); host.innerHTML = ""; }
-    return { show, setCards, setMenu, say, play, flash, setAtmosphere, setSeen: drawHolds, setPartner, focusMenu, destroy, fit: fitView, busy: () => busy, el, geo: () => geo,
+    return { show, setCards, setMenu, say, play, flash, setAtmosphere, setSeen: drawHolds, setPartner, setDog, focusMenu, destroy, fit: fitView, busy: () => busy, el, geo: () => geo,
       poses: () => poses, __render: p => { cur = p; render(p); } };     // poses and __render: for the prototype's pose checks
   }
 

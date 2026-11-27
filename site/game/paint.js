@@ -1356,6 +1356,90 @@
     const meSvg = d3.select(wrap).insert("svg", () => svgEl.nextSibling).attr("class", "me-layer").attr("aria-hidden", "true")
       .attr("width", ME_BOX[0]).attr("height", ME_BOX[1]).attr("viewBox", `${-ME_FOOT[0]} ${-ME_FOOT[1]} ${ME_BOX[0]} ${ME_BOX[1]}`);
     const meG = meSvg.append("g").attr("class", "me").attr("id", "me-live");
+    // ---- Pickles, when he's off his rock (Phase 4, Stage 5): waiting by your car, trotting
+    // along behind you, or curled up asleep beside you. Like you, he lives in a small SVG
+    // of his own over the map (just under you), so his legs and tail can move every frame
+    // without the park repainting. setDog({ pos, pose: "walk" | "stand" | "sit" | "sleep",
+    // phase, facing: 1 | -1, wag }) or setDog(null). He's drawn as one outlined shape:
+    // the outlines first, then the fur over them, so the joins never show.
+    const DOG_BOX = [64, 50], DOG_FOOT = [32, 38];
+    const dogSvg = d3.select(wrap).insert("svg", () => meSvg.node()).attr("class", "me-layer dog-layer").attr("aria-hidden", "true").attr("display", "none")
+      .attr("width", DOG_BOX[0]).attr("height", DOG_BOX[1]).attr("viewBox", `${-DOG_FOOT[0]} ${-DOG_FOOT[1]} ${DOG_BOX[0]} ${DOG_BOX[1]}`);
+    const dogG = dogSvg.append("g").attr("class", "dog-fig");
+    let dogWorld = null, dogSt = null, dogParts = null, dogK = null;
+    function drawDogFig() {
+      dogG.selectAll("*").remove();
+      const hit = dogG.append("ellipse").attr("class", "dog-hit").attr("cx", 1).attr("cy", -8).attr("rx", 14).attr("ry", 11);
+      hit.on("click", ev => { ev.stopPropagation(); if (opts.onDog) opts.onDog(); });
+      const flip = dogG.append("g");
+      const one = (g, paths) => { for (const d of paths) g.append("path").attr("class", "dog-ink").attr("d", d); for (const d of paths) g.append("path").attr("class", "dog-fur").attr("d", d); };
+      const legs = g => [0, 1, 2, 3].map(() => ({ ink: g.append("path").attr("class", "dog-leg-ink"), fur: g.append("path").attr("class", "dog-leg") }));
+      const HEAD = "M3,-10C3.5,-13.5 5,-15.5 7.5,-15.5C9.5,-15.5 10.5,-14.5 11.5,-13.2C12.3,-12.2 11.8,-11 10.6,-11L8.6,-11C7.6,-10.4 6.6,-8.5 5,-7.5Z";
+      const face = (g, eyes = "open") => {
+        g.append("path").attr("class", "dog-ear").attr("d", "M7.2,-15C6,-14.6 5.6,-12.6 6.3,-11.4C7.2,-12.2 7.8,-13.6 7.9,-14.8Z");
+        if (eyes === "open") g.append("circle").attr("class", "dog-eye").attr("cx", 9.2).attr("cy", -13.6).attr("r", .6);
+        else g.append("path").attr("class", "dog-line").attr("d", "M8.6,-13.4Q9.2,-13 9.8,-13.4");
+        g.append("circle").attr("class", "dog-eye").attr("cx", 11.7).attr("cy", -12.5).attr("r", .65);
+      };
+      // Standing and walking.
+      const walk = flip.append("g");
+      const wLegs = legs(walk);
+      const wTail = walk.append("g").attr("class", "dog-tailg");
+      wTail.append("path").attr("class", "dog-tail-ink").attr("d", "M-6.6,-10C-8.6,-11 -9.6,-13 -9.3,-15");
+      wTail.append("path").attr("class", "dog-tail").attr("d", "M-6.6,-10C-8.6,-11 -9.6,-13 -9.3,-15");
+      one(walk, ["M-7,-9.5C-7,-12 -3,-12.5 1,-12C4,-11.7 5.5,-10.5 5.5,-8.5C5.5,-6 3.5,-5 0,-5L-5,-5C-7,-5 -7.5,-7 -7,-9.5Z", HEAD]);
+      walk.append("path").attr("class", "dog-patch").attr("d", "M-4.2,-9.6a2.2,1.4 0 1,0 4.4,0a2.2,1.4 0 1,0 -4.4,0");
+      face(walk);
+      // Sitting.
+      const sit = flip.append("g");
+      const sTail = sit.append("g").attr("class", "dog-tailg");
+      sTail.append("path").attr("class", "dog-tail-ink").attr("d", "M-4.6,-1.4C-7,-1 -8.6,-1.6 -9.4,-3.2");
+      sTail.append("path").attr("class", "dog-tail").attr("d", "M-4.6,-1.4C-7,-1 -8.6,-1.6 -9.4,-3.2");
+      const sLegs = legs(sit);
+      one(sit, ["M-4.5,-2.8C-6.5,-3.5 -6.3,-8 -3.8,-10.5C-2,-12.3 1,-12.6 2.8,-11C4.2,-9.5 3.9,-6.5 3.2,-4L3,-1L-3,-1C-4.5,-1 -5,-2 -4.5,-2.8Z",
+        "M-5.6,-2a2.8,1.9 0 1,0 5.6,0a2.8,1.9 0 1,0 -5.6,0", HEAD.replace(/(-?\d+\.?\d*),(-?\d+\.?\d*)/g, (m, x, y) => `${(+x - 2.4).toFixed(2)},${(+y - 2.6).toFixed(2)}`)]);
+      sit.append("path").attr("class", "dog-patch").attr("d", "M-2.6,-7.6a1.6,1.2 0 1,0 3.2,0a1.6,1.2 0 1,0 -3.2,0");
+      face(sit.append("g").attr("transform", "translate(-2.4,-2.6)"));
+      // Asleep, curled up (the shape he naps in by his rock).
+      const sleep = flip.append("g").attr("class", "dog-sleep").attr("transform", "scale(10)");
+      sleep.append("path").attr("class", "dog-tail-ink").attr("d", "M-.68,-.05C-.85,-.1 -.9,.02 -.75,.08");
+      one(sleep, ["M-.7,0C-.75,-.35 -.4,-.55 0,-.55C.26,-.55 .42,-.51 .52,-.44C.61,-.5 .72,-.51 .83,-.48C.99,-.43 1.05,-.28 1.01,-.13C.98,-.02 .87,.04 .72,.04H-.5C-.62,.05 -.7,.03 -.7,0Z"]);
+      sleep.append("path").attr("class", "dog-line").attr("d", "M.53,-.43C.47,-.32 .47,-.15 .56,-.03");
+      sleep.append("path").attr("class", "dog-ear").attr("d", "M.6,-.47L.68,-.64L.79,-.48Z");
+      sleep.append("path").attr("class", "dog-patch").attr("d", "M-.42,-.3a.22,.14 0 1,0 .44,0a.22,.14 0 1,0 -.44,0");
+      sleep.append("path").attr("class", "dog-line").attr("d", "M.76,-.3Q.81,-.27 .86,-.3");
+      sleep.append("circle").attr("class", "dog-eye").attr("cx", 1).attr("cy", -.24).attr("r", .045);
+      dogParts = { flip, walk, sit, sleep, wLegs, sLegs, wTail, sTail };
+    }
+    const legD = (x, y0, dx) => `M${f2(x)},${f2(y0)}L${f2(x + dx)},-.4`;
+    function poseDog() {
+      if (!dogParts || !dogSt) return;
+      const { flip, walk, sit, sleep, wLegs, sLegs, wTail, sTail } = dogParts, pose = dogSt.pose || "stand";
+      flip.attr("transform", dogSt.facing < 0 ? "scale(-1,1)" : null);
+      walk.attr("display", pose === "walk" || pose === "stand" ? null : "none");
+      sit.attr("display", pose === "sit" ? null : "none");
+      sleep.attr("display", pose === "sleep" ? null : "none");
+      const ph = dogSt.phase || 0, m = pose === "walk";
+      const sw = k => (m ? Math.sin(ph * 2.2 + k * Math.PI) * 1.6 : 0);
+      [[3.6, -6, sw(0)], [2, -6, sw(1)], [-4.4, -6.4, sw(1)], [-6, -6.4, sw(0)]].forEach(([x, y, d], i) => { const p = legD(x, y, d); wLegs[i].ink.attr("d", p); wLegs[i].fur.attr("d", p); });
+      [[2.6, -5], [1.2, -5]].forEach(([x, y], i) => { const p = legD(x, y, 0); sLegs[i].ink.attr("d", p); sLegs[i].fur.attr("d", p); });
+      sLegs[2].ink.attr("d", null); sLegs[2].fur.attr("d", null); sLegs[3].ink.attr("d", null); sLegs[3].fur.attr("d", null);
+      const wag = dogSt.wag ? Math.sin((dogSt.t || 0) / 70) * 18 : 0;
+      wTail.attr("transform", `rotate(${f2(wag)} -6.6 -10)`); sTail.attr("transform", `rotate(${f2(wag * .6)} -4.6 -1.4)`);
+      walk.attr("transform", m ? `translate(0,${f2(-Math.abs(Math.cos(ph * 2.2)) * .5)})` : null);
+    }
+    function placeDog() {
+      if (!dogWorld || !dogSt) return;
+      dogSvg.node().style.transform = `translate3d(${f1(T.applyX(dogWorld[0]) - pad + slide[0] - DOG_FOOT[0])}px,${f1(T.applyY(-dogWorld[1]) - pad + slide[1] - DOG_FOOT[1])}px,0)`;
+      const sc = meScale() * .95; if (sc !== dogK) { dogK = sc; dogG.attr("transform", `scale(${f2(sc)})`); }
+    }
+    function setDog(st) {
+      if (!st) { if (dogSt) { dogSt = null; dogSvg.attr("display", "none"); } return; }
+      if (!dogParts) drawDogFig();
+      if (!dogSt) dogSvg.attr("display", null);
+      dogSt = st; dogWorld = st.pos;
+      poseDog(); placeDog();
+    }
     // What stands in front of you (Stage 6): copies of the nearby boulders and
     // trees between you and the viewer, drawn over you in this small layer, and a
     // faint see-through outline of you on top so you never lose yourself.
@@ -1368,6 +1452,8 @@
     const ghostSvg = d3.select(wrap).insert("svg", () => occSvg.node().nextSibling).attr("class", "me-layer me-ghost").attr("aria-hidden", "true").attr("display", "none")
       .attr("width", ME_BOX[0]).attr("height", ME_BOX[1]).attr("viewBox", `${-ME_FOOT[0]} ${-ME_FOOT[1]} ${ME_BOX[0]} ${ME_BOX[1]}`);
     ghostSvg.append("use").attr("href", "#me-live");
+    // Pickles goes above the copies of what's in front of you (he's always right beside you).
+    wrap.insertBefore(dogSvg.node(), ghostSvg.node().nextSibling);
     let occKey = "";
     let outfit = { shirt: "#c2553a", pants: "#3f4f63", shorts: false, jacket: false, hat: null, scarf: false, pad: "#2f6b8f", skin: "#e6bf98", hair: "#4a3426" };
     let mePose = { phase: 0, moving: false, facing: "d", padDown: false };
@@ -1663,6 +1749,7 @@
     const placeMe = () => {
       const tr = `translate3d(${f1(T.applyX(meWorld[0]) - pad + slide[0] - ME_FOOT[0])}px,${f1(T.applyY(-meWorld[1]) - pad + slide[1] - ME_FOOT[1])}px,0)`;
       meSvg.node().style.transform = tr; if (occKey && occKey !== "|") ghostSvg.node().style.transform = tr;
+      if (dogSt) placeDog();
       const sc = meScale(); if (sc !== meK) { meK = sc; meG.attr("transform", `scale(${f2(sc)})`); }
       placeOccluders();
     };
@@ -2017,7 +2104,7 @@
     draw();
     return { setDate, setTime, flyTo, setMarks, setMe, setKnown, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
       zoomBy: f => { commitSlide(); svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f); },
-      setFollow, following: () => follow, setOutfit, setPeople, personAt: who => personAt.get(who) || null, toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],
+      setFollow, following: () => follow, setOutfit, setPeople, setDog, dogShown: () => !!dogSt, personAt: who => personAt.get(who) || null, toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],
       tilesPending: () => pending.size + (building ? 1 : 0) };
   }
 

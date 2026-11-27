@@ -116,5 +116,27 @@ test("a bad deepening or best tier from a save file is dropped", () => {
   Social.ensure(g);
   assert(!g.social.npc["n:bea"].up && !g.social.npc["n:bea"].best);
 });
+// ---- Stage 5: Pickles
+test("Pickles: knows you, then greets you, then follows you, then (once he's ready) is yours", () => {
+  const g = save(); Social.ensure(g);
+  const st = () => Social.dog(g);
+  assert(st().key === "new");
+  const D0 = Social.DOG;
+  for (let n = 0; n < D0.adopt; n++) Social.moment(g, "n:pickles", "pet", days(n));
+  assert(st().key === "follows" && !st().ready, "not before he's walked with you");
+  for (let n = 0; n < D0.walks; n++) Social.moment(g, "n:pickles", "walk", days(n));
+  assert(st().ready, "ready");
+  g.dog = { adopted: "2025-11-01" };
+  assert(st().key === "yours" && st().n === 4 && !st().ready && st().adopted === "2025-11-01");
+  const h = save(); Social.ensure(h);
+  for (let n = 0; n < 3; n++) Social.moment(h, "n:pickles", "pet", "2025-10-01");
+  assert(Social.dog(h).pets === 1, "a pet a day, at most");
+  assert(Social.bond(h, "n:otis") === 0 && Social.KINDS.walk === 0, "walks are his alone");
+});
+test("Pickles: an old save's pets count", () => {
+  const g = save(); g.know.met = { "n:pickles": { n: 12, first: "2025-09-06", last: "2025-10-20", pets: 10, petted: "2025-10-20" } }; delete g.social;
+  Social.ensure(g);
+  assert(Social.dog(g).key === "follows", Social.dog(g).key);
+});
 console.log(`\n${passed} passed${failed ? `, ${failed} FAILED` : ""}`);
 process.exit(failed ? 1 : 0);

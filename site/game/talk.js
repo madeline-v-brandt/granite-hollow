@@ -171,6 +171,11 @@
     if (env.invite && env.invite.who === who) c.invite = env.invite;
     c.invited = !!(G.day && G.day.invite && G.day.invite.who === who && !G.day.invite.seen);
     c.pets = env.pets || 0; c.gusOut = !!env.gusOut;
+    // Pickles (Stage 5): how he feels about you, where he is, and whether he's with you now.
+    c.dog = Social.dog ? Social.dog(G) : { n: 0 };
+    c.dogMode = env.dogMode || "rock";
+    c.dogWith = c.dogMode === "with" || c.dogMode === "follow";
+    c.yours = c.dog.n >= 4;
     return c;
   }
 
@@ -184,6 +189,8 @@
       first: [l("gus.hi1", "happy", T, () => "Ranger Gus. Welcome to the Hollow. You're one of the first climbers allowed back in since '87, you know."),
         l("gus.hi2", "happy", T, () => "Morning! Gus. I look after the park. Mostly I look after Pickles.")],
       hello: [
+        l("gus.h.dog", "thoughtful", c => c.dog && c.dog.n === 3, () => "I see Pickles has found himself a new favourite. He's not my dog, you understand. But I'll be keeping an eye on you.", { w: 3 }),
+        l("gus.h.yours", "happy", c => c.yours, () => "How's my— your dog? Our dog. The dog. He looks happy. That's all I wanted.", { w: 3 }),
         l("gus.h.gap", "happy", c => c.gap >= 21, c => `Well, look who it is! ${c.gap >= 45 ? "I was about to put up a missing poster." : "Thought you'd found another park."} Good to have you back.`, { w: 6 }),
         l("gus.h.drill", "happy", T, () => "Pack it in, pack it out. You know the drill."),
         l("gus.h.early", "happy", c => c.part === "morning", () => "Morning! You're out early. Pickles was up before both of us."),
@@ -274,6 +281,7 @@
       first: [l("hol.hi1", "neutral", T, () => "Hollis Pruitt. I'm keeping notes on everything that goes up out here. Somebody has to."),
         l("hol.hi2", "thoughtful", T, () => "Hollis. I'm documenting every problem in this park. Some of them twice, in case the first one was wrong.")],
       hello: [
+        l("hol.h.dog", "happy", c => c.yours && c.dogWith, () => "Hello, Pickles. I've added him to the binder, you know. Under “Dogs, notable”. It's a short section.", { w: 3 }),
         l("hol.h.gap", "excited", c => c.gap >= 21, c => `There you are! I'd marked you as “whereabouts unknown”. ${c.gap >= 45 ? "With a question mark." : "In pencil."} Welcome back.`, { w: 6 }),
         l("hol.h.witness", "thoughtful", T, () => "Ah, good. I need a witness. Does the Billboard traverse go left to right, or did I make that up?"),
         l("hol.h.twice", "happy", T, () => "Back again! I've updated the notes. Twice."),
@@ -361,6 +369,7 @@
       nod: [l("oti.n.1", "happy", T, () => "Hey hey!"), l("oti.n.2", "happy", T, () => "Well, hello!"), l("oti.n.3", "excited", T, () => "Look who it is!")],
       first: [l("oti.hi1", "excited", T, () => "Otis! Isn't it perfect sending weather?"), l("oti.hi2", "happy", T, () => "Name's Otis. Perfect day for it, isn't it?")],
       hello: [
+        l("oti.h.dog", "excited", c => c.yours && c.dogWith, () => "Pickles! Perfect dog weather. Here, he can have the crust.", { w: 3 }),
         l("oti.h.gap", "excited", c => c.gap >= 21, () => "Look who it is! You picked a perfect day to come back. Every day's perfect, but still.", { w: 6 }),
         l("oti.h.perfect", "happy", T, () => "Perfect sending weather!"),
         l("oti.h.wet", "happy", c => c.wx.wet, () => "Perfect sending weather! Well. Perfect sandwich weather.", { w: 3 }),
@@ -448,6 +457,7 @@
       first: [l("row.hi1", "embarrassed", T, () => "Oh! Hi. Sorry, I was sketching. I'm Rowan. This boulder has the best shadows in the morning."),
         l("row.hi2", "happy", T, () => "Hi, I'm Rowan. I come up here to draw the rocks and occasionally climb one.")],
       hello: [
+        l("row.h.dog", "happy", c => c.yours && c.dogWith, () => "I've been drawing Pickles curled up by your pad. He's a very good model. He never moves.", { w: 3 }),
         l("row.h.gap", "happy", c => c.gap >= 21, () => "Oh! You're back. I kept looking up whenever someone came down the trail. Anyway. Hi.", { w: 6 }),
         l("row.h.back", "happy", T, () => "Hey, you're back! I was hoping someone would come up here."),
         l("row.h.light", "thoughtful", c => c.part === "morning", () => "The light's doing something lovely on the rock this morning. I've drawn it three times and it's still wrong.", { w: 2 }),
@@ -533,6 +543,7 @@
       first: [l("bea.hi1", "excited", T, () => "I'm Bea! Have you tried jumping for it? You should always try jumping for it."),
         l("bea.hi2", "excited", T, () => "Hi! Bea. Did you see that? I almost stuck it. Almost!")],
       hello: [
+        l("bea.h.dog", "excited", c => c.yours && c.dogWith, () => "PICKLES!! Oh, and hi. Hi. But PICKLES.", { w: 3 }),
         l("bea.h.gap", "excited", c => c.gap >= 21, () => "WHERE HAVE YOU BEEN. Okay, sorry. Hi. I've learned SO many dynos since.", { w: 6 }),
         l("bea.h.almost", "excited", T, () => "Did you see that? I almost stuck it! Almost!"),
         l("bea.h.school", "excited", c => !c.weekend && c.part !== "morning" && c.season !== "summer", () => "School was SO long today. I've got till my mom gets here. Go go go.", { w: 3 }),
@@ -617,6 +628,7 @@
       nod: [l("dez.n.1", "neutral", T, () => "Hey."), l("dez.n.2", "happy", T, () => "Mm. Hi."), l("dez.n.3", "neutral", c => c.part === "morning", () => "Morning.")],
       first: [l("dez.hi1", "neutral", T, () => "Dez. Good to meet you."), l("dez.hi2", "neutral", T, () => "…Dez. Hi.")],
       hello: [
+        l("dez.h.dog", "happy", c => c.yours && c.dogWith, () => "Hey, Pickles. …And you.", { w: 3 }),
         l("dez.h.gap", "happy", c => c.gap >= 21, () => "Hey. Been a while. Good to see you.", { w: 6 }),
         l("dez.h.mm", "neutral", T, () => "Mm. Good conditions."),
         l("dez.h.prime", "happy", c => c.prime, () => "Good day.", { w: 2 }),
@@ -726,24 +738,58 @@
   LINES.pickles = {
     first: [l("pic.hi", "sleepy", T, () => "A scruffy dog is napping in the shade of the boulder. His tag says PICKLES. His tail thumps when he sees you.", { narr: true })],
     hello: [
-      l("pic.h.thump", "sleepy", T, () => "Pickles is napping in the shade of his rock. His tail thumps twice when he sees you.", { narr: true }),
-      l("pic.h.belly", "happy", T, () => "Pickles opens one eye, decides you're a friend, and rolls over for a belly rub.", { narr: true }),
+      l("pic.h.thump", "sleepy", c => c.dog.n <= 1, () => "Pickles is napping in the shade of his rock. His tail thumps twice when he sees you.", { narr: true }),
+      l("pic.h.belly", "happy", c => c.dog.n <= 1, () => "Pickles opens one eye, decides you're a friend, and rolls over for a belly rub.", { narr: true }),
       l("pic.h.stick", "excited", T, () => "Pickles is guarding a very important stick beside his rock.", { narr: true }),
       l("pic.h.cold", "sleepy", c => c.cold, () => "Pickles is curled up so tight against the cold he's mostly tail. One ear lifts when you say his name.", { narr: true, w: 2 }),
       l("pic.h.wet", "frustrated", c => c.wx.wet, () => "Pickles is damp, and would like you to know he's damp.", { narr: true, w: 2 }),
+      l("pic.h.knows", "happy", c => c.dog.n >= 1, () => "Pickles hears you coming. His tail starts going before he's even opened his eyes.", { narr: true, w: 3 }),
+      l("pic.h.wriggle", "happy", c => c.dog.n >= 1, () => "Pickles lifts his head, sees it's you, and does his best happy wriggle without actually getting up.", { narr: true, w: 3 }),
+      l("pic.h.trot", "excited", c => c.dog.n >= 2, () => "Pickles is up and trotting over before you've even reached his rock.", { narr: true, w: 4 }),
+    ],
+    // Waiting for you at the lot (once he knows you well enough to come and meet you).
+    lot: [
+      l("pic.l.wag", "excited", T, () => "Pickles is waiting by your car, his whole back end wagging.", { narr: true }),
+      l("pic.l.expect", "happy", T, () => "Pickles is sitting by your car like he's been expecting you. He has. Since breakfast.", { narr: true }),
+      l("pic.l.stick", "excited", T, () => "Pickles has brought a stick to the car. It's for you. He'd like it thrown immediately.", { narr: true }),
+      l("pic.l.cold", "happy", c => c.cold, () => "Pickles is waiting by your car, breathing little clouds and wagging.", { narr: true, w: 2 }),
+    ],
+    // He's with you (following you round, or your dog): you crouch down to say hello.
+    with: [
+      l("pic.w.walk", "happy", c => !c.yours, () => "Pickles looks up at you: is it walk time? It's always walk time.", { narr: true }),
+      l("pic.w.lean", "happy", T, () => "Pickles leans against your leg and sighs, happily.", { narr: true }),
+      l("pic.w.yours", "excited", c => c.yours, () => "Your dog. Your actual dog. He thumps his tail like he can hear you thinking it.", { narr: true, w: 2 }),
+      l("pic.w.chalk", "happy", c => c.yours, () => "Pickles has chalk on his nose again. He looks very pleased about it.", { narr: true, w: 2 }),
+      l("pic.w.pad", "sleepy", c => c.yours, () => "Pickles has claimed the warm spot on your pad. Negotiations are ongoing.", { narr: true }),
+    ],
+    // He decides to come along.
+    follow: [
+      l("pic.f.heel", "excited", T, () => "Pickles gets up, shakes himself all over, and falls in at your heel.", { narr: true }),
+      l("pic.f.too", "happy", T, () => "Pickles decides that whatever you're doing today, he's doing it too.", { narr: true }),
+      l("pic.f.stick", "excited", T, () => "Pickles picks up his stick and trots after you, very serious about it.", { narr: true }),
+    ],
+    // He's had enough and goes home to his rock.
+    home: [
+      l("pic.o.enough", "sleepy", T, () => "Pickles has had enough adventure for one day. He trots off back towards his rock.", { narr: true }),
+      l("pic.o.gus", "happy", c => c.gusOut, () => "Somewhere off by the lot, Gus whistles. Pickles' ears go up, and off he trots.", { narr: true, w: 2 }),
+      l("pic.o.nap", "sleepy", T, () => "Pickles yawns enormously, looks at you apologetically, and heads home for a nap.", { narr: true }),
     ],
     pet: [
       l("pic.p.1", "happy", c => c.pets < 3, () => "He leans into your hand.", { narr: true }),
       l("pic.p.2", "happy", c => c.pets >= 3 && c.pets < 10, () => "He leans his whole weight against your leg and sighs.", { narr: true }),
-      l("pic.p.3", "excited", c => c.pets >= 10 && c.gusOut, () => "He follows you a few steps toward the trail before Gus whistles him back.", { narr: true }),
-      l("pic.p.4", "happy", c => c.pets >= 10 && !c.gusOut, () => "He follows you a few steps toward the trail, then thinks better of it and flops back down in the shade.", { narr: true }),
+      l("pic.p.3", "excited", c => c.pets >= 10 && c.gusOut && c.dog.n < 3, () => "He follows you a few steps toward the trail before Gus whistles him back.", { narr: true }),
+      l("pic.p.4", "happy", c => c.pets >= 10 && !c.gusOut && c.dog.n < 3, () => "He follows you a few steps toward the trail, then thinks better of it and flops back down in the shade.", { narr: true }),
+      l("pic.p.5", "happy", c => c.dog.n >= 2, () => "He presses his head into your hands and closes his eyes.", { narr: true, w: 2 }),
+      l("pic.p.6", "excited", c => c.yours, () => "He rolls onto his back, all four paws in the air, entirely yours.", { narr: true, w: 2 }),
     ],
     stick: [
       l("pic.k.1", "excited", T, () => "You throw the stick. Pickles watches it go, looks at you, and lies back down. It was a good throw, though.", { narr: true }),
       l("pic.k.2", "excited", T, () => "You throw the stick. Pickles bolts after it, brings back a completely different stick, and drops it at your feet, very pleased.", { narr: true }),
       l("pic.k.3", "happy", T, () => "Pickles brings the stick back and won't let go of it. This is apparently the game.", { narr: true }),
     ],
-    bye: [l("pic.b.nap", "sleepy", T, () => "You leave Pickles to his nap. He's asleep again before you've gone three steps.", { narr: true })],
+    bye: [l("pic.b.nap", "sleepy", c => !c.dogWith && c.dogMode !== "lot", () => "You leave Pickles to his nap. He's asleep again before you've gone three steps.", { narr: true }),
+      l("pic.b.car", "happy", c => c.dogMode === "lot", () => "Pickles watches you go, tail still going.", { narr: true }),
+      l("pic.b.with", "happy", c => c.dogWith, () => "Pickles flops down at your feet. He's not going anywhere.", { narr: true })],
     again: [l("pic.g.again", "happy", T, () => "Pickles' tail thumps. You again! Excellent.", { narr: true })],
   };
 
@@ -787,6 +833,11 @@
     const c = ctxFor(env, who), r = env.rng || Math.random, out = [];
     // A hello they haven't used on you lately (or a nod), then news you haven't heard
     // from them; never the same news twice in a fortnight. At least one beat.
+    if (c.key === "pickles") {            // where he is decides how he greets you (Stage 5)
+      const tp = c.firstMeeting && c.dogMode === "rock" ? "first" : c.dogMode === "lot" ? "lot" : c.dogWith ? "with" : "hello";
+      const b = choose(env, who, [tp], c, r, true) || choose(env, who, [tp], c, r);
+      return b ? [b] : [];
+    }
     const hi = c.firstMeeting ? choose(env, who, ["first"], c, r)
       : c.invited ? choose(env, who, ["invited"], c, r)
       : (c.gap >= 21 && choose(env, who, ["hello"].filter(() => true), { ...c }, r, true, ln => /\.gap$/.test(ln.id))) || choose(env, who, ["hello"], c, r, true) || choose(env, who, ["nod"], c, r, true);

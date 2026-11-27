@@ -30,7 +30,7 @@
 // (tick.with).
 (function (root) {
   "use strict";
-  const KINDS = { met: 1, chat: 2, climb: 3, sendWith: 3, beta: 1, proj: 0, pet: 1, lesson: 2, invite: 2,
+  const KINDS = { met: 1, chat: 2, climb: 3, sendWith: 3, beta: 1, proj: 0, pet: 1, lesson: 2, invite: 2, walk: 0,
     brush: 0, fa: 0, wet: 0, dyno: 0, hard: 0, quiet: 0 };
   // Each regular's own: what's worth more to them (added to KINDS), and how you'd notice.
   const LIKES = {
@@ -147,6 +147,26 @@
     const n = tierIndex(G, who);
     return { ...TIERS[n], n, bond: bond(G, who) };
   }
+  // ---- Pickles (Phase 4, Stage 5) -----------------------------------------------------------
+  // How he feels about you, from the days you've petted him (pet) and the days he's
+  // followed you round the park (walk). He gets to know you, then greets you at the lot,
+  // then follows you, and at the end of a day he's followed you, once he's ready, he
+  // decides you're his human (G.dog.adopted, the date: for good).
+  const DOG = { knows: 3, greets: 6, follows: 9, adopt: 14, walks: 3 };
+  const DOG_STAGES = [
+    { key: "new", words: "A friendly crag dog" },
+    { key: "knows", words: "Knows you" },
+    { key: "greets", words: "Greets you at the lot" },
+    { key: "follows", words: "Follows you around" },
+    { key: "yours", words: "Your dog" },
+  ];
+  function dog(G) {
+    const e = G && G.social && G.social.npc && G.social.npc["n:pickles"], k = (e && e.k) || {};
+    const pets = k.pet || 0, walks = k.walk || 0;
+    const adopted = G && G.dog && isDay(G.dog.adopted) ? G.dog.adopted : null;
+    const n = adopted ? 4 : pets >= DOG.follows ? 3 : pets >= DOG.greets ? 2 : pets >= DOG.knows ? 1 : 0;
+    return { ...DOG_STAGES[n], n, pets, walks, adopted, ready: !adopted && pets >= DOG.adopt && walks >= DOG.walks };
+  }
   // Record a moment and see whether the friendship deepened: returns the new tier
   // ({ key, words, n }) if it did, else null. A deepening is kept (up) until they've
   // mentioned it.
@@ -183,6 +203,6 @@
     const ks = Object.keys(s); if (ks.length > SAID) for (const k of ks.slice(0, ks.length - SAID)) delete s[k];
   }
 
-  const Social = { KINDS, LIKES, TIERS, MEMORY, ensure, seed, moment, befriend, heard, shared, bond, tier, remembers, saidOn, say };
+  const Social = { KINDS, LIKES, TIERS, MEMORY, DOG, DOG_STAGES, dog, ensure, seed, moment, befriend, heard, shared, bond, tier, remembers, saidOn, say };
   if (typeof module !== "undefined") module.exports = Social; else root.Social = Social;
 })(typeof window !== "undefined" ? window : globalThis);

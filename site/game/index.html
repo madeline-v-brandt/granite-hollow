@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=51">
+<link rel="stylesheet" href="scene.css?v=52">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -480,6 +480,13 @@ svg#map:active { cursor: grabbing; }
 .me { pointer-events: none; }
 .me-layer { position: absolute; left: 0; top: 0; overflow: hidden; pointer-events: none; will-change: transform; }
 .me-ghost { opacity: .4; }
+.dog-layer .dog-hit { fill: transparent; pointer-events: all; cursor: pointer; }   /* Pickles off his rock (Phase 4, Stage 5) */
+.dog-ink { fill: none; stroke: #34322e; stroke-width: 1.3px; stroke-linejoin: round; } .dog-fur { fill: #9c9a94; }
+.dog-layer .dog-sleep * { vector-effect: non-scaling-stroke; } .dog-layer .dog-sleep .dog-tail-ink { stroke-width: 1px; }
+.dog-layer .dog-ear { fill: #6a6862; } .dog-layer .dog-patch { fill: #e8e6e0; } .dog-eye { fill: #2b2622; }
+.dog-leg-ink { fill: none; stroke: #34322e; stroke-width: 2.6px; stroke-linecap: round; } .dog-leg { fill: none; stroke: #9c9a94; stroke-width: 1.3px; stroke-linecap: round; }
+.dog-tail-ink { fill: none; stroke: #34322e; stroke-width: 2.4px; stroke-linecap: round; } .dog-tail { fill: none; stroke: #9c9a94; stroke-width: 1.1px; stroke-linecap: round; }
+.dog-layer .dog-line { fill: none; stroke: #34322e; stroke-width: .8px; stroke-linecap: round; }
 .people .person { cursor: pointer; }
 /* a name over the head of someone you've met, on hover or after a tap (Phase 4, Stage 1) */
 .people .person-tag-g { display: none; }
@@ -729,6 +736,7 @@ svg#map:active { cursor: grabbing; }
 .why .chips { gap: 4px; margin-top: 4px; }
 .why .chip { font-size: 12.5px; padding: 1px 6px; }
 .why.knowers { font-style: italic; }
+.adopt-face svg { width: 104px; height: 104px; display: block; margin: 2px auto 10px; border-radius: 16px; }   /* Pickles adopts you (Phase 4, Stage 5) */
 .your-people { list-style: none; padding: 0; margin: 6px 0 14px; display: grid; gap: 10px; }   /* your people (Phase 4, Stage 4) */
 .your-people li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: center; }
 .pp-face svg { width: 48px; height: 48px; display: block; border-radius: 9px; }
@@ -1117,16 +1125,16 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=51"></script>
-<script src="art.js?v=51"></script>
-<script src="world.js?v=51"></script>
-<script src="knowledge.js?v=51"></script>
-<script src="social.js?v=51"></script>
-<script src="portraits.js?v=51"></script>
-<script src="talk.js?v=51"></script>
-<script src="illustrate.js?v=51"></script>
-<script src="paint.js?v=51"></script>
-<script src="paper.js?v=51"></script>
-<script src="travel.js?v=51"></script>
-<script src="scene.js?v=51"></script>
-<script src="game.js?v=51"></script>
+<script src="mechanics.js?v=52"></script>
+<script src="art.js?v=52"></script>
+<script src="world.js?v=52"></script>
+<script src="knowledge.js?v=52"></script>
+<script src="social.js?v=52"></script>
+<script src="portraits.js?v=52"></script>
+<script src="talk.js?v=52"></script>
+<script src="illustrate.js?v=52"></script>
+<script src="paint.js?v=52"></script>
+<script src="paper.js?v=52"></script>
+<script src="travel.js?v=52"></script>
+<script src="scene.js?v=52"></script>
+<script src="game.js?v=52"></script>

@@ -133,3 +133,16 @@ body.climbing { overflow: hidden; }
   .sc-tags { display: none; } .sc-me .sc-sub + .sc-sub { display: none; }
   .sc-bar { grid-template-columns: 38px 1fr; } .sc-bar .n { display: none; }
 }
+
+/* Pickles, curled up beside your pad (Phase 4, Stage 5). Outline first, fur over it, so he's one piece. */
+.sc-dog-ink { fill: none; stroke: #34322e; stroke-width: .09; stroke-linejoin: round; }
+.sc-dog-fur { fill: #9c9a94; }
+.sc-dog-ear { fill: #6a6862; } .sc-dog-patch { fill: #e8e6e0; } .sc-dog-nose { fill: #2b2622; }
+.sc-dog-line { fill: none; stroke: #34322e; stroke-width: .045; stroke-linecap: round; }
+.sc-dog-tail { fill: none; stroke: #34322e; stroke-width: .07; stroke-linecap: round; transform-box: fill-box; transform-origin: 100% 0; }
+.sc-dog-shadow { fill: #1e222c; opacity: .2; }
+.sc-dog.cheer .sc-dog-curl { animation: sc-dog-up .5s ease-out 2 alternate; transform-box: fill-box; }
+.sc-dog.cheer .sc-dog-tail { animation: sc-dog-wag .18s ease-in-out 12 alternate; }
+@keyframes sc-dog-wag { from { transform: rotate(-25deg); } to { transform: rotate(25deg); } }
+@keyframes sc-dog-up { to { translate: 0 -.25px; } }
+@media (prefers-reduced-motion: reduce) { .sc-dog.cheer .sc-dog-curl, .sc-dog.cheer .sc-dog-tail { animation: none; } }

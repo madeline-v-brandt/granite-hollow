@@ -185,6 +185,21 @@ test("friendship: deepening, a long gap, your level, a hard first ascent, memori
   }
   g.social = JSON.parse(save0); delete g.lvlOn;
 });
+test("Pickles: his greeting depends on where he is; the regulars notice once he's yours", () => {
+  const { g, K } = saves[2];
+  const keep = JSON.stringify(g.social), keepDog = g.dog;
+  for (const [mode, topic] of [["rock", "hello"], ["lot", "lot"], ["follow", "with"], ["with", "with"]]) {
+    const o = Talk.opening({ ...env(g, K), dogMode: mode }, "n:pickles");
+    assert(o.length === 1 && o[0].narr && Talk.LINES.pickles[topic].some(l => l.id === o[0].id), `${mode}: ${o.map(b => b.id)}`);
+    for (const t of ["follow", "home", "pet", "stick", "bye"]) { const r = Talk.reply({ ...env(g, K), dogMode: mode }, "n:pickles", t); assert(r.length === 1 && r[0].t, `${mode} ${t}`); }
+  }
+  g.dog = { adopted: g.date };
+  for (const w of World.REG) {
+    const xs = Talk.everyLine({ ...env(g, K), dogMode: "with" }, w).filter(x => /\.h\.(dog|yours)$/.test(x.id));
+    assert(xs.length >= 1 && xs.every(x => x.t && !(x.t.includes("Rowan") && Talk.GENDERED.test(x.t))), `${w} notices Pickles`);   // (Pickles is "he")
+  }
+  g.social = JSON.parse(keep); g.dog = keepDog;
+});
 test("Hollis only says “never made a first ascent” when that's true", () => {
   for (const { g, K } of saves) {
     const has = Object.values(g.world.est).some(e => e.by === "n:hollis");
