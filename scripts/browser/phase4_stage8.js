@@ -80,7 +80,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   g = await startOn(g, "2025-10-31");
   check("…and the day before, a reminder", /Tomorrow: The Granite Hollow Bouldering Comp/.test(opening(g)) && !/put up a poster/.test(opening(g)), opening(g).slice(-140));
   g = await startOn(g, day);
-  if (g.day.minute < 575) { await click(p, "#act-rest"); await sleep(500); g = await saved(); }     // the Bishop comes mid-morning
+  if (g.day.minute < 575) { g.day.minute = 580; await write(g); await closeAll(); g = await saved(); }     // the Bishop comes mid-morning (9:30)
   const people = await p.evaluate(() => [...document.querySelectorAll("g.person")].map(x => x.dataset.who));
   check("comp day: everyone's out, Pickles is yours", g.date === day && World.CLIMBING_REGULARS.every(w => people.includes(w)) && people.includes("n:bishop") && g.dog && g.dog.adopted, `${g.date} ${g.day.minute} ${people.join(",")} dog ${JSON.stringify(g.dog)}`);
   // Rowan, as a partner.
@@ -95,13 +95,29 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   await p.evaluate(() => { window.__long = []; try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__long.push(Math.round(e.duration)); }).observe({ entryTypes: ["longtask"] }); } catch (e) {} document.body.focus(); });
   await p.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "no-preference" }]); await sleep(200);
   await p.evaluate(() => { window.__ft = []; let last = performance.now(); const f = n => { window.__ft.push(n - last); last = n; if (window.__ft.length < 500) requestAnimationFrame(f); }; requestAnimationFrame(f); });
-  for (const k of ["d", "s", "a", "w"]) { await p.keyboard.down(k); await sleep(1300); await p.keyboard.up(k); }
-  await sleep(600);
+  // Your partner walks with you, in a layer of their own (after Phase 4), not standing at a boulder.
+  const layers = () => p.evaluate(() => { const at = s => { const e = document.querySelector(s); if (!e || e.getAttribute("display") === "none") return null; const r = e.getBoundingClientRect(); return [r.x, r.y]; };
+    return { me: at(".me-layer:not(.dog-layer):not(.pal-layer):not(.me-ghost)"), pal: at(".pal-layer"), standing: !!document.querySelector("g.person[data-who='n:rowan']") }; });
+  const apart = L => (L.me && L.pal ? Math.round(Math.hypot(L.me[0] - L.pal[0], L.me[1] - L.pal[1])) : 999);
+  const L0 = await layers();
+  check("your partner walks with you, drawn beside you rather than standing at a boulder", L0.pal && !L0.standing && apart(L0) < 60, JSON.stringify(L0));
+  const mids = [];
+  for (const k of ["d", "s", "a", "w"]) { await p.keyboard.down(k); await sleep(1300); mids.push(await layers()); await p.keyboard.up(k); }
+  await sleep(1500);
+  const L1 = await layers();
+  check("…keeps up while you walk", mids.every(L => apart(L) < 90) && mids.some(L => L.pal && L0.pal && Math.hypot(L.pal[0] - L0.pal[0], L.pal[1] - L0.pal[1]) > 20), mids.map(apart).join(", "));
+  check("…and stands beside you when you stop", apart(L1) < 45, `${apart(L1)} px`);
   const ft = await p.evaluate(() => window.__ft.slice(5)), fps = 1000 / (ft.reduce((a, c) => a + c, 0) / ft.length), slow = ft.filter(x => x > 25).length / ft.length;
   const walkLong = await p.evaluate(() => window.__long.splice(0));
   console.log(`  walking on comp day: ${fps.toFixed(1)} fps, ${(100 * slow).toFixed(1)}% slow frames; long tasks: ${walkLong.join(", ") || "none"}`);
   check("walking on comp day stays smooth (50+ fps in headless Chrome)", fps >= 50, `${fps.toFixed(1)} fps`);
   await p.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
+  // Clicking your partner talks to them, right there.
+  await p.evaluate(() => { const h = document.querySelector(".pal-layer .pal-hit"); if (h) h.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+  for (let k = 0; k < 20 && !(await box()); k++) await sleep(150);
+  const palTalk = await p.evaluate(() => (document.querySelector(".talk") || {}).getAttribute ? document.querySelector(".talk").getAttribute("aria-label") : "");
+  check("…and clicking them talks to them, right where you are", /Rowan/.test(palTalk || ""), palTalk);
+  await p.keyboard.press("Escape"); await sleep(200);
   // Talking to three people in a row: no long freezes opening the box or drawing portraits.
   const talkMs = [];
   for (const w of ["n:gus", "n:bea", "n:bishop"]) {

@@ -62,9 +62,10 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   g.loc = { sector: "The Tailgate", boulder: here }; g.pos = null; g.player.energy = 45; g.day.climb = null; g.day.encounter = null;
   await write(g); await sleep(400);
   g = await saved();
-  const onMap = await p.evaluate(w => !!document.querySelector(`g.person[data-who='${w}']`), met);
-  const near = await p.evaluate(w => { const a = document.querySelector(`g.person[data-who='${w}']`); return a ? a.getAttribute("transform") : null; }, met);
-  check("they come along on the map, to the boulder you're at", onMap, `${near}`);
+  // They walk with you (after Phase 4): drawn beside you in a layer of their own, not standing at a boulder.
+  const near = await p.evaluate(w => { const at = s => { const e = document.querySelector(s); if (!e || e.getAttribute("display") === "none") return null; const r = e.getBoundingClientRect(); return [r.x, r.y]; };
+    const me = at(".me-layer:not(.dog-layer):not(.pal-layer):not(.me-ghost)"), pal = at(".pal-layer"); return { standing: !!document.querySelector(`g.person[data-who='${w}']`), apart: me && pal ? Math.round(Math.hypot(me[0] - pal[0], me[1] - pal[1])) : null }; }, met);
+  check("they come along on the map, beside you", !near.standing && near.apart != null && near.apart < 60, JSON.stringify(near));
   const opened = await click(p, "[data-try]:not([disabled])"); await sleep(400);
   check("opened the climbing scene", opened);
   const pal = await p.evaluate(() => document.querySelectorAll(".sc-pal-fig *").length);

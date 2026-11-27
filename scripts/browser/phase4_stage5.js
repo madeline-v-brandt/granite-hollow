@@ -23,7 +23,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   const box = () => p.evaluate(() => { const t = document.querySelector("#talk-root:not([hidden]) .talk"); if (!t) return null;
     return { text: t.querySelector(".talk-say").innerText, choices: [...t.querySelectorAll(".talk-choice")].map(x => x.innerText.replace(/^\d\s*/, "").trim()) }; });
   const dogLayer = () => p.evaluate(() => { const l = document.querySelector(".dog-layer"); if (!l || l.getAttribute("display") === "none") return null; const r = l.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height * .76 }; });
-  const meAt = () => p.evaluate(() => { const r = document.querySelector(".me-layer:not(.dog-layer):not(.me-ghost)").getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height * .74 }; });
+  const meAt = () => p.evaluate(() => { const r = document.querySelector(".me-layer:not(.dog-layer):not(.pal-layer):not(.me-ghost)").getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height * .74 }; });
   const atRock = () => p.evaluate(() => !!document.querySelector("g.person[data-who='n:pickles']"));
   const outToday = () => p.evaluate(() => { const li = [...document.querySelectorAll("#tabbody li")].find(x => /Pickles/.test(x.innerText)); return li ? li.innerText.replace(/\s+/g, " ") : ""; });
   const said = g => Object.keys(((g.social || {}).npc || {})["n:pickles"]?.said || {});

@@ -1440,8 +1440,13 @@
       wTail.attr("transform", `rotate(${f2(wag)} -6.6 -10)`); sTail.attr("transform", `rotate(${f2(wag * .6)} -4.6 -1.4)`);
       walk.attr("transform", m ? `translate(0,${f2(-Math.abs(Math.cos(ph * 2.2)) * .5)})` : null);
     }
+    let dogBehind = null;
     function placeDog() {
       if (!dogWorld || !dogSt) return;
+      // Behind you (further from the viewer): under you, so he never sits on your head;
+      // otherwise above you and the copies of what's in front of you (after Phase 4).
+      const behind = dogWorld[1] > meWorld[1] + .2;
+      if (behind !== dogBehind) { dogBehind = behind; wrap.insertBefore(dogSvg.node(), behind ? meSvg.node() : ghostSvg.node().nextSibling); }
       dogSvg.node().style.transform = `translate3d(${f1(T.applyX(dogWorld[0]) - pad + slide[0] - DOG_FOOT[0])}px,${f1(T.applyY(-dogWorld[1]) - pad + slide[1] - DOG_FOOT[1])}px,0)`;
       const sc = meScale() * .95; if (sc !== dogK) { dogK = sc; dogG.attr("transform", `scale(${f2(sc)})`); }
     }
@@ -1451,6 +1456,42 @@
       if (!dogSt) dogSvg.attr("display", null);
       dogSt = st; dogWorld = st.pos;
       poseDog(); placeDog();
+    }
+    // ---- Your climbing partner (after Phase 4): they walk along with you rather than waiting
+    // at your boulder. Drawn like you (drawSide/drawFacing, in their own colours) in a small
+    // SVG of their own over the map, like Pickles, so walking never repaints the park.
+    // setPal({ who, look, pos, facing: "l" | "r" | "u" | "d", moving, phase, padDown }) or setPal(null).
+    // Under you when they're further from the viewer than you are, over you when nearer; under
+    // the copies of what's in front of you either way, so a boulder you walk behind hides them too.
+    const palSvg = d3.select(wrap).insert("svg", () => meSvg.node().nextSibling).attr("class", "me-layer pal-layer").attr("aria-hidden", "true").attr("display", "none")
+      .attr("width", ME_BOX[0]).attr("height", ME_BOX[1]).attr("viewBox", `${-ME_FOOT[0]} ${-ME_FOOT[1]} ${ME_BOX[0]} ${ME_BOX[1]}`);
+    const palG = palSvg.append("g").attr("class", "pal");
+    let palSt = null, palParts = null, palWho = null, palK = null, palBehind = null;
+    function drawPal(st) {
+      palG.selectAll("*").remove(); palWho = st.who;
+      const fig = palG.append("g").attr("class", "me-fig");
+      fig.append("ellipse").attr("class", "me-shadow").attr("cx", 0).attr("cy", 0).attr("rx", 7.5).attr("ry", 2.3);
+      const body = fig.append("g").attr("class", "me-body");
+      const o = { skin: "#e6bf98", hair: "#4a3426", pants: "#3f4f63", pad: "#2f6b8f", ...st.look };
+      palParts = { body, side: drawSide(body.append("g"), o), front: drawFacing(body.append("g"), o, true), back: drawFacing(body.append("g"), o, false) };
+      // Click them to talk; hover for their card (as for anyone on the map).
+      palG.append("ellipse").attr("class", "pal-hit").attr("cx", 0).attr("cy", -14).attr("rx", 8).attr("ry", 16)
+        .on("click", ev => { ev.stopPropagation(); if (opts.onPal) opts.onPal(palWho); })
+        .on("pointermove", ev => { if (ev.pointerType !== "touch") personTip(ev, palWho); })
+        .on("pointerleave", () => { if (tip) tip.hidden = true; });
+    }
+    function placePal() {
+      if (!palSt) return;
+      const behind = palSt.pos[1] > meWorld[1];
+      if (behind !== palBehind) { palBehind = behind; wrap.insertBefore(palSvg.node(), behind ? meSvg.node() : occSvg.node()); }
+      palSvg.node().style.transform = `translate3d(${f1(T.applyX(palSt.pos[0]) - pad + slide[0] - ME_FOOT[0])}px,${f1(T.applyY(-palSt.pos[1]) - pad + slide[1] - ME_FOOT[1])}px,0)`;
+      const sc = meScale(); if (sc !== palK) { palK = sc; palG.attr("transform", `scale(${f2(sc)})`); }
+    }
+    function setPal(st) {
+      if (!st) { if (palSt) { palSt = null; palSvg.attr("display", "none"); } return; }
+      if (st.who !== palWho || !palParts) drawPal(st);
+      if (!palSt) palSvg.attr("display", null);
+      palSt = st; poseFig(palParts, st); placePal();
     }
     // What stands in front of you (Stage 6): copies of the nearby boulders and
     // trees between you and the viewer, drawn over you in this small layer, and a
@@ -1563,8 +1604,13 @@
     // body bobs; the pad comes off at a boulder.
     function poseMe() {
       if (!meParts) return;
-      const { body, side, front, back } = meParts, m = mePose.moving, f = mePose.facing;
-      const s = m ? Math.sin(mePose.phase * 1.35) : 0, sw = s * 3, bob = m ? -Math.abs(Math.cos(mePose.phase * 1.35)) * .9 : 0;
+      poseFig(meParts, mePose);
+      meG.classed("moving", mePose.moving);
+    }
+    // A walking figure's pose (you, or your partner): { moving, facing: l r u d, phase, padDown }.
+    function poseFig(parts, ps) {
+      const { body, side, front, back } = parts, m = ps.moving, f = ps.facing;
+      const s = m ? Math.sin(ps.phase * 1.35) : 0, sw = s * 3, bob = m ? -Math.abs(Math.cos(mePose.phase * 1.35)) * .9 : 0;
       const view = f === "u" || f === "up" ? back : f === "d" || f === "down" ? front : side;
       for (const v of [side, front, back]) v.g.attr("display", v === view ? null : "none");
       body.attr("transform", `translate(0,${f2(bob)})`);
@@ -1589,8 +1635,7 @@
           view.arms[i].attr("d", `M${f2(sd * 4.6)},-19.6L${f2(sd * (5.7 + Math.abs(s) * .3))},${f2(-13.4 + (i ? s : -s) * 1.4)}`);
         });
       }
-      view.padG.attr("display", mePose.padDown && !m ? "none" : null);
-      meG.classed("moving", m);
+      view.padG.attr("display", ps.padDown && !m ? "none" : null);
     }
     const hereB = S.boulders.find(bo => bo.b.name === state.here);
     let meWorld = hereB ? [hereB.b.x - hereB.form.R * .55, hereB.b.y - hereB.form.R * 1.45] : [0, 0];
@@ -1762,6 +1807,7 @@
       const tr = `translate3d(${f1(T.applyX(meWorld[0]) - pad + slide[0] - ME_FOOT[0])}px,${f1(T.applyY(-meWorld[1]) - pad + slide[1] - ME_FOOT[1])}px,0)`;
       meSvg.node().style.transform = tr; if (occKey && occKey !== "|") ghostSvg.node().style.transform = tr;
       if (dogSt) placeDog();
+      if (palSt) placePal();
       const sc = meScale(); if (sc !== meK) { meK = sc; meG.attr("transform", `scale(${f2(sc)})`); }
       placeOccluders();
     };
@@ -2116,7 +2162,8 @@
     draw();
     return { setDate, setTime, flyTo, setMarks, setMe, setKnown, setOldTrails, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
       zoomBy: f => { commitSlide(); svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f); },
-      setFollow, following: () => follow, setOutfit, setPeople, setDog, dogShown: () => !!dogSt, personAt: who => personAt.get(who) || null, toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],
+      setFollow, following: () => follow, setOutfit, setPeople, setDog, setPal, dogShown: () => !!dogSt,
+      personAt: who => personAt.get(who) || (palSt && palSt.who === who ? { x: palSt.pos[0], y: palSt.pos[1], side: palSt.facing === "l" ? -1 : 1 } : null), toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],
       tilesPending: () => pending.size + (building ? 1 : 0) };
   }
 

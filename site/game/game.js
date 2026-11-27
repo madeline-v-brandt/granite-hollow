@@ -1967,6 +1967,14 @@
         if (G.pos && Math.hypot(G.pos[0] - p[0], G.pos[1] - p[1]) < 5) { if (meetNearby(G.pos)) { save(); renderAll(); } return; }
         goToPoint([p[0] + 2.5, p[1] - .8]);
       },
+      // Your partner, walking with you: a click talks to them right there (like anyone close by).
+      onPal: who => {
+        if (G.day.over || climbing() || (G.day.encounter && G.day.encounter.who === who)) return;
+        UI.talkTo = who;
+        const at = P.personAt(who); if (!at) return;
+        if (G.pos && Math.hypot(G.pos[0] - at.x, G.pos[1] - at.y) < 7) { if (meetNearby(G.pos)) { save(); renderAll(); } return; }
+        goToPoint([at.x + 1.6, at.y - .5]);
+      },
       onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
         const mins0 = minutesTo({ sector: b.sector, boulder: b.id }, true);
@@ -2306,20 +2314,21 @@
       if (key !== knownKey) { knownKey = key; P.setKnown(view); }
       const ok = G.day.no + "|" + G.day.weather.temp;
       if (ok !== outfitKey) { outfitKey = ok; P.setOutfit(outfitFor()); }
-      // Your partner comes along: at the boulder you're at (or the last one you were at).
+      // Your partner walks along with you (after Phase 4: they used to wait at your boulder),
+      // drawn in a layer of their own (syncPal), so they're not one of the standing figures.
       const pal = partnerNow();
-      const palB = pal ? (G.loc.boulder != null ? G.loc.boulder : G.day.partner.b) : null;
+      if (pal && !PL.pos) { const at = P.personAt(pal); if (at) PL.pos = [at.x, at.y]; }      // from where they were standing
       // Who's around at this hour (they come and go: Phase 4, Stage 1), with a name tag
       // over anyone you've met.
       const now = G.day.over ? [] : peopleNow(), dog = v2() && !G.day.over && dogMode() === "rock";
-      const pk = [G.date, ...now.map(x => x.who + (isKnown(x.who) ? "+" : "")), dog, dog && isKnown("n:pickles"), pal, palB].join("|");
+      const pk = [G.date, ...now.map(x => x.who + (isKnown(x.who) ? "+" : "")), dog, dog && isKnown("n:pickles"), pal].join("|");
       if (pk !== peopleKey) {
         peopleKey = pk;
-        const list = now.map(x => ({ ...x, ...(x.who === pal && palB != null ? { b: palB, side: 1 } : {}), name: isKnown(x.who) ? x.name : "Someone you haven't met", tag: isKnown(x.who) ? firstName(x.who) : null }));
+        const list = now.filter(x => x.who !== pal).map(x => ({ ...x, name: isKnown(x.who) ? x.name : "Someone you haven't met", tag: isKnown(x.who) ? firstName(x.who) : null }));
         P.setPeople([...list, ...(dog ? [{ who: "n:pickles", name: isKnown("n:pickles") ? "Pickles" : "A dog", dog: true, tag: isKnown("n:pickles") ? "Pickles" : null }] : [])]);
       }
       if (!walk && !keys.size) P.setMe(G.pos, pose(false));
-      syncDog();
+      syncDog(); syncPal();
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
       P.setMarks({
         here: G.loc.boulder ?? null, sector: G.loc.sector ?? null, tip: tipBoulders,
@@ -2365,7 +2374,7 @@
         // Behind you along the way you came, or beside you when you've stopped.
         const tr = DG.trail, lastPt = tr[tr.length - 1];
         if (!lastPt || Math.hypot(me[0] - lastPt[0], me[1] - lastPt[1]) > .5) { tr.push(me.slice()); if (tr.length > 80) tr.shift(); }
-        let need = 2.8, tgt = null;
+        let need = PL.pos ? 5 : 2.8, tgt = null;                                   // further back when your partner's walking with you
         for (let i = tr.length - 1, prev = me; i >= 0; i--) { const q = tr[i], d = Math.hypot(prev[0] - q[0], prev[1] - q[1]); if (d >= need) { const u = need / d; tgt = [prev[0] + (q[0] - prev[0]) * u, prev[1] + (q[1] - prev[1]) * u]; break; } need -= d; prev = q; }
         target = tgt || [me[0] - 2.2, me[1] - .6];
         if (!solid(target)) {} else target = [me[0] - 2.2, me[1] - .6];
@@ -2387,6 +2396,49 @@
       }
       P.setDog({ pos: DG.pos, pose, phase: DG.phase, facing: DG.facing, wag, t: now });
       DG.raf = requestAnimationFrame(dogFrame);
+    }
+    // ---- Your partner, walking with you (after Phase 4) ----
+    // Behind you along the way you came while you walk; when you stop, they step up beside
+    // you (on the other side from Pickles) and turn to face you, pad off at a boulder.
+    // Only their own small layer changes (P.setPal), and only when something has.
+    const PL = { pos: null, trail: [], phase: 0, facing: "r", raf: 0, last: 0, who: null, key: "" };
+    function syncPal() {
+      const w = !G.day.over && !climbing() ? partnerNow() : null;
+      if (!w) { if (PL.raf) cancelAnimationFrame(PL.raf); PL.raf = 0; PL.pos = null; PL.who = null; PL.trail = []; PL.key = ""; P.setPal(null); return; }
+      if (PL.who !== w) { PL.who = w; PL.trail = []; PL.key = ""; if (!PL.pos) PL.pos = G.pos ? [G.pos[0] + 3, G.pos[1] + .4] : LOT.slice(); }
+      if (!PL.raf) { PL.last = performance.now(); PL.raf = requestAnimationFrame(palFrame); }
+    }
+    function palFrame(now) {
+      PL.raf = 0;
+      if (!PL.who || PL.who !== partnerNow() || G.day.over) return syncPal();
+      const dt = Math.min(.1, (now - PL.last) / 1000); PL.last = now;
+      const me = G.pos || LOT, tr = PL.trail, lastPt = tr[tr.length - 1];
+      if (!lastPt || Math.hypot(me[0] - lastPt[0], me[1] - lastPt[1]) > .5) { tr.push(me.slice()); if (tr.length > 80) tr.shift(); }
+      const youWalk = !!walk || keys.size > 0;
+      let target = null;
+      if (youWalk) {
+        // A couple of metres behind you, along the way you came.
+        let need = 2.8;
+        for (let i = tr.length - 1, prev = me; i >= 0; i--) { const q = tr[i], d = Math.hypot(prev[0] - q[0], prev[1] - q[1]); if (d >= need) { const u = need / d; target = [prev[0] + (q[0] - prev[0]) * u, prev[1] + (q[1] - prev[1]) * u]; break; } need -= d; prev = q; }
+      }
+      if (!target) {
+        // Beside you: the right (Pickles sits on your left), or the left, wherever there's room.
+        target = [[me[0] + 3, me[1] + .4], [me[0] - 3, me[1] + .8], [me[0] + 1, me[1] + 2.6]].find(q => !solid(q)) || PL.pos;
+      }
+      const dx = target[0] - PL.pos[0], dy = target[1] - PL.pos[1], dist = Math.hypot(dx, dy);
+      let moving = false;
+      if (dist > 45 || reduceMotion) PL.pos = target.slice();                       // a long trip (you faded there): they're there too
+      else if (dist > .12) {
+        const v = Math.max(3.5, dist * 4), step = Math.min(dist, v * dt);
+        PL.pos = [PL.pos[0] + dx / dist * step, PL.pos[1] + dy / dist * step];
+        PL.phase += step * 1.6; moving = step / Math.max(dt, 1e-3) > .5;
+        if (moving) PL.facing = Math.abs(dx) >= Math.abs(dy) * .8 ? (dx > 0 ? "r" : "l") : dy > 0 ? "u" : "d";
+      }
+      if (!moving) PL.facing = me[0] >= PL.pos[0] ? "r" : "l";                       // stopped: turned towards you
+      const padDown = !moving && G.loc.boulder != null && !youWalk;
+      const key = [PL.pos[0].toFixed(2), PL.pos[1].toFixed(2), PL.facing, moving, padDown].join("|");
+      if (key !== PL.key) { PL.key = key; P.setPal({ who: PL.who, look: LOOKS[PL.who.slice(2)] || {}, pos: PL.pos, facing: PL.facing, moving, phase: PL.phase, padDown }); }
+      PL.raf = requestAnimationFrame(palFrame);
     }
     const findPerson = who => {
       if (who === "n:pickles") { const d = dogLive() || (dogSpot() && [dogSpot().x, dogSpot().y]); if (!d) return; UI.talkTo = who; lookAtMe(400); goToPoint([d[0] + 3, d[1] - 1]); return; }
