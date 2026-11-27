@@ -41,7 +41,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   // You've met everyone but Dez; you know The Tailgate, The Schoolhouse and Hawkwatch only.
   const regs = Object.keys(g.world.reg);
   g.know.met = g.know.met || {};
-  for (const w of [...regs, "n:pickles"]) if (w !== "n:dez") g.know.met[w] = { n: 2, first: "2025-09-10", last: "2025-09-12" };
+  for (const w of [...regs, "n:pickles", "n:bishop"]) if (w !== "n:dez") g.know.met[w] = { n: 2, first: "2025-09-10", last: "2025-09-12" };
   delete g.know.met["n:dez"];
   g.day.minute = Math.max(...Object.values(g.world.reg).map(R => (R.recent.find(s => s.d === g.date) || { t: [0] }).t[0])) + 10;
   g.day.minute = Math.min(g.day.minute, g.day.weather.dusk - 90);
@@ -57,7 +57,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   const before = await shownTags();
   // Stand by someone you know, so they're on screen.
   {
-    const near = metOut.map(x => [x.who, (g.world.reg[x.who].recent.find(r => r.d === g.date) || {}).b]).find(([, b]) => b != null);
+    const near = metOut.filter(x => g.world.reg[x.who]).map(x => [x.who, (g.world.reg[x.who].recent.find(r => r.d === g.date) || {}).b]).find(([, b]) => b != null);
     if (near) { const bo = D.boulders[near[1]]; const g2 = await saved(); g2.pos = [bo.x, bo.y - 9]; g2.loc = { sector: bo.sector, boulder: null }; await write(g2); }
   }
   // Someone on screen (inside the map, not under its legend).

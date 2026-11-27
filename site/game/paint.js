@@ -1968,10 +1968,13 @@
       const d = g.append("g").attr("class", "person-fig").append("g").attr("transform", "scale(11)");
       nameTag(g, p.tag, -11);
       d.append("path").attr("class", "dog-shadow").attr("d", ell(.1, .05, .8, .24));
-      d.append("path").attr("class", "dog").attr("d", "M-.7,0C-.75,-.35 -.4,-.55 0,-.55C.42,-.55 .7,-.4 .72,-.15C.74,0 .55,.05 .4,.05H-.5C-.62,.05 -.7,.03 -.7,0Z");
-      d.append("path").attr("class", "dog").attr("d", "M.45,-.12C.45,-.38 .62,-.48 .82,-.45C1,-.42 1.05,-.25 1,-.1C.95,0 .6,.02 .45,-.12Z");
-      d.append("path").attr("class", "dog-ear").attr("d", "M.62,-.45L.7,-.62L.8,-.44Z");
+      // Curled up asleep: body and head in one outline, the head resting on his front paws.
+      d.append("path").attr("class", "dog").attr("d", "M-.7,0C-.75,-.35 -.4,-.55 0,-.55C.26,-.55 .42,-.51 .52,-.44C.61,-.5 .72,-.51 .83,-.48C.99,-.43 1.05,-.28 1.01,-.13C.98,-.02 .87,.04 .72,.04H-.5C-.62,.05 -.7,.03 -.7,0Z");
+      d.append("path").attr("class", "dog-line").attr("d", "M.53,-.43C.47,-.32 .47,-.15 .56,-.03");
+      d.append("path").attr("class", "dog-ear").attr("d", "M.6,-.47L.68,-.64L.79,-.48Z");
       d.append("path").attr("class", "dog-patch").attr("d", ell(-.2, -.3, .22, .14));
+      d.append("path").attr("class", "dog-line").attr("d", "M.76,-.3Q.81,-.27 .86,-.3");
+      d.append("path").attr("class", "dog-nose").attr("d", ell(1.0, -.24, .04, .035));
       d.append("path").attr("class", "dog-tail").attr("d", "M-.68,-.05C-.85,-.1 -.9,.02 -.75,.08");
       d.append("text").attr("class", "zzz").attr("x", .95).attr("y", -.75).attr("font-size", ".42px").text("z");
       d.append("text").attr("class", "zzz").attr("x", 1.2).attr("y", -1.05).attr("font-size", ".32px").text("z");

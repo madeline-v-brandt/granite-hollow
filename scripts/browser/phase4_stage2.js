@@ -75,7 +75,10 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   check("Esc leaves the conversation", !(await box()));
   // Walking away ends it.
   await walkTo(who); await p.evaluate(() => document.body.focus());
-  await p.keyboard.down("s"); await sleep(2200); await p.keyboard.up("s"); await sleep(500);
+  for (const key of ["s", "a", "d", "w"]) {                // (a boulder can be in the way: try another direction)
+    await p.keyboard.down(key); await sleep(2200); await p.keyboard.up(key); await sleep(500);
+    if (!(await saved()).day.encounter) break;
+  }
   g = await saved();
   check("walking away ends the conversation", !(await box()) && !g.day.encounter, `encounter ${g.day.encounter ? "still open" : "closed"}`);
   // Leaks: nothing in any of it names an area or boulder you haven't found.

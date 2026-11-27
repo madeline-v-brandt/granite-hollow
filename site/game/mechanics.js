@@ -75,6 +75,15 @@
     vibeFriend: 0.03,                 // a friend's first ascent in the last couple of days
     vibesMax: 0.25,
     partnerLearn: 0.5,                // with someone watching from the ground, a fall teaches this much more
+    // ---- other people's beta (Phase 4, Stage 3): one tip per person per line, closing this
+    // share of what you don't yet know of one move, by how well they know the line
+    betaSent: 0.5,                    // they've climbed it
+    betaProj: 0.25,                   // they're working it (only the moves they've reached)
+    betaStyle: 0.15,                  // it's their style (only a move in that style)
+    betaHint: 0.2,                    // a stranger's hint, on the crux
+    betaTier: { met: 0.8, know: 1, friends: 1.2, good: 1.4 },   // friends tell you more, someone you've just met less
+    betaBody: 0.5,                    // their way relies on a reach you don't have (or a squeeze you can't fit)
+    bodyGap: 8,                       // cm of reach between you before that matters
   };
   const BETA_MAX = BAL.betaMax;
   const sigmoid = x => 1 / (1 + Math.exp(-x));
@@ -397,7 +406,7 @@
     const a = altFor(player, p);
     if (a && !ps.alt && fallAt === a.at && mk[fallAt] >= BAL.altAt && rng() < BAL.altOnFall) { ps.alt = true; alt = true; }
     ps.mk = mk.map(r2);
-    if (fallAt >= 0) ps.seen = Math.max(ps.seen || 0, fallAt + 1);
+    if (fallAt >= 0) { ps.seen = Math.max(ps.seen || 0, fallAt + 1); const fx = fallsOf(p, ps); fx[fallAt]++; ps.fx = fx; }
     ps.beta = betaFrom(p, ps);
     return { alt };
   }
@@ -434,20 +443,71 @@
     ps.beta = betaFrom(p, ps);
     return true;
   }
-  // A local's beta: the better way through if there is one for you, otherwise a
-  // good look at the crux you know least. Returns "alt" or "crux".
-  function tip(player, p, ps) {
+  // Falls on each move (Phase 4, Stage 3; optional, so older saves start from none).
+  function fallsOf(p, ps) {
+    const n = sequence(p).n;
+    return Array.isArray(ps.fx) && ps.fx.length === n && ps.fx.every(v => Number.isInteger(v) && v >= 0) ? ps.fx.map(v => Math.min(v, 999)) : Array(n).fill(0);
+  }
+  // The move you're stuck on: the one you keep falling on and know least. With no
+  // falls yet, the crux you know least.
+  function stuckScore(p, ps, i) {
+    const s = sequence(p), mk = knowledge(p, ps), fx = fallsOf(p, ps);
+    return ((fx[i] || 0) + (s.moves[i].kind === "crux" ? 1 : 0.1)) * (1 - clamp(mk[i], 0, 1));
+  }
+  // The moves someone can tell you about. from = { knows: "sent" | "proj" | "style" | "hint",
+  // upto (proj: how far up they've got, 0–1), likes (style: their styles) }.
+  function betaMoves(p, from) {
+    const s = sequence(p);
+    if (from.knows === "sent") return s.moves.map(m => m.i);
+    if (from.knows === "proj") { const k = Math.max(1, Math.ceil(clamp(from.upto || 0, 0, 1) * s.n)); return s.moves.filter(m => m.i < k).map(m => m.i); }
+    if (from.knows === "style") return s.moves.filter(m => m.style && (from.likes || []).includes(m.style) && m.kind !== "start").map(m => m.i);
+    return s.cruxes.length ? s.cruxes.slice() : [Math.floor(s.n / 2)];
+  }
+  // Can they use the better way through? A technique (a heel hook) anyone can; an
+  // intermediate only shorter people use, skipping a hold only taller ones, though a
+  // friend will have watched people your size do it.
+  const reachOf = b => (b.height || 170) + (b.ape || 0);
+  function altKnown(p, from) {
+    const a = sequence(p).alt;
+    if (!a || !["sent", "proj"].includes(from.knows) || !betaMoves(p, from).includes(a.at)) return false;
+    if (!a.body || from.reach == null || ["friends", "good"].includes(from.tier)) return true;
+    return a.body === "short" ? from.reach <= 176 : from.reach >= 176;
+  }
+  // Beta from someone else, for this climber on this line: the better way through if
+  // they know it and you can use it; otherwise a good look at the move you're stuck
+  // on, out of the ones they know. Their way can rely on their body: a long reach on
+  // someone much taller than you (or a tight squeeze on someone much shorter) is worth
+  // less to you. Changes ps; returns { what: "alt" | "move" | "none", at, gain, body:
+  // "taller" | "shorter" | null, kind, style, hold }. Several people's beta can't
+  // pass what's possible: each closes a share of the gap, and beta is capped.
+  function giveBeta(player, p, ps, from = { knows: "sent" }) {
     const s = sequence(p), mk = knowledge(p, ps), a = altFor(player, p);
-    let what = "crux";
-    if (a && !ps.alt) { ps.alt = true; what = "alt"; }
-    else {
-      const c = s.cruxes.length ? s.cruxes.reduce((x, y) => (mk[y] < mk[x] ? y : x)) : 0;
-      mk[c] += 0.5 * (1 - mk[c]);
-      ps.seen = Math.max(ps.seen || 0, c + 1);
+    const out = { what: "none", at: -1, gain: 0, body: null, kind: null, style: null, hold: null };
+    if (a && !ps.alt && altKnown(p, from)) {
+      ps.alt = true; Object.assign(out, { what: "alt", at: a.at, kind: s.moves[a.at].kind, style: s.moves[a.at].style, hold: s.moves[a.at].hold });
+      if (a.body && from.reach != null) out.body = from.reach > reachOf(player) + BAL.bodyGap ? "taller" : from.reach < reachOf(player) - BAL.bodyGap ? "shorter" : null;
+    } else {
+      const moves = betaMoves(p, from).filter(i => mk[i] < 0.98);
+      if (!moves.length) return out;
+      const at = moves.reduce((x, y) => (stuckScore(p, ps, y) > stuckScore(p, ps, x) + 1e-9 ? y : x));
+      const m = s.moves[at], d = from.reach != null ? from.reach - reachOf(player) : 0;
+      const body = m.reach === "long" && d > BAL.bodyGap ? "taller" : m.reach === "tight" && d < -BAL.bodyGap ? "shorter" : null;
+      const base = { sent: BAL.betaSent, proj: BAL.betaProj, style: BAL.betaStyle, hint: BAL.betaHint }[from.knows] || BAL.betaHint;
+      const f = Math.min(0.75, base * (BAL.betaTier[from.tier] || 1) * (body ? BAL.betaBody : 1));
+      const before = mk[at];
+      mk[at] += f * (1 - mk[at]);
+      Object.assign(out, { what: "move", at, gain: r2(mk[at] - before), body, kind: m.kind, style: m.style, hold: m.hold });
     }
     ps.mk = mk.map(r2);
+    ps.seen = Math.max(ps.seen || 0, out.at + 1);
     ps.beta = betaFrom(p, ps);
-    return what;
+    return out;
+  }
+  // Phase 3's local tip, kept for anything that still asks for it: someone who's
+  // climbed it. Returns "alt" or "crux".
+  function tip(player, p, ps) {
+    const r = giveBeta(player, p, ps, { knows: "sent" });
+    return r.what === "alt" ? "alt" : "crux";
   }
 
   // Good vibes (Stage 4), from what's going on: { partner, rowan (your partner is
@@ -606,7 +666,7 @@
 
   const Mech = { PREF, BAL, levelInfo, levelOf, levelCost, proofCap, proofLeft, ability, baseXp, relFactor, styleBonus, morph, reachDependence,
     frictionSensitivity, breakdown, margin, sendChance, chanceOf, feel, canSpot, attemptCost, restGain, sendXp, skillGains, applySkills,
-    convertSkills, replay, topsOf, sequence, altFor, knowledge, betaFrom, seenOf, fallMove, learnBurn, workMove, workCost, fade, tip, previewRest, previewWork, attempt, weather, forecastDay, realize, rainChance, rainStart, dayEnds, hm, startOfDay, describeCond, atLeast,
+    convertSkills, replay, topsOf, sequence, altFor, knowledge, betaFrom, seenOf, fallMove, learnBurn, workMove, workCost, fade, tip, giveBeta, betaMoves, altKnown, fallsOf, stuckScore, previewRest, previewWork, attempt, weather, forecastDay, realize, rainChance, rainStart, dayEnds, hm, startOfDay, describeCond, atLeast,
     shadeOf, warmth, condAt, tapeFeel, AREA_SHADE, vibes,
     tagsOf, BETA_MAX, clamp };
   if (typeof module !== "undefined") module.exports = Mech; else root.Mech = Mech;

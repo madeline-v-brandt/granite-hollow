@@ -59,6 +59,9 @@ function season(seed, days, name = "Sam") {
     const t = g.ticks[g.ticks.length - 1]; if (t) Social.moment(g, w, "sendWith", World.addDays(g.date, -3), t.p);
     for (let k = 1; k < 30; k++) Social.moment(g, w, "chat", World.addDays(g.date, -k));
   }
+  // Beta they gave you on a line you've since sent (Stage 3: "told you so").
+  const t = g.ticks[g.ticks.length - 1];
+  if (t && World.daysBetween(t.date, g.date) <= 10) { g.ps[t.p].sentOn = t.date; g.ps[t.p].tips = Object.fromEntries(World.REG.map(w => [w, [World.addDays(t.date, -2), 1, "move"]])); }
   return { g, K };
 }
 const saves = [season("talk-a", 12), season("talk-b", 70), season("talk-c", 220), season("talk-d", 40, "you")];
@@ -131,6 +134,30 @@ test("replies: what they're working on, your project, a story, goodbye", () => {
     if (c.yourProj) assert(Talk.reply(env(g, K), w, "tell").length === 1, `${w} tell`);
   }
   for (const t of ["pet", "stick", "bye"]) assert(Talk.reply(env(saves[1].g, saves[1].K), "n:pickles", t).length === 1, `Pickles ${t}`);
+});
+test("beta, pointers and recommendations: every kind renders in every voice, with no gendered pronouns", () => {
+  const { g, K } = saves[2];
+  const p = Object.keys(g.ps).map(Number).find(i => !g.ps[i].sent) ?? 0;
+  const combos = [];
+  for (const what of ["alt", "move"]) for (const knows of ["sent", "proj", "style"]) for (const body of [null, "taller", "shorter"]) for (const falls of [0, 5])
+    combos.push({ p, r: { what, at: 3, kind: "crux", style: "crimpy", hold: "crimp", body }, from: { knows, fa: knows === "sent" }, altKind: "heel", falls });
+  let n = 0;
+  for (const w of World.REG) {
+    for (const beta of combos) {
+      const xs = Talk.everyLine({ ...env(g, K), beta }, w).filter(x => x.topic === "beta");
+      assert(xs.length >= 1, `${w} has nothing for ${JSON.stringify(beta.r)} ${beta.from.knows}`);
+      for (const x of xs) { n++; assert(x.t && x.t.length < 330, `${x.id}: ${x.t}`); assert(!Talk.GENDERED.test(x.t), `${x.id}: "${x.t}"`); }
+    }
+    for (const point of [null, { who: "n:dez", person: "Dez", where: "Dez's out today, at somewhere at Millrace Caves" }, { who: "n:rowan", person: "Rowan", where: null }]) {
+      const xs = Talk.everyLine({ ...env(g, K), point }, w).filter(x => x.topic === "nobeta");
+      assert(xs.length >= 1, `${w} nobeta`);
+      for (const x of xs) { assert(x.t, x.id); assert(!Talk.GENDERED.test(x.t), `${x.id}: "${x.t}"`); }
+    }
+    const est = Object.keys(g.world.est).map(Number).find(i => K.line(i) === "est");
+    const rs = Talk.everyLine({ ...env(g, K), rec: est }, w).filter(x => x.topic === "rec");
+    assert(rs.length >= 1 && rs.every(x => x.t && !Talk.GENDERED.test(x.t)), `${w} rec`);
+  }
+  assert(n > 200, `${n} beta lines`);
 });
 test("Hollis only says “never made a first ascent” when that's true", () => {
   for (const { g, K } of saves) {

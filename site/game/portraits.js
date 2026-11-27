@@ -186,8 +186,9 @@
     const tongue = mood === "happy" || mood === "excited" ? P("M56,77 C56,86 64,86 64,77 Z", "#d77a82", `stroke-width="1.1"`) : "";
     const zz = mood === "sleepy" ? `<text x="84" y="34" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="${INK}">z</text><text x="93" y="24" font-family="Caveat, cursive" font-size="12" font-weight="700" fill="${INK}">z</text>` : "";
     return `<rect x="1" y="1" width="118" height="118" rx="12" fill="#f6ecd4"/><circle cx="60" cy="56" r="47" fill="#dfe0cf" fill-opacity=".85"/>`
-      + P("M22,121 C24,100 38,90 60,90 C82,90 96,100 98,121 Z", fur) + P("M44,95 C50,104 70,104 76,95 L72,112 C66,116 54,116 48,112 Z", pale)
-      + `<path d="M47,93 Q60,99 73,93" fill="none" stroke="#b5462e" stroke-width="3.4" stroke-linecap="round"/><circle cx="60" cy="100" r="2.6" fill="#e3c76a" stroke="${INK}" stroke-width="1"/>`
+      // Shoulders and a neck that rises up behind his head, so he's all in one piece whichever way he tilts it.
+      + P("M22,121 C24,104 34,95 45,91 C44,82 49,72 60,72 C71,72 76,82 75,91 C86,95 96,104 98,121 Z", fur) + P("M45,98 C51,106 69,106 75,98 L72,113 C66,117 54,117 48,113 Z", pale)
+      + `<path d="M45,90 Q60,98 75,90" fill="none" stroke="#b5462e" stroke-width="3.4" stroke-linecap="round"/><circle cx="60" cy="96.6" r="2.6" fill="#e3c76a" stroke="${INK}" stroke-width="1"/>`
       + `<g transform="rotate(${tilt} 60 60)">${ears}`
       + P("M38,56 C36,34 50,28 60,28 C70,28 84,34 82,56 C82,72 74,84 60,84 C46,84 38,72 38,56 Z", fur)
       + P("M48,48 C44,40 49,33 56,34 C55,40 53,45 48,48 Z", pale, `stroke-width="1"`)

@@ -452,6 +452,25 @@
     return null;
   }
 
+  // What a regular knows of a line, for beta (Phase 4, Stage 3), from their record:
+  //   { knows: "sent", fa }          they've climbed it (fa: it's their first ascent)
+  //   { knows: "proj", upto, n, left } they're working it, or worked it and moved on (upto: how far up)
+  //   { knows: "style", likes }      they haven't been on it, but it's their kind of climbing
+  //   null                           they can't help
+  // Their body comes along (reach, cm). Only the regulars who climb; never the Bishop or Pickles.
+  function knowsLine(D, G, w, p, d) {
+    const W = G.world, key = w && w.slice(2), n = NAMED[key], pr = D.problems[p];
+    if (!W || !W.est || !n || !REG.includes(w) || !W.npc[w] || !pr) return null;
+    const e = W.est[p], R = W.reg && W.reg[w], body = { reach: n.h || 170 };
+    if ((e && e.date <= d && (e.by === w || e.logs.some(l => l[0] === w))) || (R && R.sent.includes(+p) && e)) return { knows: "sent", fa: !!(e && e.by === w), ...body };
+    if (R && R.proj && R.proj.p === +p) return { knows: "proj", upto: Math.max(0.3, R.proj.best), n: R.proj.n, ...body };
+    const left = R && R.done.find(x => x[0] === +p && x[4] === "left");
+    if (left) return { knows: "proj", upto: 0.6, n: left[3], left: true, ...body };
+    const likes = n.likes.split("|"), tags = String(pr.tags || "").split("|");
+    if (levelOn(w, d) >= pr.grade - 1 && tags.some(t => likes.includes(t))) return { knows: "style", likes, ...body };
+    return null;
+  }
+
   function stepDay(D, G, d, ctx) {
     const W = G.world, P = PARAMS, r = stream(W.seed, "day|" + d), dd = dataOf(D), sd = seedOf(D, W.seed);
     const events = [];
@@ -765,7 +784,7 @@
   }
 
   const World = { REOPENED, BEFORE, PARAMS, NAMED, CLIMBING_REGULARS, NOTEBOOK, LEGENDS, AREAS, KIOSK_AREAS, REG, ROUTINES, GROWTH, RP,
-    ensureReg, regOf, sessionOn, levelOn, validateReg,
+    ensureReg, regOf, sessionOn, levelOn, validateReg, knowsLine,
     create, initialKnow, step, recordSend, migrate, validate, check, cleanName, isMine, nameFa, faCount, isWho, whoInfo, whoName,
     faText, legendOf, devRevealAll, devEstablish, seedFrom, newSeed, stream, addDays, daysBetween, notebook: D => dataOf(D).notebook };
   if (typeof module !== "undefined") module.exports = World; else root.World = World;

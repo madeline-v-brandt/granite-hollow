@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=47">
+<link rel="stylesheet" href="scene.css?v=49">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -285,6 +285,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .side { min-width: 0; height: clamp(480px, calc(100vh - 150px), 920px); display: flex; flex-direction: column;
   background: var(--panel) var(--grain); border: 1px solid var(--rule-ink); border-radius: 12px; overflow: hidden;
   box-shadow: 0 10px 24px -16px rgba(70, 52, 20, .4); }
+/* On a desktop the whole game fits the window: the header, then the map and the notebook
+   filling what's left (the notebook scrolls inside). Only a very short window scrolls. */
+@media (min-width: 1001px) {
+  body { padding-block: 14px; margin-block: 0; }
+  #game:not([hidden]) { display: flex; flex-direction: column; height: calc(100vh - 28px); height: calc(100dvh - 28px); min-height: 520px; }
+  #game > .hud { flex: none; }
+  #game > .layout { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  #game .map-wrap, #game .side { height: auto; min-height: 0; }
+}
 @media (max-width: 1000px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
   .map-wrap { height: clamp(360px, 56vh, 580px); }
@@ -574,7 +583,7 @@ svg#map:active { cursor: grabbing; }
 .notice, .kiosk-roof { stroke: #4a3218; stroke-width: .4px; vector-effect: non-scaling-stroke; } .kiosk-roof { fill: #7a3a28; }
 .bin { stroke: #2a2420; stroke-width: .5px; vector-effect: non-scaling-stroke; } .bin.bin0 { fill: #3f6a4a; } .bin.bin1 { fill: #6a5a4a; } .bin-lid { fill: #2f2a26; }
 .raccoon { fill: #7d7872; stroke: #2a2420; stroke-width: .4px; vector-effect: non-scaling-stroke; } .raccoon-mask { fill: #1e1c1a; }
-.dog { fill: #9c9a94; stroke: #34322e; stroke-width: .5px; vector-effect: non-scaling-stroke; } .dog-ear { fill: #6a6862; } .dog-patch { fill: #e8e6e0; } .dog-shadow { fill: #1e222c; opacity: .22; }
+.dog { fill: #9c9a94; stroke: #34322e; stroke-width: .5px; vector-effect: non-scaling-stroke; } .dog-ear { fill: #6a6862; } .dog-patch { fill: #e8e6e0; } .dog-shadow { fill: #1e222c; opacity: .22; } .dog-line { fill: none; stroke: #34322e; stroke-width: .4px; stroke-linecap: round; vector-effect: non-scaling-stroke; } .dog-nose { fill: #34322e; }
 .zzz { font: 700 .55px var(--hand); fill: #4a3a28; }
 .picnic-top, .picnic-bench { fill: #a8743f; stroke: #3d2a16; stroke-width: .5px; vector-effect: non-scaling-stroke; } .picnic-leg { fill: none; stroke: #5a3e22; stroke-width: .14; } .picnic-cloth { fill: #d4553a; opacity: .85; }
 .bell { fill: #b0873a; stroke: #4a3418; stroke-width: .5px; vector-effect: non-scaling-stroke; } .bell-lip { fill: #8a6628; }
@@ -706,6 +715,9 @@ svg#map:active { cursor: grabbing; }
 .mv.k3 { background: var(--project); }
 .mv.crux { border-radius: 1.5px; transform: rotate(45deg) scale(.92); margin: 0 1px; }
 .mv.alt { border-color: var(--gold); }
+.mv.told { position: relative; }
+.mv.told::after { content: ""; position: absolute; top: -5px; left: 50%; width: 3.5px; height: 3.5px; margin-left: -1.75px; border-radius: 50%; background: var(--gold); }   /* someone gave you beta on this move (Phase 4, Stage 3) */
+.mv.crux.told::after { top: -4px; left: -4px; margin-left: 0; }
 .mv.unseen { border: 1.5px dashed var(--muted); opacity: .55; }
 .mv.hi { box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 3px var(--ink-2); }
 .feel { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 66px; }
@@ -716,6 +728,7 @@ svg#map:active { cursor: grabbing; }
 .why { margin: 8px 0 2px 48px; font-size: 13px; color: var(--ink-2); }
 .why .chips { gap: 4px; margin-top: 4px; }
 .why .chip { font-size: 12.5px; padding: 1px 6px; }
+.why.knowers { font-style: italic; }
 .rowlist { list-style: none; margin: 0; padding: 0; }
 .rowlist li { border-bottom: 1px solid var(--rule); }
 .rowbtn {
@@ -1095,16 +1108,16 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=47"></script>
-<script src="art.js?v=47"></script>
-<script src="world.js?v=47"></script>
-<script src="knowledge.js?v=47"></script>
-<script src="social.js?v=47"></script>
-<script src="portraits.js?v=47"></script>
-<script src="talk.js?v=47"></script>
-<script src="illustrate.js?v=47"></script>
-<script src="paint.js?v=47"></script>
-<script src="paper.js?v=47"></script>
-<script src="travel.js?v=47"></script>
-<script src="scene.js?v=47"></script>
-<script src="game.js?v=47"></script>
+<script src="mechanics.js?v=49"></script>
+<script src="art.js?v=49"></script>
+<script src="world.js?v=49"></script>
+<script src="knowledge.js?v=49"></script>
+<script src="social.js?v=49"></script>
+<script src="portraits.js?v=49"></script>
+<script src="talk.js?v=49"></script>
+<script src="illustrate.js?v=49"></script>
+<script src="paint.js?v=49"></script>
+<script src="paper.js?v=49"></script>
+<script src="travel.js?v=49"></script>
+<script src="scene.js?v=49"></script>
+<script src="game.js?v=49"></script>

@@ -79,17 +79,6 @@
     if (m.kind === "start") return p.sit ? "You couldn't even get off the ground from the sit start." : `You slipped off ${an(m.hold)} on the first move.`;
     return [`You came off ${an(m.hold)} on the way up.`, `A foot slipped on an easy move to ${an(m.hold)}.`, `You fumbled the ${m.hold} and dropped.`][k % 3];
   }
-  const BETA_TIP = {
-    crimpy: "Thumb-catch the crimp and drive with your feet.", slopey: "Keep your hips tight to the wall on the sloper.",
-    pinchy: "Squeeze the pinch with your thumb pad, not the tip.", juggy: "Climb it fast and shake out on the big jug.",
-    compression: "Toe hook the right side so you can squeeze.", dyno: "Pre-load low and look at the hold, not your feet.",
-    technical: "There's a tiny smear left of the arête. Trust it.", powerful: "Bump your left hand instead of doing the big lock-off.",
-    mantle: "Turn your hand around and press. Don't pull.", slab: "Stand up straight and weight your feet.",
-    overhang: "Heel hook out right and the move goes static.", roof: "There's a kneebar under the lip.",
-    traverse: "There's a no-hands rest on the ledge halfway.", highball: "The top-out is easier than it looks. Commit.",
-    eliminate: "Ignore the arête. The sequence goes left.", reachy: "There's an intermediate pebble for shorter people.",
-    bunchy: "Start with your feet higher than feels right.",
-  };
   const LEVEL_LINES = [
     "", "The holds are starting to make sense.", "You've stopped over-gripping the jugs.",
     "Most people who try bouldering never get here.", "You're reading sequences before you pull on.",
@@ -879,7 +868,7 @@
     let line = pick(greet);
     if (w.cond >= 0.3) line += " Friction's amazing today."; else if (w.cond <= -0.3) line += " Pretty greasy out here though.";
     const { rec, recLine } = recommend("c" + ci, sector, D.liked[ci], h, { tell: false });
-    return { ci, who: "c" + ci, sector, line, rec, recLine, beta: betaFor(sector), accepted: false, betaTaken: false, open: true, idx: 0, used: [], beats: [{ t: line, mood: "happy" }] };
+    return { ci, who: "c" + ci, sector, line, rec, recLine, beta: betaFor(sector, "c" + ci), accepted: false, betaTaken: false, open: true, idx: 0, used: [], beats: [{ t: line, mood: "happy" }] };
   }
   // A recommendation: something they liked that suits you (or the best fit here).
   function recommend(who, sector, liked, h, opts = {}) {
@@ -898,15 +887,93 @@
     }
     return { rec, recLine };
   }
-  // Beta for a project you're working in this sector.
-  function betaFor(sector) {
-    const projects = D.sectorProblems.get(sector).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && !G.ps[i].tipped);
+  // A stranger's hint for a project you're working in this sector (Phase 4, Stage 3: a
+  // hint, on the crux; once per person per line). The words come when you ask.
+  function betaFor(sector, who) {
+    const projects = D.sectorProblems.get(sector).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 3 && !(G.ps[i].tips && G.ps[i].tips[who]));
     if (!projects.length || Math.random() >= 0.7) return null;
-    const pi = projects.sort((a, b) => G.ps[b].att - G.ps[a].att)[0], p = D.problems[pi];
-    const a = Mech.altFor(G.player, p);
-    if (a && !G.ps[pi].alt) return { p: pi, text: `Saw you working ${pref(pi)}. ${ALT[a.kind].tip}` };
-    const worst = p.tagList.filter(t => BETA_TIP[t]).sort((a, b) => (G.player.skills[a] ?? Mech.morph(G.player, p)) - (G.player.skills[b] ?? Mech.morph(G.player, p)))[0];
-    return { p: pi, text: `Saw you working ${pref(pi)}. ${BETA_TIP[worst] || "Try it with more confidence on the first move."}` };
+    return { p: projects.sort((a, b) => G.ps[b].att - G.ps[a].att)[0] };
+  }
+
+  // ---- beta from people (Phase 4, Stage 3) ------------------------------------------------
+  // Everyone can tell you something once per line: what depends on how well they know it
+  // (climbed it, working it, or it's their style: World.knowsLine), how well they know you,
+  // and their body against yours (Mech.giveBeta). Kept in ps.tips { who: [date, move, what] }.
+  const upFirst = t => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+  const tipsOf = i => (G.ps[i] && G.ps[i].tips) || {};
+  const tippedBy = (i, w) => !!tipsOf(i)[w];
+  function fromOf(w, i) {
+    const k = v2() ? World.knowsLine(D, G, w, i, G.date) : null;
+    if (!k) return null;
+    const t = Social.tier(G, w);
+    return { ...k, tier: t && K.met(w) && K.met(w).n > 1 ? t.key : "met" };
+  }
+  // Take someone's beta: change what you know, and remember who told you.
+  function takeBetaFrom(w, i, from) {
+    const p = D.problems[i], st = pstate(i), r = Mech.giveBeta(G.player, p, st, from);
+    st.tips = { ...tipsOf(i), [w]: [G.date, r.at, r.what] }; st.tipped = true;
+    if (typeof w === "string" && w.startsWith("n:")) Social.moment(G, w, "beta", G.date, i);
+    const name = typeof w === "string" && w.startsWith("n:") ? firstName(w) : whoOf(+String(w).slice(1));
+    note(`${name} gave you beta for ${pref(i)}${r.at >= 0 ? `: ${Talk.moveWord(r)}` : ""}.`);
+    if (r.what === "alt") toast("Beta: a better way through", `${name} showed you a better way through the crux of ${pname(i)}.`, "info");
+    else if (r.what === "move") toast("Beta", `${name} told you about ${Talk.moveWord(r)} of ${pname(i)}.`, "info");
+    return r;
+  }
+  const betaHow = (i, r) => Talk.how(r, D.problems[i].seq.alt && D.problems[i].seq.alt.kind);
+  // Your lines worth asking about: tried lately and not sent, the one you've tried most first.
+  function yourLines() {
+    return Object.keys(G.ps).map(Number).filter(i => G.ps[i] && !G.ps[i].sent && G.ps[i].att >= 2 && K.visible(i)
+      && (G.ps[i].log || []).some(x => Array.isArray(x) && String(x[0]) >= addDays(G.date, -14))).sort((a, b) => G.ps[b].att - G.ps[a].att);
+  }
+  // What to ask a regular about (up to two): the lines of yours they can help with, then
+  // your main project even if they can't (they'll tell you who can).
+  function betaAsks(w) {
+    if (!World.REG.includes(w)) return [];
+    const lines = yourLines().filter(i => !tippedBy(i, w)), help = lines.filter(i => fromOf(w, i)), mine = currentProject();
+    const out = help.slice(0, 2);
+    if (out.length < 2 && mine != null && !tippedBy(mine, w) && !out.includes(mine)) out.push(mine);
+    return out;
+  }
+  // Someone else who could help: a regular you've met who's climbed it (or is on it),
+  // and where they are today if they're out (only places you know).
+  function pointFor(i, except) {
+    const out = peopleToday(), m = G.day.minute;
+    const cand = World.REG.filter(w => w !== except && K.met(w) && !tippedBy(i, w)).map(w => ({ w, k: World.knowsLine(D, G, w, i, G.date) }))
+      .filter(x => x.k && (x.k.knows === "sent" || x.k.knows === "proj"))
+      .map(x => ({ ...x, today: out.find(p => p.who === x.w) })).sort((a, b) => (b.k.knows === "sent") - (a.k.knows === "sent") || !!b.today - !!a.today);
+    const x = cand[0];
+    if (!x) return null;
+    let where = null;
+    if (x.today && m < x.today.to) { const wh = whereIs(x.today.b); where = m >= x.today.from ? `${firstName(x.w)}'s out today, ${wh.text}` : `${firstName(x.w)}'s around later today`; }
+    return { who: x.w, person: firstName(x.w), where, sent: x.k.knows === "sent" };
+  }
+  function askBeta(e, i) {
+    e.used = e.used || []; const key = "beta:" + i; if (!e.used.includes(key)) e.used.push(key);
+    const from = fromOf(e.who, i), env = talkEnv();
+    if (!from || tippedBy(i, e.who)) {
+      const pt = pointFor(i, e.who);
+      talkAdd(e, Talk.reply({ ...env, point: pt, beta: null }, e.who, "nobeta"));
+      if (pt) note(`${firstName(e.who)} says ${pt.person} ${pt.sent ? "has climbed" : "has been on"} ${pref(i)}.`);
+      return;
+    }
+    const falls = Mech.fallsOf(D.problems[i], pstate(i));
+    const r = takeBetaFrom(e.who, i, from);
+    const b = Talk.reply({ ...env, beta: { p: i, r, from, how: betaHow(i, r), falls: r.at >= 0 ? falls[r.at] : 0 } }, e.who, "beta");
+    talkAdd(e, b.length ? b : [{ t: betaHow(i, r), mood: "thoughtful" }]);
+  }
+  // The regulars you've met who know a line, for its panel: who's climbed it and who's on it.
+  function knowersHtml(i) {
+    if (!v2()) return "";
+    const bits = [];
+    for (const w of World.REG) {
+      if (!K.met(w)) continue;
+      const k = World.knowsLine(D, G, w, i, G.date), told = tippedBy(i, w);
+      if (!k || k.knows === "style") { if (told) bits.push(`${firstName(w)} gave you beta`); continue; }
+      bits.push(`${firstName(w)} ${k.knows === "sent" ? (k.fa ? "made the first ascent" : "has climbed it") : k.left ? "has tried it" : "is working on it"}${told ? " (and gave you beta)" : ""}`);
+    }
+    if (!bits.length) return "";
+    const ask = bits.some(b => !/gave you beta/.test(b)) && G.ps[i] && !G.ps[i].sent ? " Ask them about it when you see them." : "";
+    return `<div class="why knowers">${esc(bits.join(" · "))}.${esc(ask)}</div>`;
   }
 
   // ---- the regulars (Stage 5): people you get to know. Who's around, where,
@@ -1074,9 +1141,20 @@
       const b = D.problems[hidden].b;
       e.reveal = hidden;
       e.revealLine = key === "bishop" ? `“There's a line on ${D.boulders[b].name} nobody's done since me,” he says. “Ha.”` : key === "dez" ? `There's a line on ${D.boulders[b].name}. Hard. Nobody's touched it.` : `Have you seen the line on ${D.boulders[b].name}? It's easy to miss.`;
-    } else if (key !== "bishop") Object.assign(e, recommend(w, sector, null, n.h, { tell: false }));
-    if (key !== "bishop") e.beta = betaFor(sector);
+    } else if (key !== "bishop" && Math.random() < 0.45) {
+      // A recommendation (Stage 3: rarer, and only something they've climbed themselves lately).
+      const rec = theirRec(w);
+      if (rec != null) { e.rec = rec; const b = Talk.reply({ ...talkEnv(), rec }, w, "rec"); e.recLine = b.length ? b[0].t : `Try ${pname(rec)}.`; }
+    }
+    e.asks = key === "bishop" ? [] : betaAsks(w);
     return e;
+  }
+  // Something a regular's climbed lately that would suit you: their recent sends, best fit first.
+  function theirRec(w) {
+    const R = World.regOf(G, w); if (!R) return null;
+    const recent = new Set([...R.recent.slice(0, 10).flatMap(s => s.w.concat(s.out === "send" && s.p != null ? [s.p] : [])), ...R.done.filter(x => x[4] === "sent" && World.daysBetween(x[2], G.date) <= 45).map(x => x[0])]);
+    const ok = [...recent].filter(i => G.world.est[i] && !G.ps[i]?.sent && !G.tips.some(t => t.p === i) && playerFit(i) > -3).sort((a, b) => playerFit(b) - playerFit(a));
+    return ok.length ? ok[0] : null;
   }
   const whoOf = f => (typeof f === "number" ? (D.climbers[f] || ["someone"])[0] : World.whoName(D, f));
   function askWay() {
@@ -1170,20 +1248,15 @@
     toast(`${firstName(w)} heads off`, text || "“Thanks for the session!”", "info");
     note(`${firstName(w)} headed off.`);
   }
-  // Do they know the line well enough to call up beta? Their own first ascent, or a
-  // documented line comfortably within their grade.
-  function partnerKnows(w, i) {
-    const e = v2() && G.world.est[i], n = World.NAMED[w.slice(2)];
-    return !!e && (e.by === w || (n && (n.level || 0) >= D.problems[i].grade + 1));
-  }
+  // Your partner calls up beta once on a line they know (Phase 4, Stage 3: once per person per line).
   function partnerBeta(w, i) {
-    const p = D.problems[i], st = pstate(i);
-    if (st.tipped || !partnerKnows(w, i)) return "";
-    const what = Mech.tip(G.player, p, st); st.tipped = true;
-    Social.moment(G, w, "beta", G.date, i);
-    const tag = p.tagList.find(t => BETA_TIP[t]);
-    note(`Got beta for ${pref(i)} from ${firstName(w)}.`);
-    return ` ${firstName(w)} calls up from the pad: “${what === "alt" ? ALT[p.seq.alt.kind].tip : BETA_TIP[tag] || "Commit to the crux! You had it."}”`;
+    if (tippedBy(i, w)) return "";
+    const from = fromOf(w, i);
+    if (!from || from.knows === "style" && Math.random() < 0.5) return "";
+    const r = takeBetaFrom(w, i, from);
+    if (r.what === "none") return "";
+    const body = r.body ? ` I'm ${r.body} than you, so it might feel different.` : "";
+    return ` ${firstName(w)} calls up from the pad: “${upFirst(Talk.moveWord(r))}! ${betaHow(i, r)}${body}”`;
   }
   // The vibes right now (memoised: the problem lists ask for every line).
   let vibeMemo = { key: "", v: null };
@@ -1219,13 +1292,13 @@
     else if (vb.v >= 0.12) bits.push("Good vibes at the crag today.");
     return bits.join(" ");
   }
+  // A stranger's hint (regulars' beta is askBeta).
   function takeBeta() {
-    const e = G.day.encounter; if (!e || !e.beta) return;
-    const st = pstate(e.beta.p), what = Mech.tip(G.player, D.problems[e.beta.p], st); st.tipped = true; e.betaTaken = true;
-    if (typeof e.who === "string" && e.who.startsWith("n:")) Social.moment(G, e.who, "beta", G.date, e.beta.p);
-    note(`Got beta for ${pref(e.beta.p)} from ${whoOf(e.ci ?? e.who)}.`);
-    toast("Beta unlocked", what === "alt" ? `There's a better way through the crux of ${pname(e.beta.p)}.` : `You've a clearer picture of the crux of ${pname(e.beta.p)}.`, "info");
+    const e = G.day.encounter; if (!e || !e.beta || e.betaTaken) return "";
+    const w = e.ci != null ? "c" + e.ci : e.who, i = e.beta.p, [, h] = e.ci != null ? D.climbers[e.ci] || [] : [];
+    const r = takeBetaFrom(w, i, { knows: "hint", tier: "met", reach: h || null }); e.betaTaken = true;
     save(); renderAll();
+    return `Saw you working ${pref(i)}. ${upFirst(Talk.moveWord(r))}: ${betaHow(i, r)}`;
   }
 
   // ---- conversations (Phase 4, Stage 2): a box over the map, with a portrait ----------------
@@ -1254,6 +1327,7 @@
     if (n && key !== "bishop" && !used("ask")) out.push(["ask", "What are you working on?", "data-ask"]);
     if (n && key !== "bishop" && mine != null && !used("tell")) out.push(["tell", `I'm working on ${pname(mine)}`, "data-tell"]);
     if (canPartner(e) && !e.partnered) out.push(["together", "Climb together?", "data-together"]);
+    for (const i of e.asks || []) if (!used("beta:" + i)) out.push(["beta:" + i, `Any beta for ${pname(i)}?`, "data-beta"]);
     if (e.beta && !e.betaTaken) out.push(["beta", `Any tips for ${pname(e.beta.p)}?`, "data-beta"]);
     if (e.dir && !e.dirTaken) out.push(["dir", key === "bishop" ? "Ask where else is worth a look" : "Know any other good spots?", "data-dir"]);
     if (e.dir && e.dirTaken && !G.day.over) out.push(["go-sector", `Walk to ${e.dir}`, "data-go-sector"]);
@@ -1269,12 +1343,13 @@
     const e = G.day.encounter; if (!e) return;
     const env = talkEnv(), use = () => { e.used = e.used || []; if (!e.used.includes(k)) e.used.push(k); };
     const who = typeof e.who === "string" && e.who.startsWith("n:") ? whoOf(e.who).replace(/^the /, "The ") : whoOf(e.ci ?? e.who);
+    if (/^beta:\d+$/.test(k)) { const i = +k.slice(5); if ((e.asks || []).includes(i)) askBeta(e, i); save(); renderAll(); return; }
     switch (k) {
       case "next": if (e.idx < e.beats.length - 1) e.idx++; else if (e.closing) return closeTalk(); break;
       case "ask": use(); talkAdd(e, Talk.reply(env, e.who, "ask")); break;
       case "tell": { use(); const p = currentProject(); if (p != null) Social.moment(G, e.who, "proj", G.date, p); talkAdd(e, Talk.reply(env, e.who, "tell")); break; }
       case "together": climbTogether(); if (e.partnered) talkAdd(e, [{ t: e.partnered.replace(/^“|”$/g, ""), mood: "happy" }]); break;
-      case "beta": { const t = e.beta && e.beta.text; takeBeta(); if (t) talkAdd(e, [{ t, mood: "thoughtful" }]); break; }
+      case "beta": { const t = takeBeta(); if (t) talkAdd(e, [{ t, mood: "thoughtful" }]); break; }
       case "dir": { const line = e.dirLine; askWay(); talkAdd(e, [{ t: line, mood: "thoughtful", narr: e.who === "n:bishop" }, { t: `${e.who === "n:bishop" ? "He draws" : who + " draws"} you a little map to ${e.dir} on the back of a receipt.`, mood: "happy", narr: true }]); break; }
       case "reveal": { const line = e.revealLine; hearLine(); talkAdd(e, [{ t: line, mood: "thoughtful", narr: e.who === "n:bishop" }]); break; }
       case "rec": use(); if (e.rec != null) K.tell(e.rec, e.who, G.date); talkAdd(e, [{ t: e.recLine, mood: "happy" }]); break;
@@ -1293,6 +1368,12 @@
   }
   function closeTalk() { G.day.encounter = null; UI.talkKey = ""; save(); renderAll(); }
   const dogSpot = () => (M && M.paint && M.paint.scene.landmarks.find(l => l.kind === "dog")) || null;
+  // More than 16 m from who you're talking to (not a partner, who comes along).
+  function walkedAway(e) {
+    const n = typeof e.who === "string" && e.who.startsWith("n:"), key = n ? e.who.slice(2) : null;
+    const at = key === "pickles" ? dogSpot() : n && e.who !== partnerNow() && M && M.paint ? M.paint.personAt(e.who) : null;
+    return !!(at && G.pos && Math.hypot(G.pos[0] - at.x, G.pos[1] - at.y) > 16);
+  }
   function renderTalk() {
     const root = $("#talk-root"); if (!root) return;
     const e = G && G.day && G.day.encounter;
@@ -1301,8 +1382,7 @@
     if (!Array.isArray(e.beats) || !e.beats.length) { e.beats = [{ t: [e.line, e.recLine].filter(Boolean).join(" ") || "Hello!", mood: "neutral", narr: !!(e.say || e.pet) }]; e.idx = 0; e.used = e.used || []; }   // from before Stage 2
     // Walked away: the conversation's over.
     const n = typeof e.who === "string" && e.who.startsWith("n:"), key = n ? e.who.slice(2) : null;
-    const at = key === "pickles" ? dogSpot() : n && e.who !== partnerNow() && M && M.paint ? M.paint.personAt(e.who) : null;
-    if (at && G.pos && Math.hypot(G.pos[0] - at.x, G.pos[1] - at.y) > 16) { G.day.encounter = null; return hide(); }
+    if (walkedAway(e)) { G.day.encounter = null; return hide(); }
     const idx = Math.max(0, Math.min(e.idx || 0, e.beats.length - 1)), b = e.beats[idx], last = idx >= e.beats.length - 1;
     let name, sub;
     if (n) {
@@ -1542,6 +1622,7 @@
     // Where you are changed: arriving at a boulder or an area (walking past things on a trip is quiet).
     function moved_(quiet = false) {
       if (!quiet && meetNearby(G.pos)) { renderAll(); showPrompt(); }
+      else if (G.day.encounter && walkedAway(G.day.encounter)) { G.day.encounter = null; renderTalk(); save(); }   // walked off mid-conversation
       const now = locAt(G.pos, G.loc);
       if (sameLoc(now, G.loc)) return;
       const prev = { ...G.loc };
@@ -1557,11 +1638,9 @@
       if (G.day.over) return;
       const W = opts.tap ? Wm : Wk, path = plan(to, !!opts.tap);
       if (!path) { toast("No way through", "There's water in the way.", "info"); return; }
-      const w = G.day.weather, knownRain = G.day.rainWarned ? Mech.rainStart(w) : null;
-      if (path.minutes >= 1 && G.day.minute + path.minutes >= Math.min(w.dusk, knownRain ?? Infinity)) {
-        const raining = knownRain != null && knownRain < w.dusk;
-        toast(raining ? "Rain's coming" : "Not enough daylight", raining ? "It'll be raining before you get there." : "It'll be dark before you get there. Head home instead.", "info"); return;
-      }
+      // Only the dark stops a walk: rain stops the climbing, not the day.
+      const w = G.day.weather;
+      if (path.minutes >= 1 && G.day.minute + path.minutes >= w.dusk) { toast("Not enough daylight", "It'll be dark before you get there. Head home instead.", "info"); return; }
       stop();
       const M_ = path.metres, real = d3.sum(path.pts.slice(1), (q, i) => Math.hypot(q[0] - path.pts[i][0], q[1] - path.pts[i][1]) / (path.rates[i] === W.rate.trail ? SPEED.trail : SPEED.off));
       const lead = Math.min(45, M_ * .2), phases = [];
@@ -1971,7 +2050,7 @@
     const p = D.problems[i], parts = Mech.breakdown(G.player, p, G.ps[i], here(i));
     const label = {
       ability: `Your level`, style: `Your skill on ${p.tagList.filter(t => STYLE[t]).map(t => STYLE[t][0].toLowerCase()).join(", ") || "this style"}`,
-      morph: Mech.reachDependence(p) < 0 ? "Bunchy, vs your reach" : "Reachy, vs your reach", beta: "Beta you've worked out",
+      morph: Mech.reachDependence(p) < 0 ? "Bunchy, vs your reach" : "Reachy, vs your reach", beta: Object.keys(tipsOf(i)).length ? "Beta, yours and other people's" : "Beta you've worked out",
       conditions: knows("read") ? `Friction here now (${shadeWord(p.b).toLowerCase()})` : "Friction", brushed: "Freshly brushed", dirt: "Dirty holds",
       tape: "Tape (less feel)", vibes: "Good vibes", fatigue: "Tiredness", skin: "Thin skin", head: "Highball nerves", grade: `Grade V${p.grade}`,
     };
@@ -1996,7 +2075,9 @@
       const lvl = mk[j] >= 0.67 ? 3 : mk[j] >= 0.34 ? 2 : mk[j] > 0.05 ? 1 : 0;
       const what = m.kind === "crux" ? `the crux, ${an(m.hold)}` : m.kind === "top" ? "the top-out" : an(m.hold);
       const alt = st.alt && p.seq.alt && p.seq.alt.at === j ? ` You've found a better way: ${ALT[p.seq.alt.kind].see}` : "";
-      return `<i class="mv k${lvl}${m.kind === "crux" ? " crux" : ""}${j === hi ? " hi" : ""}${alt ? " alt" : ""}" title="${esc(`Move ${j + 1}: ${what}. You know it ${know(mk[j])}.${alt}`)}"></i>`;
+      const told = Object.entries(st.tips || {}).filter(([w, t]) => t[1] === j && w !== "?").map(([w]) => (w.startsWith("n:") ? firstName(w) : "a climber you met"));
+      const by = told.length ? ` Beta from ${[...new Set(told)].join(" and ")}.` : "";
+      return `<i class="mv k${lvl}${m.kind === "crux" ? " crux" : ""}${j === hi ? " hi" : ""}${alt ? " alt" : ""}${by ? " told" : ""}" title="${esc(`Move ${j + 1}: ${what}. You know it ${know(mk[j])}.${alt}${by}`)}"></i>`;
     }).join("");
     const cr = p.seq.cruxes.filter(j => j < seen);
     const label = `${p.moves} moves, ${seen} seen.${cr.length ? ` Crux at move ${cr.map(j => j + 1).join(" and ")}, known ${cr.map(j => know(mk[j])).join(" and ")}.` : ""}${st.alt ? " You've found a better way through." : ""}`;
@@ -2018,7 +2099,7 @@
         ${feelHtml(i)}
         ${st?.sent || easyFor(i) ? `<button type="button" class="btn small ${st?.sent ? "" : "primary"}" data-climb="${i}" ${disabled || (rainNow() ? "disabled" : "")} title="${rainNow() ? "Too wet to climb" : st?.sent ? "Climb it again" : "One burn, right here"}">${st?.sent ? "Repeat" : "Climb it"}</button>`
           : `<button type="button" class="btn small primary" data-try="${i}" ${disabled} title="Open the climbing scene">Try</button>`}
-      </div>${open ? whyHtml(i) + `<div class="why"><button type="button" class="linklike" data-cl="${i}">See it on CragLog</button></div>` : ""}</div>`;
+      </div>${open ? whyHtml(i) + knowersHtml(i) + `<div class="why"><button type="button" class="linklike" data-cl="${i}">See it on CragLog</button></div>` : ""}</div>`;
   }
   function hereHtml() {
     const d = G.day;
@@ -3346,6 +3427,17 @@
     if (g.day && g.day.partner != null && !(g.day.partner && CLIMB_WITH.includes(g.day.partner.who) && typeof g.day.partner.until === "number" && isFinite(g.day.partner.until))) g.day.partner = null;
     if (g.day && g.day.partner && g.day.partner.b != null && !(Number.isInteger(g.day.partner.b) && g.day.partner.b >= 0 && g.day.partner.b < D.boulders.length)) delete g.day.partner.b;
     for (const t of g.ticks || []) if (t && t.with != null && !CLIMB_WITH.includes(t.with)) delete t.with;
+    // Beta from people (Phase 4, Stage 3): { who: [date, move, "alt" | "move" | "none"] } per line;
+    // Phase 3's single tip (tipped) counts as one from someone unknown ("?"). Falls per move (fx).
+    for (const [k, st] of Object.entries(g.ps || {})) {
+      if (!st || typeof st !== "object") continue;
+      const n = D.problems[+k] ? Mech.sequence(D.problems[+k]).n : 0, tips = {};
+      if (st.tips && typeof st.tips === "object" && !Array.isArray(st.tips)) for (const [w, t] of Object.entries(st.tips).slice(0, 40))
+        if ((w === "?" || /^c\d{1,5}$/.test(w) || World.isWho(w)) && Array.isArray(t) && /^\d{4}-\d\d-\d\d$/.test(String(t[0])) && Number.isInteger(t[1]) && t[1] >= -1 && t[1] < n && ["alt", "move", "none"].includes(t[2])) tips[w] = [t[0], t[1], t[2]];
+      if (st.tipped && !Object.keys(tips).length) tips["?"] = [g.date || "2025-09-06", -1, "move"];
+      if (Object.keys(tips).length) { st.tips = tips; st.tipped = true; } else delete st.tips;
+      if (st.fx != null && !(Array.isArray(st.fx) && st.fx.length === n && st.fx.every(v => Number.isInteger(v) && v >= 0 && v < 1e5))) delete st.fx;
+    }
     const fix = name => (name == null || D.sectorBy.has(name) ? name : OLD_SECTOR_NAMES[name] || null);
     g.loc = g.loc || { sector: null, boulder: null };
     const b = Number.isInteger(g.loc.boulder) ? D.boulders[g.loc.boulder] : null;

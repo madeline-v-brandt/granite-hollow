@@ -12,6 +12,7 @@
 //   node scripts/balance_game.js --json out.json    also write the numbers
 //   node scripts/balance_game.js --noprep           climbers never brush or tape (Stage 3)
 //   node scripts/balance_game.js --novibes          no partners or good vibes (Stage 4)
+//   node scripts/balance_game.js --nobeta           nobody asks the regulars for beta (Phase 4, Stage 3)
 //
 // Playstyles: steady (climbs at their level), projector (works one hard line at a
 // time, resting between burns), mileage (lots of easier problems), explorer (finds
@@ -23,7 +24,10 @@
 // and tape up when their skin wears thin, once they'd have learned how. Since
 // Stage 4, a quarter of their days (after the first few) they climb with a partner
 // for a few hours, and good vibes come and go with the crowd, prime days and
-// their own recent breakthroughs.
+// their own recent breakthroughs. Since Phase 4, Stage 3, a keen climber asks every
+// regular who's out that day and knows a line they're working (they've climbed it, are
+// on it, or it's their style) for beta, once each per line, and a stranger now and then
+// gives a hint.
 const fs = require("fs");
 const path = require("path");
 const args = process.argv.slice(2);
@@ -43,6 +47,7 @@ const chanceOf = (pl, pr, st, w) => (Mech.chanceOf ? Mech.chanceOf(pl, pr, st, w
 const addSkills = (pl, gains) => { if (Mech.applySkills) Mech.applySkills(pl, gains); else for (const [t, g] of Object.entries(gains)) pl.skills[t] += g; };
 
 const N = +opt("n", 40), DAYS = +opt("days", 200), OPEN = !!opt("open", false), PREP = !opt("noprep", false), VIBES = !opt("novibes", false) && !!Mech.vibes;
+const BETA = !opt("nobeta", false) && !!Mech.giveBeta && !!World.knowsLine;
 const START = "2025-09-06", START_AREA = "The Tailgate", MAX_CAL = 700;
 const STYLE_NAMES = String(opt("style", "steady,projector,mileage,explorer")).split(",");
 const CHECKS = [15, 30, 55, 100, 180];
@@ -120,7 +125,7 @@ function play(styleName, seed, build) {
   K.visitArea(START_AREA);
   if (OPEN) for (const s of D.sectors) g.know.areas[s.name] = 2;
   const out = { style: styleName, build, levelDay: {}, checks: {}, attempts: [], sends: [], fa2025: null, faEnd: null, climbDays: 0, outOfLines: 0,
-    works: 0, workMin: 0, altsByWork: 0, falls: { crux: 0, other: 0 }, brushes: 0, tapes: 0 };
+    works: 0, workMin: 0, altsByWork: 0, falls: { crux: 0, other: 0 }, brushes: 0, tapes: 0, beta: 0, betaAlt: 0 };
   const daysOn = {};                    // problem -> set of climbing days it was tried
   const lastOn = {};                    // problem -> calendar day it was last tried (for fading)
   let rest = 0, climbDays = 0, project = null, projectSince = 0;
@@ -250,6 +255,23 @@ function play(styleName, seed, build) {
     if (S.areaEvery && climbDays % S.areaEvery === 0) {
       const nx = D.sectors.filter(s => K.area(s.name) < 1).sort((a, b) => a.walk_min - b.walk_min)[0];
       if (nx) g.know.areas[nx.name] = 1;
+    }
+    // Beta: for the lines you're working, ask the regulars out today who know them.
+    if (BETA) {
+      const lines = Object.keys(g.ps).map(Number).filter(p => !g.ps[p].sent && g.ps[p].att >= 2 && lastOn[p] != null && cal - lastOn[p] <= 14).sort((a, b) => g.ps[b].att - g.ps[a].att).slice(0, 2);
+      for (const p of lines) {
+        const st = g.ps[p], pr = D.problems[p];
+        st.tips = st.tips || {};
+        for (const w of World.REG) {
+          if (st.tips[w] || !World.sessionOn(g, w, g.date)) continue;
+          const k = World.knowsLine(D, g, w, p, g.date);
+          if (!k) continue;
+          const r = Mech.giveBeta(pl, pr, st, { ...k, tier: climbDays > 60 ? "friends" : climbDays > 15 ? "know" : "met" });
+          st.tips[w] = 1; out.beta++; if (r.what === "alt") out.betaAlt++;
+          day.minute += 10;
+        }
+        if (!st.tips.c && st.att >= 3 && rng() < 0.15) { Mech.giveBeta(pl, pr, st, { knows: "hint", tier: "met" }); st.tips.c = 1; out.beta++; }
+      }
     }
     if (S.project) {
       if (project == null || climbDays - projectSince > 12) { project = pickProject(day); projectSince = climbDays; }
@@ -385,6 +407,7 @@ function report(name, runs) {
   const hard = runs.flatMap(r => r.sends.filter(s => s.d >= 1));
   say(`\nMoves: ${pct(fc / Math.max(1, fc + fo))} of falls were on a crux. Sends at least a grade up that used a better way through: ${pct(hard.filter(s => s.alt).length / Math.max(1, hard.length))}.` +
     (runs.some(r => r.works) ? ` Worked moves: ${fx(med(runs.map(r => r.works)))} per climber (${fx(med(runs.map(r => r.workMin / 60)), 0)} hours), ${fx(med(runs.map(r => r.altsByWork)))} better ways found that way.` : ""));
+  if (runs.some(r => r.beta)) say(`Beta (Phase 4, Stage 3): ${fx(med(runs.map(r => r.beta)))} tips per climber, ${fx(med(runs.map(r => r.betaAlt)))} of them a better way through.`);
   if (runs.some(r => r.brushes || r.tapes)) say(`Preparation (Stage 3): ${fx(med(runs.map(r => r.brushes)))} brushings and ${fx(med(runs.map(r => r.tapes)))} days taped per climber.`);
   const fa25 = runs.map(r => r.fa2025).filter(v => v != null);
   say(`\nYour share of first ascents: ${pct(med(fa25))} by the end of 2025 (target about 30% for a keen player), ${pct(med(runs.map(r => r.faEnd)))} at the end.`);
