@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=56">
+<link rel="stylesheet" href="scene.css?v=60">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -350,11 +350,8 @@ svg#map:active { cursor: grabbing; }
 .trail-ink { fill: none; stroke: #6d4927; stroke-width: 1.6px; stroke-dasharray: 5 3.5; vector-effect: non-scaling-stroke; }
 .trail-snowpack { fill: none; stroke: #d3dcea; stroke-width: 1.5; stroke-linecap: round; opacity: calc(var(--snow) * .95); }
 .trail-blaze { fill: #3c70c4; stroke: #1c3a6c; stroke-width: .06; opacity: calc(.85 - var(--snow) * .6); }
-/* The old trails (Phase 4, Stage 7): a faint, overgrown line until Trail Day reopens one (.open) */
-.trail-edge.old-trail:not(.open) { opacity: 0; }
-.trail-dirt.old-trail:not(.open) { stroke-width: 1.5; stroke-dasharray: 1.4 1.5; opacity: .7; }
-.trail-ink.old-trail:not(.open) { stroke-dasharray: 1.5 6; opacity: .35; }
-.trail-snowpack.old-trail:not(.open) { opacity: 0; }
+/* The old trails (Trail Day) are hidden until the day each reopens: a surprise. */
+.old-trail:not(.open) { display: none; }
 /* understory */
 .fl { opacity: var(--flowers); } .fl0 { fill: var(--fl-0); } .fl1 { fill: var(--fl-1); } .fl2 { fill: var(--fl-2); } .fl3 { fill: var(--fl-3); }
 .grass { fill: none; stroke: var(--grass-c); stroke-width: .09; stroke-linecap: round; opacity: calc(.8 - var(--snow) * .7); }
@@ -773,7 +770,6 @@ svg#map:active { cursor: grabbing; }
 @media (prefers-reduced-motion: reduce) { .talk.arrive { animation: none; } }
 .talk-portrait svg { width: 112px; height: 112px; display: block; }
 .talk .nm { font-size: 19px; line-height: 1.2; }
-.talk.npc .nm small { display: block; margin: 2px 0 0; }
 .talk-text { margin: 8px 0 10px; font-size: 16px; line-height: 1.45; color: var(--ink); }
 .talk-text q { quotes: "\201C" "\201D"; }
 .talk-text.narr { font-style: italic; color: var(--ink-2); }
@@ -854,7 +850,6 @@ svg#map:active { cursor: grabbing; }
   font-weight: 800; font-size: 20px; color: var(--accent-ink); background: var(--accent); font-variation-settings: "SOFT" 100;
 }
 .npc .nm { font-family: var(--serif); font-weight: 700; font-size: 18px; font-variation-settings: "SOFT" 100; }
-.npc .nm small { font-family: var(--body); font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
 .npc q { display: block; margin: 4px 0 8px; color: var(--ink-2); quotes: "\201C" "\201D"; }
 .npc .acts { display: flex; flex-wrap: wrap; gap: 6px; }
 .npc.regular { border-left: 4px solid var(--gold); }
@@ -1184,16 +1179,16 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=56"></script>
-<script src="art.js?v=56"></script>
-<script src="world.js?v=56"></script>
-<script src="knowledge.js?v=56"></script>
-<script src="social.js?v=56"></script>
-<script src="portraits.js?v=56"></script>
-<script src="talk.js?v=56"></script>
-<script src="illustrate.js?v=56"></script>
-<script src="paint.js?v=56"></script>
-<script src="paper.js?v=56"></script>
-<script src="travel.js?v=56"></script>
-<script src="scene.js?v=56"></script>
-<script src="game.js?v=56"></script>
+<script src="mechanics.js?v=60"></script>
+<script src="art.js?v=60"></script>
+<script src="world.js?v=60"></script>
+<script src="knowledge.js?v=60"></script>
+<script src="social.js?v=60"></script>
+<script src="portraits.js?v=60"></script>
+<script src="talk.js?v=60"></script>
+<script src="illustrate.js?v=60"></script>
+<script src="paint.js?v=60"></script>
+<script src="paper.js?v=60"></script>
+<script src="travel.js?v=60"></script>
+<script src="scene.js?v=60"></script>
+<script src="game.js?v=60"></script>

@@ -96,7 +96,7 @@ The trails all branch out from The Tailgate, so between two neighbouring areas y
 | Aug 4, 2029 | the Miller's Path | The Spillway and Bracken Gully | 16 min, about 8 |
 
 How they work:
-- **Before:** they're on the map as faint, dotted, overgrown lines through the woods, and the trees keep off them.
+- **Before:** they're hidden, so each is a surprise on its Trail Day (after the review; at first they were drawn as faint, overgrown lines). The trees keep off them.
 - **Each Trail Day** the volunteers reopen the next one. The day's opening says which.
 - **From that morning,** it's drawn as a proper trail on the map and the trail map, and walks use it: trips the game walks for you, and walking yourself at trail pace.
 - **It opens whether or not you help.** If you missed the day, Local Buzz says it's open.
@@ -163,7 +163,7 @@ Local Buzz could only list the world's stored news. It can now also add things w
     - Local Buzz a few days later
   - the bonfire (Prime, stories)
   - the spring comp (its card and results)
-  - Trail Day: the old trails faint the day before, this year's open that morning, helping, and the trail map
+  - Trail Day: the old trails hidden the day before, this year's open that morning, helping, and the trail map
   - the dusk session
   - a phone
   - a bad save file

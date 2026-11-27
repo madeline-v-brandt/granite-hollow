@@ -75,7 +75,7 @@
     rowan: { name: "Rowan Ellery", h: 172, level: 5.8, likes: "slab|technical|highball", type: "regular", regular: true, home: ["Hawkwatch", "The Schoolhouse"], arrive: 3,
       blurb: "sketches the boulders between burns" },
     hollis: { name: "Hollis Pruitt", h: 178, level: 5.2, likes: "technical|crimpy|traverse", type: "regular", regular: true, home: ["The Schoolhouse", "The Tailgate"], arrive: 2,
-      blurb: "has documented everything, twice" },
+      blurb: "built CragLog, and logs everything in it" },
     otis: { name: "Otis Fairweather", h: 183, level: 4.4, likes: "slab|mantle|juggy", type: "regular", regular: true, home: ["Hemlock Hollow", "Millrace Caves"], arrive: 6,
       blurb: "thinks every day is perfect sending weather" },
     bea: { name: "Bea Marchetti", h: 158, level: 9.6, likes: "dyno|powerful|overhang", type: "local_hero", regular: true, home: ["Bracken Gully", "Millrace Caves"], arrive: 10,
@@ -277,7 +277,7 @@
   // Who comes when: the chance they're out that day, and the hours they're around.
   const ROUTINES = {
     gus: () => ({ p: 0.6, t: [450, 1140] }),                                           // the ranger: most days, near the lot, till the gate shuts
-    hollis: d => ({ p: [0.3, 0.2, 0.5, 0.6, 0.5, 0.3, 0.6][dow(d)], t: [540, 1080] }),  // midweek and Saturdays, binder in hand
+    hollis: d => ({ p: [0.3, 0.2, 0.5, 0.6, 0.5, 0.3, 0.6][dow(d)], t: [540, 1080] }),  // midweek and Saturdays, laptop in the pack
     otis: () => ({ p: 0.5, t: [510, 1140], rain: true }),                              // every day is perfect sending weather, even wet ones
     rowan: d => (dow(d) <= 1 ? { p: 0.85, t: [510, 1140] }                             // the library's shut Sunday and Monday
       : dow(d) % 2 === 0 ? { p: 0.65, t: [780, 1170] } : { p: 0.65, t: [420, 780] }),  // other days, before or after a half-day shift
@@ -307,8 +307,8 @@
   function nextEvent(d, within = 14) { for (let k = 0; k <= within; k++) { const e = eventOn(addDays(d, k)); if (e) return { ...e, in: k }; } return null; }
   // The old trails (Trail Day): paths from the quarry and mill days, lost under the leaves
   // since before the closure, each joining two areas the trail map doesn't. The volunteers
-  // reopen one every Trail Day, from 2026. Until then they're on the map as faint, overgrown
-  // paths; from that day on they're trails, and walks use them. Worked out from the date.
+  // reopen one every Trail Day, from 2026. Until then they're hidden (a surprise
+  // on the day); from that day on they're trails, and walks use them. Worked out from the date.
   const OLD_TRAILS = [
     { id: "quarrymen", a: "Hawkwatch", b: "Millrace Caves", name: "the Quarrymen's Path", year: 2026 },
     { id: "cart", a: "Bracken Gully", b: "The Grout Piles", name: "the old Cart Track", year: 2027 },

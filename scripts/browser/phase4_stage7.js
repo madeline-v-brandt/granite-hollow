@@ -124,14 +124,17 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   check("…and its results at dusk", /Spring Comp/i.test(m) && /The results/.test(m), m.slice(0, 80));
   await closeAll();
 
-  // 5. Trail Day (August): the old trail on the map is faint until that morning; then it's a trail, and helping walks you along it.
+  // 5. Trail Day (August): the old trail is hidden on the map until that morning; then it's a trail, and helping walks you along it.
   g = await saved(); await eveOf(g, "2026-08-01");
   const faint = await p.evaluate(() => ({ n: document.querySelectorAll(".old-trail").length, open: document.querySelectorAll(".old-trail.open").length }));
-  check("before Trail Day: the old trails are on the map, faint (none open)", faint.n >= 4 && faint.open === 0, JSON.stringify(faint));
+  faint.shown = await p.evaluate(() => [...document.querySelectorAll(".old-trail")].filter(x => getComputedStyle(x).display !== "none").length);
+  check("before Trail Day: the old trails are hidden (none open, none drawn)", faint.n >= 4 && faint.open === 0 && faint.shown === 0, JSON.stringify(faint));
   await toTomorrow();
   g = await saved(); const m0 = g.day.minute;
   t = await here();
   const opened = await p.evaluate(() => [...document.querySelectorAll(".old-trail.open")].map(x => x.getAttribute("data-old")));
+  const drawn = await p.evaluate(() => [...document.querySelectorAll(".old-trail")].filter(x => getComputedStyle(x).display !== "none").map(x => x.getAttribute("data-old")));
+  check("…and drawn on the map (only that one)", drawn.length >= 1 && drawn.every(x => x === "quarrymen"), drawn.join(","));
   check("Trail Day (first Saturday in August): this year's old trail is open from the morning", g.date === "2026-08-01" && opened.length >= 1 && opened.every(x => x === "quarrymen") && /Quarrymen's Path/.test(g.day.last.text), opened.join());
   check("…and you can help", /Help with Trail Day/.test(t));
   await click(p, "[data-trail]"); await sleep(500);

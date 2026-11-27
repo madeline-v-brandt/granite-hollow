@@ -23,7 +23,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
     await p.goto(url, { waitUntil: "load" }); await ready(p); await sleep(400); await closeModals();
   };
   const box = () => p.evaluate(() => { const t = document.querySelector("#talk-root:not([hidden]) .talk"); if (!t) return null;
-    return { text: t.querySelector(".talk-say").innerText, sub: t.querySelector(".nm small").innerText, choices: [...t.querySelectorAll(".talk-choice")].map(x => x.innerText.replace(/^\d\s*/, "").trim()) }; });
+    return { text: t.querySelector(".talk-say").innerText, sub: (t.querySelector(".nm small") || {}).innerText || "", choices: [...t.querySelectorAll(".talk-choice")].map(x => x.innerText.replace(/^\d\s*/, "").trim()) }; });
   const walkTo = async w => { await p.evaluate(w => { const el = document.querySelector(`g.person[data-who='${w}'] path`) || document.querySelector(`g.person[data-who='${w}']`); if (el) el.dispatchEvent(new MouseEvent("click", { bubbles: true })); }, w);
     for (let t = 0; t < 120 && !(await box()); t++) await sleep(200); };
   const toasts = () => p.evaluate(() => [...document.querySelectorAll("#toasts .toast, #toasts > *")].map(x => x.innerText).join(" | "));
@@ -68,7 +68,7 @@ const check = (what, ok, extra = "") => { if (!ok) fails++; console.log(`${ok ? 
   g = await saved();
   check("…and they say so, there and then", Object.keys(g.social.npc[who].said).some(id => /\.c\.friends$/.test(id)) && !g.social.npc[who].up, lines.join(" / ").slice(0, 240));
   t = await box();
-  check("…and the box says you're friends", t && /friends/i.test(t.sub), t && t.sub);
+  check("…and the box shows just the name, no tagline", t && !t.sub, t && t.sub);
   if (SHOTS) await p.screenshot({ path: path.join(SHOTS, "p4s4-friends.png") });
   await p.keyboard.press("Escape"); await sleep(200);
   // Your people.

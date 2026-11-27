@@ -338,6 +338,23 @@ test("Stage 8: asking again says “still”; the same project as you; goodbyes 
     g.date = d;
   } finally { g.social = JSON.parse(keep); g.events = keepEv; g.world.reg = JSON.parse(keepReg); }
 });
+test("Hollis runs CragLog: the rankings “glitch” when you're top, and no binder left", () => {
+  const { g, K } = saves[2], keep = JSON.stringify(g.world.est);
+  try {
+    const count = () => { const n = {}; for (const e of Object.values(g.world.est)) if (!e.old) n[e.by] = (n[e.by] || 0) + 1; return n; };
+    const top = Math.max(...Object.entries(count()).filter(([w]) => w !== "you").map(([, k]) => k));
+    const give = k => { let left = k; for (const e of Object.values(g.world.est)) if (left > 0 && !e.old && e.by !== "you") { e.by = "you"; left--; } };
+    const ids = () => Talk.everyLine(env(g, K), "n:hollis").map(x => x.id);
+    give(Math.max(0, top + 2 - (count().you || 0)));                 // more first ascents than anyone
+    assert(Talk.context(env(g, K), "n:hollis").rank === 1 && ids().includes("hol.h.top") && !ids().includes("hol.h.top3"), `top: rank ${Talk.context(env(g, K), "n:hollis").rank}`);
+    g.world.est = JSON.parse(keep);
+    for (const e of Object.values(g.world.est)) if (e.by === "you") e.by = "n:dez";
+    assert(Talk.context(env(g, K), "n:hollis").rank === null && !ids().includes("hol.h.top"), "no first ascents: no rank");
+    const lines = Talk.everyLine(env(g, K), "n:hollis").concat(Talk.WAVES.hollis.map(t => ({ id: "wave", t })));
+    for (const x of lines) assert(!/binder|notebook(?! shaped)|pencil/i.test(x.t) || /kiosk notebook/.test(x.t), `${x.id}: ${x.t}`);
+    assert(!Talk.GENDERED.test(lines.filter(x => !/grandmother|Pickles/.test(x.t)).map(x => x.t).join(" ")), "no pronouns for Hollis");
+  } finally { g.world.est = JSON.parse(keep); }
+});
 if (process.argv.includes("--show")) {
   const { g, K } = saves[2];
   for (const w of WHO) {

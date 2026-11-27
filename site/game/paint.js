@@ -507,7 +507,7 @@
     const trailUnder = ground.append("g").attr("class", "trails");
     // Every edge first, then every trail's dirt over them, so where trails meet no
     // edge is drawn across another trail's tread (the little outlines at junctions).
-    // The old trails (Phase 4, Stage 7): faint and overgrown until Trail Day reopens them (setOldTrails).
+    // The old trails (Phase 4, Stage 7): hidden until Trail Day reopens them (setOldTrails; .open).
     const OT = S.oldTrails || [];
     for (const t of OT) trailUnder.append("path").attr("class", "trail-edge old-trail").attr("data-old", t.old).attr("d", trailD(t));
     for (const t of S.trails) trailUnder.append("path").attr("class", "trail-edge").attr("d", trailD(t));

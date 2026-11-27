@@ -109,7 +109,7 @@
   // ====================================================================== data
   function prepData() {
     D.sectorBy = new Map(D.sectors.map(s => [s.name, s]));
-    // The old trails (Phase 4, Stage 7), for the map to draw (faint until Trail Day reopens them).
+    // The old trails (Phase 4, Stage 7), for the map to draw (hidden until Trail Day reopens them).
     D.oldTrails = World.OLD_TRAILS.map(t => { const a = D.sectorBy.get(t.a), b = D.sectorBy.get(t.b); return a && b ? { to: "old:" + t.id, old: t.id, start: [a.x, a.y], end: [b.x, b.y] } : null; }).filter(Boolean);
     D.sectorProblems = new Map(D.sectors.map(s => [s.name, []]));
     D.boulders.forEach((b, i) => { b.id = i; });
@@ -391,7 +391,7 @@
       const pal = partnerNow();
       G.ticks.push({ p: i, date: G.date, day: G.dayNo, style, att: st.att, stars: null, ...(pal ? { with: pal } : {}) });
       if (pal) bond(pal, "sendWith", i);
-      if (fa) noticed("n:hollis", "fa", i);                    // one for the binder (Hollis)
+      if (fa) noticed("n:hollis", "fa", i);                    // a new problem for CragLog (Hollis)
       G.day.sends.push({ p: i, style, xp, ...(fa ? { fa: true } : {}) });
       let text;
       if (flash) text = "Flash! You read every move from the ground.";
@@ -695,7 +695,7 @@
         : `"Holds like these want a fresh brushing. Gets the old chalk and grease off. Gently, mind: nylon, never wire."`} You can brush a line now. A line nobody has climbed comes clean for good, and on sloping, frictiony holds a fresh brushing helps all day.` },
     { key: "work", who: "n:hollis", name: "Working a move",
       when: (i, L, st) => (st && st.att >= 4 && !st.sent && (st.log || []).length >= 2) || L >= 3,     // a line you keep coming back to
-      say: here => `${here ? `Hollis Pruitt looks up from a notebook. "You keep coming off the same bit. You don't have to start from the bottom every time: pull on right there and try that move on its own. Cheaper, and you learn more. I have a whole page on it."`
+      say: here => `${here ? `Hollis Pruitt looks up from a laptop. "You keep coming off the same bit. You don't have to start from the bottom every time: pull on right there and try that move on its own. Cheaper, and you learn more. There's a whole help page on it in CragLog. I wrote it."`
         : `A climber resting nearby calls over: "You don't have to start from the bottom every time. Pull on at the move you keep falling off and try it on its own."`} You can work a single move now.` },
     { key: "tape", who: "n:otis", name: "Tape",
       when: (i, L) => (L >= 3 && G.player.skin < 50) || L >= 5,          // (a flapper teaches it on the spot)
@@ -1268,7 +1268,7 @@
     gus: ["Gus tells the story of the winter of '96, when the quarry pond froze solid and he skated the whole length of it to fix a fence. “Nobody's ever believed me. Pickles wasn't born yet, so I've no witnesses.”",
       "Gus tells you about the first climber he caught in the park after the closure, in 1991: a teenager with a bath towel for a crash pad. “I should have thrown them out. I showed them the good holds instead.”",
       "Gus tells everyone how Pickles turned up: a scruffy puppy asleep on the kiosk step one October morning, who simply never left. “I put up posters. Nobody called. I've always been a bit glad.”"],
-    bishop: ["The Bishop tells the story of the first ascent of The Billboard. It was 1974, or 1977, and either Dot spotted him or he spotted Dot, and at some point there was a mule. Hollis takes notes on what's changed since last time.",
+    bishop: ["The Bishop tells the story of the first ascent of The Billboard. It was 1974, or 1977, and either Dot spotted him or he spotted Dot, and at some point there was a mule. Hollis updates the CragLog page with what's changed since last time.",
       "The Bishop tells a story about climbing by moonlight in 1979 that ends, somehow, with him made an honorary member of the volunteer fire brigade.",
       "The Bishop says the boulders in the woods are older than the hills they sit on. Then he says something about a bear that Gus says is definitely not true."],
   };
@@ -1419,7 +1419,7 @@
   // What someone's doing, in a few words (never names a place or a line).
   const ACT = {
     gus: { proj: "Trying a problem by the lot, between patrols", mileage: "On patrol, more or less", wet: "Checking the trails after the rain" },
-    hollis: { proj: "Working a project, binder open on the pad", mileage: "Climbing, and taking notes", wet: "Writing up notes under a tarp" },
+    hollis: { proj: "Working a project, laptop open on the pad", mileage: "Climbing, and logging every go", wet: "Fixing bugs in CragLog under a tarp" },
     otis: { proj: "On a project, in perfect sending weather", mileage: "Climbing, cheerfully", wet: "Insisting it's nearly dry" },
     rowan: { proj: "Working a project, sketchbook on the pad", mileage: "Sketching the boulders between burns", wet: "Sketching in the rain" },
     bea: { proj: "Throwing for a project, over and over", mileage: "Jumping for things", wet: "Practising dynos on a log while the rock dries" },
@@ -1630,8 +1630,8 @@
   const PARTNER = {
     gus: { yes: "“I've got a couple of hours before I check the gate. Let's see what you've got.”", allDay: "“Actually, the gate can wait. Pickles will let me know.”", bye: "Ranger Gus has to go and lock up the quarry road. “Good climbing today.”",
       cheer: ["Gus whoops from the pad.", "“Now that's climbing!” Gus says."] },
-    hollis: { yes: "“Yes! I'll bring the binder. I want to see how your beta compares with my notes.”", allDay: "“I've cleared my whole afternoon. The notes can wait.”", bye: "Hollis heads off to write up the day. “That's going in the notes.”",
-      cheer: ["Hollis claps, then writes something down.", "“That's going in the binder,” Hollis says, delighted."] },
+    hollis: { yes: "“Yes! I want to see how your beta compares with what's been logged.”", allDay: "“I've cleared my whole afternoon. The bug reports can wait.”", bye: "Hollis heads off to find some signal. “Log that one tonight. I'll be watching.”",
+      cheer: ["Hollis claps, then types something.", "“That's going in CragLog,” Hollis says, delighted."] },
     otis: { yes: "“Perfect partner weather! I'll spot.”", allDay: "“I've got sandwiches for the whole day.”", bye: "Otis packs up his pad. “Perfect day. Same time next week?”",
       cheer: ["Otis cheers loud enough to scare the chickadees.", "“PERFECT sending weather!” Otis shouts."] },
     rowan: { yes: "“I'd like that. I'll bring my sketchbook, in case you do something worth drawing.”", allDay: "“Honestly, I've got nowhere else I'd rather be today.”", bye: "Rowan closes the sketchbook. “Thanks for today. Really.”",
@@ -1892,15 +1892,8 @@
     const n = typeof e.who === "string" && e.who.startsWith("n:"), key = n ? e.who.slice(2) : null;
     if (walkedAway(e)) { G.day.encounter = null; return hide(); }
     const idx = Math.max(0, Math.min(e.idx || 0, e.beats.length - 1)), b = e.beats[idx], last = idx >= e.beats.length - 1;
-    let name, sub;
-    if (n) {
-      const i = World.whoInfo(D, e.who), lvl = World.REG.includes(e.who) ? World.levelOn(e.who, G.date) : i.level, t = Social.tier(G, e.who);
-      name = i.name.replace(/^the /, "The ");
-      sub = [i.blurb.replace(/^is /, ""), i.type !== "dog" && !i.old ? `climbs around V${Math.round(lvl)}` : "", t && t.n > 0 ? t.words.toLowerCase() : ""].filter(Boolean).join(" · ");
-    } else {
-      const [nm, h, type, lvl] = D.climbers[e.ci] || ["A climber", 170, "regular", 0];
-      name = nm; sub = `${{ local_hero: "local", regular: "regular", occasional: "weekend climber", tourist: "visiting" }[type] || "climber"} · climbs around V${Math.round(lvl)}`;
-    }
+    // Just the name (no tagline under it: removed after Phase 4, from play-testing).
+    const name = n ? World.whoInfo(D, e.who).name.replace(/^the /, "The ") : (D.climbers[e.ci] || ["A climber"])[0];
     const choices = last ? talkChoices(e) : [];
     const sig = JSON.stringify([e.who, idx, e.beats.length, b.mood, !!b.sweet, choices.map(c => c[0] + (c[3] ? "!" : ""))]);
     if (sig === UI.talkKey && !root.hidden) return;
@@ -1913,7 +1906,7 @@
     const hearts = b.sweet && b.mood === "smitten" ? `<span class="talk-hearts" aria-hidden="true"><i></i><i></i><i></i></span>` : "";
     root.innerHTML = `<div class="talk npc${n ? " regular" : ""}${fresh ? " arrive" : ""}${b.sweet ? " sweet" : ""}" role="dialog" aria-label="Talking with ${esc(name)}">${hearts}
       <div class="talk-portrait">${portrait}</div>
-      <div class="talk-body"><div class="nm">${esc(name)}<small>${esc(sub)}</small></div>
+      <div class="talk-body"><div class="nm">${esc(name)}</div>
         <div class="talk-say" aria-live="polite">${text}</div>
         <div class="talk-choices">${btns}</div></div>
       <button type="button" class="talk-x" data-act="dismiss" data-dismiss aria-label="Leave the conversation" title="Leave (Esc)">×</button></div>`;
@@ -2802,7 +2795,7 @@
         <div><div class="pp-name">Pickles <span class="pp-tier t${Math.min(3, dg.n)}">${esc(dg.words)}</span></div>
         <div class="meta" style="margin:0">${esc([dg.adopted ? `yours since ${dg.adopted.slice(5) ? new Date(dg.adopted + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" }) : ""}` : "", dg.pets ? `petted on ${plural(dg.pets, "day", "days")}` : "", dg.walks ? `walked with you on ${plural(dg.walks, "day", "days")}` : ""].filter(Boolean).join(" · "))}</div>
         ${dg.n >= 1 && !dg.adopted ? `<div class="pp-likes">Pickles loves a good scratch behind the ears, and a walk. He's at his rock most days.</div>` : ""}</div></li>` : "";
-    return `<h3>Your people</h3><p class="meta">Friendships grow from time together: talking, climbing together, sharing beta, and the things each of them cares about. They never fade.</p><ul class="your-people">${rows}${pk}</ul>`;
+    return `<h3>Your people</h3><ul class="your-people">${rows}${pk}</ul>`;
   }
   function climberHtml() {
     const pl = G.player, L = levelNow(), sends = firstSends();
@@ -2816,17 +2809,12 @@
         <div><b>${G.ticks.filter(t => t.style === "Flash").length}</b><span>flashes</span></div><div><b>${G.dayNo}</b><span>days at the crag</span></div>
         ${v2() ? `<div><b>${World.faCount(G)}</b><span>first ascents</span></div>` : ""}<div><b>${Object.keys(G.ach).length}</b><span>achievements</span></div></div>
       ${v2() ? yourPeopleHtml() + eventsHtml() : ""}
-      <h3>How leveling works</h3>
-      <p class="lede">Every first send earns XP: more for harder grades, extra when it's above your level, and less the further below your level it is. Flashes, tips from locals, new hardest sends and projects that took several sessions earn bonuses. Falling earns nothing, and repeats count a little, a few times a day. To move up a grade you also need three sends at your level or harder, so your level is always a grade you climb.</p>
       <h3>Style skills</h3>
-      <p class="meta">How each style compares with the rest of your climbing. Sending a style makes it more of a strength, a little at the expense of the others. On problems with those tags it adds to your level, or takes from it, by up to two thirds of a grade.</p>
       ${skills.map(([t, v]) => {
         const left = Math.min(x(0), x(v)), width = Math.abs(x(v) - x(0));
         const tag = pl.strengths.includes(t) ? `<span class="tag-str">strength</span>` : pl.weakness === t ? `<span class="tag-weak">weakness</span>` : "";
         return `<div class="skill"><span>${STYLE[t][0]}${tag}</span><div class="track"><i style="left:${left}%;width:${width}%;background:${v >= 0 ? "var(--accent)" : "var(--minus)"}"></i><span class="zero" style="left:${x(0)}%"></span></div><span class="val">${signed(v)}</span></div>`;
       }).join("")}
-      <h3>Body</h3>
-      <p class="lede">Energy drops with every attempt and comes back with short rests and a night's sleep. Climbing on consecutive days starts you tired. Skin wears down on sharp crimps and slopers and needs rest days to grow back.</p>
       <h3>Backup</h3>
       <p class="lede">The game saves itself in this browser, but clearing browser data erases it. Download a save file to keep a copy, or to move your climber to another browser or computer.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-export>Download save file</button><button type="button" class="btn" data-import>Load save file</button></div>

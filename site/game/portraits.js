@@ -11,7 +11,7 @@
 // The look: inked like the map (warm dark lines, flat watercolour fills, a paper
 // card behind). A head and shoulders, front on, in a 120 × 120 box. Each regular
 // has their own face, hair, hat and one or two things that are theirs (Gus's
-// moustache, Hollis's glasses, Rowan's pencil, Dez's earring, the Bishop's beard).
+// moustache, Hollis's glasses and laptop, Rowan's pencil, Dez's earring, the Bishop's beard).
 (function (root) {
   "use strict";
   const INK = "#3b3226";
@@ -29,7 +29,7 @@
     gus: { hair: "temples", wide: 1.06, wash: "#d9dcb8", extras: ["moustache", "badge"], age: 1 },
     bishop: { hair: "tufts", wide: 0.98, wash: "#e6cfc2", extras: ["beard", "bushy"], age: 2 },
     rowan: { hair: "tousled", wide: 0.96, wash: "#efdcae", extras: ["pencil"] },
-    hollis: { hair: "temples", wide: 1, wash: "#d3dce6", extras: ["glasses", "collar"] },
+    hollis: { hair: "temples", wide: 1, wash: "#d3dce6", extras: ["glasses", "collar", "laptop"] },
     otis: { hair: "crop", wide: 1.08, wash: "#ecd0bd", extras: ["stubble"] },
     bea: { hair: "ponytail", wide: 0.94, wash: "#efd0dc", extras: ["clip"], young: true },
     dez: { hair: "temples", wide: 1, wash: "#d9d4e6", extras: ["earring"] },
@@ -153,6 +153,16 @@
     if (face.extras.includes("badge")) out += P("M80,103 l1.6,3.4 3.6,.4 -2.7,2.4 .8,3.6 -3.3,-1.9 -3.3,1.9 .8,-3.6 -2.7,-2.4 3.6,-.4 Z", "#e3c76a", `stroke-width="1"`);
     return out;
   }
+  // Hollis's laptop (CragLog's, really): held open at the chest, the lid towards you,
+  // with a couple of stickers on it (a little green mountain, a chalk bag) and fingers over the top.
+  function laptop(skin) {
+    return P("M29,121 L32.4,98.6 C32.7,96.9 33.8,96 35.5,96 L84.5,96 C86.2,96 87.3,96.9 87.6,98.6 L91,121 Z", "#c4c9d0")
+      + L("M33.6,99.8 L86.4,99.8", .8, `stroke-opacity=".3"`)
+      + P("M52,115 L57.6,106.6 L60.6,110.6 L62.8,107.8 L68,115 Z", "#2f6b4f", `stroke-width="1"`)
+      + `<circle cx="78" cy="106" r="3.4" fill="#e3c76a" stroke="${INK}" stroke-width="1"/>`
+      + P("M38,110 L45,108.4 L46.2,113.4 L39.2,115 Z", "#d98b9a", `stroke-width="1"`)
+      + `<ellipse cx="37.6" cy="96.6" rx="4.4" ry="3.1" fill="${skin}" stroke="${INK}" stroke-width="1.1"/><ellipse cx="82.4" cy="96.6" rx="4.4" ry="3.1" fill="${skin}" stroke="${INK}" stroke-width="1.1"/>`;
+  }
   // A climber you haven't got to know: a look drawn from a seed (deterministic).
   function strangerLook(seed) {
     let h = 2166136261; for (const ch of String(seed)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
@@ -172,6 +182,7 @@
       + `<circle cx="60" cy="56" r="47" fill="${face.wash}" fill-opacity=".85"/>`
       + body(look, face)
       + P("M52,76 L52,93 C56,96.4 64,96.4 68,93 L68,76 Z", shade(skin, -.12))
+      + (face.extras.includes("laptop") ? laptop(skin) : "")
       + `<g ${sx}>`
       + hairBack(face.hair, hair)
       + `<ellipse cx="39.6" cy="61" rx="3.6" ry="5" fill="${skin}" stroke="${INK}" stroke-width="1.2"/><ellipse cx="80.4" cy="61" rx="3.6" ry="5" fill="${skin}" stroke="${INK}" stroke-width="1.2"/>`

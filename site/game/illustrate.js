@@ -567,7 +567,7 @@
     // ---- lines on the ground: trails, brooks, stone walls
     const trails = D.trails.map(t => ({ to: t.to, pts: trailPoints(t) }));
     // The old trails (Phase 4, Stage 7; D.oldTrails, set by the game from World.OLD_TRAILS): drawn
-    // faint until Trail Day reopens them. The trees keep off them either way: they're old paths.
+    // hidden until Trail Day reopens them. The trees keep off them either way: they're old paths.
     const oldTrails = (D.oldTrails || []).map(t => ({ to: t.to, old: t.old, pts: trailPoints(t) }));
     let trailDist = lineIndex([...trails, ...oldTrails].map(t => t.pts));
     // The path from the lot: straight from its north-east corner to the Tailgate's trail

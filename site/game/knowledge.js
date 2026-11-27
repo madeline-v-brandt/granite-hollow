@@ -213,10 +213,7 @@
       if (n.kind === "named") { const h = (World.AREAS[n.s] || {}).hint || "further out";
         return { date: n.date, kind: n.kind, go: goFor(n.s, null), text: area(n.s) >= 1 ? `The boulders ${h} have a name now: people are calling them ${n.s}.` : `People have started climbing ${h}.` }; }
       if (n.kind === "found") return { date: n.date, kind: n.kind, go: goFor(n.s, null), text: area(n.s) >= 1 ? `Climbers have started poking around ${n.s}.` : `Climbers have started poking around ${(World.AREAS[n.s] || {}).hint || "further out"}.` };
-      if (n.kind === "arrival") {
-        if (!(info.regular || info.type === "local_hero")) return null;
-        return { date: n.date, kind: n.kind, go: null, text: info.regular && info.blurb ? `${cap(who)}, who ${info.blurb}, has been turning up at the Hollow.` : `A strong local, ${who}, has been turning up at the Hollow.` };
-      }
+      if (n.kind === "arrival") return null;          // who's started turning up isn't news (removed after Phase 4, from play-testing)
       return null;
     }
     // The most notable first: a line taken from you, the first problem in an area,

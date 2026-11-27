@@ -77,7 +77,7 @@ B = {
     ("Parking Lot Boulders", "Whale Stone"): ("The Curb", [
         "~Curb Appeal", "Speed Bump", "!Ankle Biter", "Parallel Parking", "Pahk the Cah"]),
     ("Parking Lot Boulders", "Pulpit Boulder 2"): ("Pickles' Rock", [
-        "~Good Girl, Pickles", "~Fetch", "Belly Rub", "Squirrel!", "Zoomies", "Off Leash", "Who Ate My Sandwich"]),
+        "~Good Boy, Pickles", "~Fetch", "Belly Rub", "Squirrel!", "Zoomies", "Off Leash", "Who Ate My Sandwich"]),
     ("Parking Lot Boulders", "Coffin Block"): ("The Tailpipe", [
         "Creeper", "Under the Hood", "Oil Change", "Grease Monkey", "Check Engine Light", "Lowrider",
         "Exhaust Leak", "!Catalytic Converter", "!Carbon Monoxide", "Jumper Cables", "Rust Belt",
