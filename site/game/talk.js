@@ -185,6 +185,36 @@
     c.sunsetAsk = !!env.sunset;
     c.rowanSweet = key !== "rowan" && c.sweet && K.met("n:rowan");
     c.rowanUs = key !== "rowan" && c.us && c.usDays <= 45 && K.met("n:rowan");
+    // Events and stories (Stage 7): today's event; the last comp (in the fortnight after);
+    // a grade they think is off, or someone thinking theirs is; a big new problem to celebrate.
+    const nm = w => World.whoName(D, w).replace(/^Ranger /, "").replace(/^the /, "").split(" ")[0];
+    const ORD = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+    const ev = World.eventOn ? World.eventOn(date) : null;
+    c.event = ev ? ev.key : null;
+    if (World.eventOn && K.compResults) for (let k = 1; k <= 14; k++) {
+      const d = addDays(date, -k), e = World.eventOn(d);
+      if (!e || !e.comp) continue;
+      const f = K.compResults(d); if (f.length < 3) break;
+      const at = w => { const i = f.findIndex(x => x.who === w); return i < 0 ? null : i + 1; };
+      const you = at("you"), them = at(who);
+      c.comp = { ago: k, winner: f[0].who === "you" ? "you" : f[0].short, winnerWho: f[0].who, score: f[0].score.toLocaleString("en-US"),
+        you, youOrd: you ? ORD[you] || `${you}th` : null, them, themOrd: them ? ORD[them] || `${them}th` : null, beatThem: !!(you && them && you < them) };
+      break;
+    }
+    if (W && W.est) {
+      const since = addDays(date, -10);
+      for (const [p, e] of Object.entries(W.est)) for (const lg of e.logs || []) {
+        const [w, d, , , sugg] = lg;
+        if (sugg == null || sugg === e.grade || d < since || d > date || e.by === w) continue;
+        if (w.startsWith("n:") && World.NAMED[w.slice(2)]) c.anyDispute = true;
+        const it = { ...lineOf(+p), p: +p, grade: e.grade, sugg, soft: sugg < e.grade ? "soft" : "sandbagged" };
+        if (w === who && !c.dispute) c.dispute = { ...it, fa: e.by.startsWith("n:") && World.NAMED[e.by.slice(2)] ? nm(e.by) : null };
+        if (e.by === who && w.startsWith("n:") && World.NAMED[w.slice(2)] && !c.disputed) c.disputed = { ...it, by: nm(w) };
+      }
+      const big = Object.entries(W.est).filter(([, e]) => e.by !== who && e.by.startsWith("n:") && World.NAMED[e.by.slice(2)] && e.grade >= 8 && days(e.date, date) >= 0 && days(e.date, date) <= 5)
+        .sort((a, b) => (a[1].date < b[1].date ? 1 : -1))[0];
+      if (big) c.party = { ...lineOf(+big[0]), person: nm(big[1].by), grade: big[1].grade };
+    }
     return c;
   }
 
@@ -201,6 +231,7 @@
         l("gus.h.dog", "thoughtful", c => c.dog && c.dog.n === 3, () => "I see Pickles has found himself a new favourite. He's not my dog, you understand. But I'll be keeping an eye on you.", { w: 3 }),
         l("gus.h.yours", "happy", c => c.yours, () => "How's my— your dog? Our dog. The dog. He looks happy. That's all I wanted.", { w: 3 }),
         l("gus.h.gap", "happy", c => c.gap >= 21, c => `Well, look who it is! ${c.gap >= 45 ? "I was about to put up a missing poster." : "Thought you'd found another park."} Good to have you back.`, { w: 6 }),
+        l("gus.h.ev", "happy", c => !!c.event, c => ({"spring": "Spring comp! And before you ask: no, it's not an April Fool. I checked the date twice. Five best sends, same as the fall.", "comp": "Comp day! I've got the clipboard, a coffee tin of pencils and no idea how the scoring works. Five best sends, they tell me. Results at the lot at dusk.", "bonfire": "Shortest day of the year. Climb while it's light; bonfire at The Tailgate at dusk. I've been saving the good logs.", "trail": "Trail Day! Grab a rake. Or a brush. Or a sandwich: Otis brought hundreds.", "midsummer": "Longest day of the year. Everyone's staying till the light goes. Otis has sandwiches. Of course Otis has sandwiches."})[c.event], { w: 8 }),
         l("gus.h.ro", "happy", c => c.rowanSweet, () => "Rowan's asked me what time the park closes twice this week. Looking at you, both times. Just an observation.", { w: 3, story: true }),
         l("gus.h.us", "happy", c => c.rowanUs, () => "So. You and Rowan. Pickles told me. Well, Pickles and everyone else in the lot. About time, if you ask me.", { w: 5, story: true }),
         l("gus.h.drill", "happy", T, () => "Pack it in, pack it out. You know the drill."),
@@ -225,10 +256,13 @@
       ],
       theirs: [
         l("gus.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `Did I tell you I finally got ${c.done.full}? ${cap(c.done.dur)} on it.${c.around("n:hollis") ? " Hollis wrote it down, so it's official." : ""}`, { w: 3 }),
+        l("gus.e.res", "happy", c => c.comp && !c.comp.you, c => `${cap(c.comp.winner)} won the comp, if you missed it. I read the results out by the lot. Pickles sat at the front, like he'd organised it.`, { w: 5, story: true }),
+        l("gus.g.mine", "thoughtful", c => c.dispute, c => `${cap(c.dispute.full)}? Felt more like V${c.dispute.sugg} to me. Not that I know anything. I just fix the gate.`, { w: 5, story: true }),
         l("gus.d.fa", "excited", c => c.theirFa && !c.sentToday, c => `I put up ${c.theirFa.full} this week. A ranger's allowed one first ascent. It's in the rules. I wrote the rules.`, { w: 2 }),
       ],
       mine: [
         l("gus.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level} now, I hear! The whole lot's talking about it. Well. Pickles is.`, { w: 4 }),
+        l("gus.e.you", "excited", c => c.comp && c.comp.you && c.comp.you <= 3, c => `${cap(c.comp.youOrd)} at the comp! I read your name out twice, I was that pleased. Pickles barked both times.`, { w: 5, story: true }),
         l("gus.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `A V${c.youFa.grade} first ascent! In my park! I'm going to have to make a little sign.`, { w: 5 }),
         l("gus.m.memory", "happy", c => c.close && c.memory, c => `I still think about that day you sent ${c.memory.full}. Pickles does too, I reckon.`, { w: 2 }),
         l("gus.m.fa", "excited", c => c.youFa, c => `Saw ${c.youFa.full} on the CragLog. A first ascent in my park! I'll need to update the map.`, { w: 4 }),
@@ -239,7 +273,8 @@
         l("gus.m.with", "happy", c => c.together, c => `Still thinking about that day on ${c.together.full}. Good climbing.`, { w: 2 }),
         l("gus.m.beta", "happy", c => c.betaWorked, c => `${cap(c.betaWorked.full)}! Told you. ${c.betaWorked.alt ? "That trick" : "Slow and steady"} works every time.`, { w: 5 }),
       ],
-      others: [l("gus.o.news", "happy", c => c.other, c => `${c.other.person} finally ${c.other.fa ? "put up" : "sent"} ${c.other.full}. ${cap(c.other.dur)} on it. Whole lot heard about it.`, { w: 2 })],
+      others: [l("gus.o.news", "happy", c => c.other, c => `${c.other.person} finally ${c.other.fa ? "put up" : "sent"} ${c.other.full}. ${cap(c.other.dur)} on it. Whole lot heard about it.`, { w: 2 }),
+        l("gus.o.party", "happy", c => c.party, c => `${c.party.person} put up ${c.party.full}, and half the Hollow turned up at the lot to celebrate. I pretended not to enjoy it.`, { w: 4, story: true })],
       ask: [
         l("gus.a.proj", "thoughtful", c => c.proj, c => `It's ${c.proj.full}. ${cap(c.proj.dur)} so far. The top's fine. It's the bottom that's the problem. And the middle.`),
         l("gus.a.none", "happy", c => !c.proj, () => "Me? I climb the warm-ups and check they're still there. They always are. Very reassuring."),
@@ -294,6 +329,7 @@
       hello: [
         l("hol.h.dog", "happy", c => c.yours && c.dogWith, () => "Hello, Pickles. I've added him to the binder, you know. Under “Dogs, notable”. It's a short section.", { w: 3 }),
         l("hol.h.gap", "excited", c => c.gap >= 21, c => `There you are! I'd marked you as “whereabouts unknown”. ${c.gap >= 45 ? "With a question mark." : "In pencil."} Welcome back.`, { w: 6 }),
+        l("hol.h.ev", "excited", c => !!c.event, c => ({"spring": "The spring comp! New season, new scoresheet. I've ruled it by hand.", "comp": "I'm keeping my own scoresheet, as a check on Gus's. Not that I doubt Gus. I doubt arithmetic.", "bonfire": "I've brought the binder. If the Bishop tells the mule story again, I'm noting what changes.", "trail": "Trail Day! I'm recording which trails we fix. In the binder, under “Trails, improved”.", "midsummer": "The longest day. I'm aiming for a personal record: problems documented between sunrise and dark."})[c.event], { w: 8 }),
         l("hol.h.ro", "thoughtful", c => c.rowanSweet, () => "Rowan asked me whether the binder has a section for “people who climb nicely”. It doesn't. I'm thinking of adding one.", { w: 3, story: true }),
         l("hol.h.us", "happy", c => c.rowanUs, () => "I've updated the index. You and Rowan are cross-referenced now. It's the most romantic thing I know how to do.", { w: 5, story: true }),
         l("hol.h.witness", "thoughtful", T, () => "Ah, good. I need a witness. Does the Billboard traverse go left to right, or did I make that up?"),
@@ -317,9 +353,14 @@
       theirs: [
         l("hol.d.fa", "embarrassed", c => c.theirFa, c => `You might have seen: I made a first ascent. ${cap(c.theirFa.full)}. After all these years of writing down everyone else's.`, { w: 4 }),
         l("hol.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3 && !c.theirFa, c => `I finally sent ${c.done.full}. ${cap(c.done.dur)}. I've written it up. Three pages. I may have overdone it.`, { w: 3 }),
+        l("hol.e.them", "excited", c => c.comp && c.comp.them && c.comp.them <= 3, c => `I came ${c.comp.themOrd} at the comp! I've written it in the binder. In pen.`, { w: 5, story: true }),
+        l("hol.e.res", "thoughtful", c => c.comp && !(c.comp.them && c.comp.them <= 3), c => `${cap(c.comp.winner)} won the comp with ${c.comp.score} points. I checked Gus's arithmetic. Twice.`, { w: 5, story: true }),
+        l("hol.g.mine", "thoughtful", c => c.dispute, c => `I've repeated ${c.dispute.full}. It's ${c.dispute.soft} for V${c.dispute.grade}, I'm afraid: more like V${c.dispute.sugg}. Filed under “Disputes, ongoing”.`, { w: 5, story: true }),
+        l("hol.g.theirs", "frustrated", c => c.disputed, c => `${c.disputed.by} says ${c.disputed.full} is ${c.disputed.soft}. ${c.disputed.by} is entitled to an opinion. It's in the binder. In pencil.`, { w: 5, story: true }),
       ],
       mine: [
         l("hol.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level}! I've updated your entry. You have an entry, did I mention?`, { w: 4 }),
+        l("hol.e.you", "excited", c => c.comp && c.comp.you && c.comp.you <= 3, c => `${cap(c.comp.youOrd)} at the comp. It's in the binder, with your scorecard stapled in.`, { w: 5, story: true }),
         l("hol.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `${cap(c.youFa.full)}: a V${c.youFa.grade} first ascent. That's a proper addition to the record. I'll need a sketch. I'll do the sketch.`, { w: 5 }),
         l("hol.m.memory", "happy", c => c.close && c.memory, c => `I was re-reading my notes on ${c.memory.full}, from the day you sent it. I wrote “witnessed”. I don't write that for everyone.`, { w: 2 }),
         l("hol.m.fa", "excited", c => c.youFa, c => `I've added ${c.youFa.full} to the binder. I'll need you to confirm the start holds. Officially.`, { w: 4 }),
@@ -329,7 +370,8 @@
         l("hol.m.with", "happy", c => c.together, c => `I've written up our day on ${c.together.full}. You come out of it very well.`, { w: 2 }),
         l("hol.m.beta", "excited", c => c.betaWorked, c => `You sent ${c.betaWorked.full} with my beta! I'm adding a footnote. Several.`, { w: 5 }),
       ],
-      others: [l("hol.o.news", "thoughtful", c => c.other, c => `For the record: ${c.other.person} ${c.other.fa ? "put up" : "sent"} ${c.other.full}, after ${c.other.dur}. I have it on good authority. Mine.`, { w: 2 })],
+      others: [l("hol.o.news", "thoughtful", c => c.other, c => `For the record: ${c.other.person} ${c.other.fa ? "put up" : "sent"} ${c.other.full}, after ${c.other.dur}. I have it on good authority. Mine.`, { w: 2 }),
+        l("hol.o.party", "excited", c => c.party, c => `${c.party.person} put up ${c.party.full}! I've given it its own page. Two pages.`, { w: 4, story: true })],
       ask: [
         l("hol.a.proj", "thoughtful", c => c.proj, c => `${cap(c.proj.full)}. I have four pages on it. Three are about the crux. The fourth is also, if I'm honest, about the crux.`),
         l("hol.a.none", "embarrassed", c => !c.proj, () => "Nothing just now. I'm between projects. Which is to say I'm writing about other people's."),
@@ -384,6 +426,7 @@
       hello: [
         l("oti.h.dog", "excited", c => c.yours && c.dogWith, () => "Pickles! Perfect dog weather. Here, he can have the crust.", { w: 3 }),
         l("oti.h.gap", "excited", c => c.gap >= 21, () => "Look who it is! You picked a perfect day to come back. Every day's perfect, but still.", { w: 6 }),
+        l("oti.h.ev", "excited", c => !!c.event, c => ({"spring": "Spring comp! The friction's perfect. Well. It's always perfect. Today it's really perfect.", "comp": "Comp day! Perfect comp weather. I'm not going to win. I'm going to have a perfect time.", "bonfire": "I brought marshmallows. And a backup bag of marshmallows.", "trail": "Perfect trail-building weather!", "midsummer": "I made forty sandwiches. Forty-one. I ate one on the drive."})[c.event], { w: 8 }),
         l("oti.h.ro", "happy", c => c.rowanSweet, () => "Rowan's been drawing the same crash pad all morning. Your crash pad. Perfect drawing weather, I suppose.", { w: 3, story: true }),
         l("oti.h.us", "excited", c => c.rowanUs, () => "You and Rowan! Perfect. Perfect weather for it. Every weather is, really, but especially this one.", { w: 5, story: true }),
         l("oti.h.perfect", "happy", T, () => "Perfect sending weather!"),
@@ -406,10 +449,14 @@
       ],
       theirs: [
         l("oti.d.sent", "excited", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `Did you hear? I got ${c.done.full}! After ${c.done.dur}. Perfect conditions. Every one of them.`, { w: 3 }),
+        l("oti.e.them", "excited", c => c.comp && c.comp.them, c => `I came ${c.comp.themOrd} at the comp! Perfect, honestly. I had seven sandwiches.`, { w: 5, story: true }),
+        l("oti.g.mine", "happy", c => c.dispute, c => `${cap(c.dispute.full)} felt like V${c.dispute.sugg} to me. Perfect conditions, though, so maybe it was just me.`, { w: 5, story: true }),
+        l("oti.g.theirs", "excited", c => c.disputed, c => `${c.disputed.by} reckons ${c.disputed.full} is ${c.disputed.soft}! Perfect. People are talking about it.`, { w: 5, story: true }),
         l("oti.d.slab", "happy", c => !c.done && c.proj && c.proj.n >= 6, c => `I've been on ${c.proj.full} for ${c.proj.dur}. It's a relationship now.`, { w: 2 }),
       ],
       mine: [
         l("oti.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level}! In perfect sending weather, I bet. This calls for a sandwich.`, { w: 4 }),
+        l("oti.e.you", "excited", c => c.comp && c.comp.you && c.comp.you <= 3, c => `${cap(c.comp.youOrd)} at the comp! Perfect result. Perfect day.`, { w: 5, story: true }),
         l("oti.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `A V${c.youFa.grade} first ascent! ${cap(c.youFa.full)}! I'd have named it “Perfect Sending Weather”. But yours is good too.`, { w: 5 }),
         l("oti.m.memory", "happy", c => c.close && c.memory, c => `Remember ${c.memory.full}? Perfect day. Perfect send. I had two sandwiches.`, { w: 2 }),
         l("oti.m.send", "happy", c => c.youSent, c => `${cap(c.youSent.full)}! I saw from over there. Beautiful. Perfect weather for it, too.`, { w: 2 }),
@@ -420,7 +467,8 @@
         l("oti.m.with", "happy", c => c.together, c => `That day on ${c.together.full}! Perfect sending weather, that was.`, { w: 2 }),
         l("oti.m.beta", "excited", c => c.betaWorked, c => `${cap(c.betaWorked.full)}! My beta! Well. Your climbing. But my beta!`, { w: 5 }),
       ],
-      others: [l("oti.o.news", "excited", c => c.other, c => `Did you hear about ${c.other.person}? ${cap(c.other.fa ? "put up" : "sent")} ${c.other.full}! What a week for it.`, { w: 2 })],
+      others: [l("oti.o.news", "excited", c => c.other, c => `Did you hear about ${c.other.person}? ${cap(c.other.fa ? "put up" : "sent")} ${c.other.full}! What a week for it.`, { w: 2 }),
+        l("oti.o.party", "excited", c => c.party, c => `We had a little party at the lot for ${c.party.person}'s new one: ${c.party.full}. Perfect party weather.`, { w: 4, story: true })],
       ask: [
         l("oti.a.proj", "happy", c => c.proj, c => `${cap(c.proj.full)}! ${cap(c.proj.dur)}. It's the best thing I've never done.`),
         l("oti.a.none", "happy", c => !c.proj, () => "Nothing! Everything! It's that kind of day."),
@@ -488,6 +536,7 @@
         l("row.h.month", "smitten", c => c.us && c.usDays >= 28 && c.usDays <= 40, () => "It's been a month since the sunset. I drew it from memory and got the colours wrong on purpose. They were better than that.", { w: 9, sweet: true, story: true }),
         l("row.h.year", "smitten", c => c.us && c.usDays >= 365 && c.usDays <= 380, () => "A year since the sunset. I've filled four sketchbooks since then. You're in most of them.", { w: 9, sweet: true, story: true }),
         l("row.h.gap", "happy", c => c.gap >= 21, () => "Oh! You're back. I kept looking up whenever someone came down the trail. Anyway. Hi.", { w: 6 }),
+        l("row.h.ev", "happy", c => !!c.event, c => ({"spring": "I'm going to draw everyone's first go of the season. Nobody's warmed up yet. It's lovely.", "comp": "I'm mostly here to draw everyone looking nervous. I might climb a bit.", "bonfire": "The light goes so early today. I'm going to try to draw the fire later. Fire's impossible to draw.", "trail": "Trail Day! Gus gave me a rake and I've no idea what to do with it.", "midsummer": "The light goes on forever today. I've drawn the same boulder four times as it changes."})[c.event], { w: 8 }),
         l("row.h.back", "happy", T, () => "Hey, you're back! I was hoping someone would come up here."),
         l("row.h.light", "thoughtful", c => c.part === "morning", () => "The light's doing something lovely on the rock this morning. I've drawn it three times and it's still wrong.", { w: 2 }),
         l("row.h.glow", "happy", c => c.part !== "morning", () => "The afternoon light makes everything look like it's glowing. Even the chalk.", { w: 2 }),
@@ -509,9 +558,13 @@
         l("row.t.usfell", "frustrated", c => c.us && c.today && c.today.out === "fell" && c.proj, c => `Fell off ${c.proj.full} again. Tell me something nice, and then I'll try it once more.`, { w: 4, sweet: true }),
         l("row.t.ussend", "laugh", c => c.us && c.sentToday, c => `I did it! ${cap(c.sentToday.full)}! I wanted you to be the first to know. Well, second. Pickles was there.`, { w: 6, sweet: true }),
       ],
-      theirs: [l("row.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `I finally sent ${c.done.full}. The drawing of it is pinned up at the library now. Nobody knows it's a boulder.`, { w: 3 })],
+      theirs: [l("row.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `I finally sent ${c.done.full}. The drawing of it is pinned up at the library now. Nobody knows it's a boulder.`, { w: 3 }),
+        l("row.e.res", "happy", c => c.comp && !(c.comp.you && c.comp.you <= 3), c => `I drew the whole comp. ${cap(c.comp.winner)}${c.comp.winner === "you" ? "'re" : " is"} mostly a blur. Everyone else is mostly arms.`, { w: 5, story: true }),
+        l("row.g.mine", "thoughtful", c => c.dispute, c => `I think ${c.dispute.full} is more like V${c.dispute.sugg}. Or maybe I've drawn it so many times it just feels easy.`, { w: 5, story: true }),
+        l("row.g.theirs", "embarrassed", c => c.disputed, c => `${c.disputed.by} says ${c.disputed.full} is ${c.disputed.soft}. I'm choosing to take it as a compliment.`, { w: 5, story: true })],
       mine: [
         l("row.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level}! I could tell, you know. You climb differently now. Smoother.`, { w: 4 }),
+        l("row.e.you", "happy", c => c.comp && c.comp.you && c.comp.you <= 3, () => "I drew you on the podium. You look so surprised in it.", { w: 5, story: true }),
         l("row.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `${cap(c.youFa.full)}. A V${c.youFa.grade} first ascent. Can I draw it? I want to get it down before anyone else climbs it.`, { w: 5 }),
         l("row.m.memory", "happy", c => c.close && c.memory, c => `I found the drawing from the day you sent ${c.memory.full}. You're a little smudge at the top, with your arms up.`, { w: 2 }),
         l("row.m.send", "happy", c => c.youSent, c => `I saw you on ${c.youSent.full}. You looked so calm. Was it calm?`, { w: 2 }),
@@ -522,7 +575,8 @@
         l("row.m.beta", "happy", c => c.betaWorked, c => `You did ${c.betaWorked.full}! I'm glad the drawing helped.`, { w: 5 }),
         l("row.m.hard", "excited", c => c.youHardest, c => `V${c.youHardest.grade}! That's your hardest yet, isn't it?`, { w: 3 }),
       ],
-      others: [l("row.o.news", "happy", c => c.other, c => `${c.other.person} ${c.other.fa ? "put up" : "sent"} ${c.other.full}. I drew the celebration. It's mostly arms.`, { w: 2 })],
+      others: [l("row.o.news", "happy", c => c.other, c => `${c.other.person} ${c.other.fa ? "put up" : "sent"} ${c.other.full}. I drew the celebration. It's mostly arms.`, { w: 2 }),
+        l("row.o.party", "happy", c => c.party, c => `Everyone cheered when ${c.party.person} came back to the lot after ${c.party.full}. I drew it. It's mostly arms again.`, { w: 4, story: true })],
       ask: [
         l("row.a.proj", "thoughtful", c => c.proj, c => `${cap(c.proj.full)}. I like it because the holds look like a face. Once you see it you can't unsee it.`),
         l("row.a.none", "happy", c => !c.proj, () => "Nothing really. I'm drawing more than climbing today."),
@@ -594,6 +648,7 @@
       hello: [
         l("bea.h.dog", "excited", c => c.yours && c.dogWith, () => "PICKLES!! Oh, and hi. Hi. But PICKLES.", { w: 3 }),
         l("bea.h.gap", "excited", c => c.gap >= 21, () => "WHERE HAVE YOU BEEN. Okay, sorry. Hi. I've learned SO many dynos since.", { w: 6 }),
+        l("bea.h.ev", "excited", c => !!c.event, c => ({"spring": "SPRING COMP. I trained ALL WINTER. On a pull-up bar in my closet.", "comp": "COMP DAY. I've been training since September. Mostly dynos. Okay, only dynos.", "bonfire": "Bonfire! My mom says I can stay till it's over. Over-over.", "trail": "We get to MOVE ROCKS. On purpose!", "midsummer": "Climbing till dark!! With HEADLAMPS!"})[c.event], { w: 8 }),
         l("bea.h.ro", "excited", c => c.rowanSweet, () => "Rowan drew you AGAIN. I saw. Are you two— no. Never mind. Forget I said anything. (Are you, though?)", { w: 3, story: true }),
         l("bea.h.us", "excited", c => c.rowanUs, () => "OH MY GOD. You and ROWAN? I KNEW it. I called it weeks ago. Nobody ever listens to me.", { w: 5, story: true }),
         l("bea.h.almost", "excited", T, () => "Did you see that? I almost stuck it! Almost!"),
@@ -615,9 +670,14 @@
         l("bea.t.warm", "happy", c => c.today && c.today.out !== "wet" && c.today.warm, c => `I stuck the dyno on ${c.today.warm.full} again this morning. Then I tried a slab for forty minutes and got absolutely nowhere. Slab is fake.`, { w: 3 }),
         l("bea.t.wet", "frustrated", c => c.today && c.today.out === "wet", () => "I've been practising dynos on a log. The log is winning."),
       ],
-      theirs: [l("bea.d.sent", "excited", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `I sent ${c.done.full}! After ${c.done.dur}! I still can't believe it. I keep thinking about it in class.`, { w: 3 })],
+      theirs: [l("bea.d.sent", "excited", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `I sent ${c.done.full}! After ${c.done.dur}! I still can't believe it. I keep thinking about it in class.`, { w: 3 }),
+        l("bea.e.them", "excited", c => c.comp && c.comp.them && c.comp.them <= 3 && !c.comp.beatThem, c => `I came ${c.comp.themOrd} at the comp!!! I'm putting it on my college applications.`, { w: 5, story: true }),
+        l("bea.e.res", "excited", c => c.comp && !(c.comp.them && c.comp.them <= 3) && !c.comp.beatThem, c => `${cap(c.comp.winner)} won the comp. I'm going to beat ${c.comp.winner === "you" ? "you" : "everyone"} next year. I've decided.`, { w: 5, story: true }),
+        l("bea.g.mine", "excited", c => c.dispute, c => `${cap(c.dispute.full)} is SO ${c.dispute.soft}. V${c.dispute.sugg}, max. I'm not being dramatic.`, { w: 5, story: true }),
+        l("bea.g.theirs", "frustrated", c => c.disputed, c => `${c.disputed.by} says ${c.disputed.full} is ${c.disputed.soft}!! It is NOT. Okay, it might be.`, { w: 5, story: true })],
       mine: [
         l("bea.m.level", "excited", c => c.youLevel, c => `V${c.youLevel.level}!! That's so good! Okay now try a dyno at that grade.`, { w: 4 }),
+        l("bea.e.beat", "frustrated", c => c.comp && c.comp.beatThem, () => "You BEAT me at the comp. Rematch. Next year. I'm already training.", { w: 5, story: true }),
         l("bea.m.hardfa", "excited", c => c.youFa && c.youFa.hard, c => `A V${c.youFa.grade} FIRST ASCENT?! ${c.youFa.full.toUpperCase()}! I'm telling my mom. She won't get it. I'm telling her.`, { w: 5 }),
         l("bea.m.memory", "happy", c => c.close && c.memory, c => `Remember when you did ${c.memory.full} and I screamed? I'm still proud of that scream.`, { w: 2 }),
         l("bea.m.send", "excited", c => c.youSent, c => `You got ${c.youSent.full}?! Did you jump for it? You should've jumped for it.`, { w: 2 }),
@@ -628,7 +688,8 @@
         l("bea.m.with", "happy", c => c.together, c => `That day on ${c.together.full} was the best. I told my mom about it. She said “that's nice, sweetie.”`, { w: 2 }),
         l("bea.m.beta", "excited", c => c.betaWorked, c => `YOU DID ${c.betaWorked.full.toUpperCase()} WITH MY BETA. I'm telling everyone.`, { w: 5 }),
       ],
-      others: [l("bea.o.news", "excited", c => c.other, c => `Did you hear ${c.other.person} ${c.other.fa ? "put up" : "sent"} ${c.other.full}?! I wasn't there. I heard about it. I'm basically a witness.`, { w: 2 })],
+      others: [l("bea.o.news", "excited", c => c.other, c => `Did you hear ${c.other.person} ${c.other.fa ? "put up" : "sent"} ${c.other.full}?! I wasn't there. I heard about it. I'm basically a witness.`, { w: 2 }),
+        l("bea.o.party", "excited", c => c.party, c => `${c.party.person} put up ${c.party.full}!! There was CAKE. Well, Otis had a muffin. We shared it.`, { w: 4, story: true })],
       ask: [
         l("bea.a.proj", "excited", c => c.proj, c => `${cap(c.proj.full)}! It's not a dyno. I'm making it a dyno.`),
         l("bea.a.none", "happy", c => !c.proj, () => "Nothing! Everything! Whatever looks jumpy."),
@@ -681,6 +742,7 @@
       hello: [
         l("dez.h.dog", "happy", c => c.yours && c.dogWith, () => "Hey, Pickles. …And you.", { w: 3 }),
         l("dez.h.gap", "happy", c => c.gap >= 21, () => "Hey. Been a while. Good to see you.", { w: 6 }),
+        l("dez.h.ev", "happy", c => !!c.event, c => ({"spring": "Comp again. …Good.", "comp": "Comp. …Good.", "bonfire": "Bonfire later. I'll stay for a bit.", "trail": "Trail Day. Brought gloves.", "midsummer": "Long day. Good."})[c.event], { w: 8 }),
         l("dez.h.ro", "thoughtful", c => c.rowanSweet, () => "Rowan keeps looking over here. Not at me.", { w: 3, story: true }),
         l("dez.h.us", "happy", c => c.rowanUs, () => "Heard about you and Rowan. …Good. Really.", { w: 5, story: true }),
         l("dez.h.mm", "neutral", T, () => "Mm. Good conditions."),
@@ -701,9 +763,13 @@
         l("dez.t.laps", "neutral", c => c.today && c.today.out === "mileage", () => "Just moving. Easy day.", { w: 2 }),
         l("dez.t.wet", "neutral", c => c.today && c.today.out === "wet", () => "Waiting."),
       ],
-      theirs: [l("dez.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `Finished ${c.done.full}. ${cap(c.done.dur)}. Worth it.`, { w: 3 })],
+      theirs: [l("dez.d.sent", "happy", c => c.done && c.done.sent && !c.done.today && c.done.n >= 3, c => `Finished ${c.done.full}. ${cap(c.done.dur)}. Worth it.`, { w: 3 }),
+        l("dez.e.won", "happy", c => c.comp && c.comp.them === 1, () => "Won the comp. …Don't tell anyone I was nervous.", { w: 5, story: true }),
+        l("dez.g.mine", "neutral", c => c.dispute, c => `${cap(c.dispute.full)}. Felt like V${c.dispute.sugg}.`, { w: 5, story: true }),
+        l("dez.g.theirs", "thoughtful", c => c.disputed, c => `${c.disputed.by} thinks ${c.disputed.full} is ${c.disputed.soft}. Could be.`, { w: 5, story: true })],
       mine: [
         l("dez.m.level", "happy", c => c.youLevel, c => `V${c.youLevel.level}. Nice.`, { w: 4 }),
+        l("dez.e.beat", "happy", c => c.comp && c.comp.beatThem && c.comp.you === 1, () => "You beat me. At the comp. …Good. Again next year.", { w: 5, story: true }),
         l("dez.m.hardfa", "happy", c => c.youFa && c.youFa.hard, c => `${cap(c.youFa.full)}. V${c.youFa.grade}, first ascent. …Respect.`, { w: 5 }),
         l("dez.m.memory", "happy", c => c.close && c.memory, c => `${cap(c.memory.full)}. Still a good day, that.`, { w: 2 }),
         l("dez.m.send", "happy", c => c.youSent, c => `Saw ${c.youSent.full}. Clean.`, { w: 2 }),
@@ -714,7 +780,8 @@
         l("dez.m.with", "happy", c => c.together, c => `Good day, that one. ${cap(c.together.full)}.`, { w: 2 }),
         l("dez.m.beta", "happy", c => c.betaWorked, c => `${cap(c.betaWorked.full)}. Told you.`, { w: 5 }),
       ],
-      others: [l("dez.o.news", "neutral", c => c.other, c => `${c.other.person} ${c.other.fa ? "put up" : "got"} ${c.other.full}. Good for them.`, { w: 2 })],
+      others: [l("dez.o.news", "neutral", c => c.other, c => `${c.other.person} ${c.other.fa ? "put up" : "got"} ${c.other.full}. Good for them.`, { w: 2 }),
+        l("dez.o.party", "neutral", c => c.party, c => `${c.party.person}. ${cap(c.party.full)}. Strong.`, { w: 4, story: true })],
       ask: [l("dez.a.proj", "thoughtful", c => c.proj, c => `${cap(c.proj.full)}. Hard. Good.`), l("dez.a.none", "neutral", c => !c.proj, () => "Nothing right now. Looking.")],
       tell: [
         l("dez.k.did", "thoughtful", c => c.yourProj && c.yourProj.theyDid && !c.yourProj.tipped, c => `${cap(c.yourProj.full)}. Did it. Want the beta?`, { w: 3 }),
@@ -773,6 +840,8 @@
       l("bis.h.first", "happy", T, () => "You know who put up the first problem in this park? Me. Well. Me and Dot. Mostly me."),
       l("bis.h.name", "thoughtful", T, () => "They call me the Bishop. Don't ask why. It's a long story, and most of it's true."),
       l("bis.h.gap", "happy", c => c.gap >= 21, c => `Thought you'd given up! Back in '${c.yy}, people gave up all the time. You're made of sterner stuff.`, { w: 5 }),
+      l("bis.h.ev", "happy", c => !!c.event, c => ({ spring: `A comp on April Fools' Day? In '${c.yy} we'd have done it in fancy dress.`, comp: `A comp! Back in '${c.yy} we had one too. I won. Nobody wrote it down, of course.`, bonfire: "Shortest day of the year. Dot and I used to light a fire right about here. Mind you, it was a different here.", trail: "Trail Day. I built half these trails. The good half.", midsummer: `Longest day. In '${c.yy} we climbed till midnight by the headlights of a car. Somebody else's car.` })[c.event], { w: 8 }),
+      l("bis.h.grade", "thoughtful", c => !!c.anyDispute, c => `Arguing about grades again, are they? In '${c.yy} we had two grades: “hard” and “Dot did it”.`, { w: 2 }),
       l("bis.h.us", "happy", c => c.rowanUs, () => "You and the one with the sketchbook, eh? Dot and I used to watch the sunset from up on the hill. Best seat in the park, that.", { w: 5, story: true }),
     ],
     story: [
@@ -965,7 +1034,8 @@
     }
     const hi = c.firstMeeting ? choose(env, who, ["first"], c, r)
       : c.invited ? choose(env, who, ["invited"], c, r)
-      : (c.us && choose(env, who, ["hello"], c, r, true, ln => /\.h\.(after|month|year)$/.test(ln.id)))     // the day after the sunset, and anniversaries (Stage 6)
+      : (c.event && choose(env, who, ["hello"], c, r, true, ln => /\.h\.ev$/.test(ln.id)))                       // an event today (Stage 7)
+        || (c.us && choose(env, who, ["hello"], c, r, true, ln => /\.h\.(after|month|year)$/.test(ln.id)))     // the day after the sunset, and anniversaries (Stage 6)
         || (c.gap >= 21 && choose(env, who, ["hello"].filter(() => true), { ...c }, r, true, ln => /\.gap$/.test(ln.id))) || choose(env, who, ["hello"], c, r, true) || choose(env, who, ["nod"], c, r, true);
     if (hi) out.push(hi);
     // A friendship that's just deepened: they say so (once).

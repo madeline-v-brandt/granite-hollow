@@ -148,7 +148,9 @@
       const sb = svg.append("g").attr("transform", `translate(${f1(PAD + 14)},${f1(MH - PAD - 16)})`).attr("pointer-events", "none"), m100 = 100 * SC;
       for (let i = 0; i < 2; i++) sb.append("rect").attr("x", i * m100).attr("y", -3).attr("width", m100).attr("height", 5).attr("fill", i ? "#f3e9cf" : "#4a3f30").attr("stroke", "#4a3f30").attr("stroke-width", .8);
       for (const [i, t] of [[0, "0"], [1, "100"], [2, "200 m"]]) sb.append("text").attr("class", "pp-scale").attr("x", i * m100).attr("y", -7).text(t);
-      // What changes with each opening sits on top.
+      // What changes with each opening sits on top: the old trails Trail Day has reopened (Phase 4,
+      // Stage 7), the areas, your view, the people you know, and you.
+      svg.append("g").attr("class", "pp-old").attr("pointer-events", "none");
       svg.append("g").attr("class", "pp-areas");
       svg.append("g").attr("class", "pp-view").attr("pointer-events", "none");
       svg.append("g").attr("class", "pp-people");
@@ -195,6 +197,9 @@
         const go = () => pick({ x: sec.x, y: sec.y, sector: a.name });
         gA.on("click", e => { e.stopPropagation(); go(); }).on("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
       }
+      const og = svg.select(".pp-old"); og.selectAll("*").remove();
+      const open = (S.oldTrails || []).filter(t => (s.oldTrails || []).includes(t.old));
+      if (open.length) og.append("path").attr("d", open.map(t => lineD(P(t.pts))).join("")).attr("fill", "none").attr("stroke", "#a9442c").attr("stroke-width", 1.6).attr("stroke-dasharray", "4.5 3").attr("stroke-linecap", "round");
       const vg = svg.select(".pp-view"); vg.selectAll("*").remove();
       if (s.view) {
         const [a0, b0] = px(s.view[0], s.view[3]), [a1, b1] = px(s.view[2], s.view[1]);

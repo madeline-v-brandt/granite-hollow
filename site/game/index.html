@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=53">
+<link rel="stylesheet" href="scene.css?v=55">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -350,6 +350,11 @@ svg#map:active { cursor: grabbing; }
 .trail-ink { fill: none; stroke: #6d4927; stroke-width: 1.6px; stroke-dasharray: 5 3.5; vector-effect: non-scaling-stroke; }
 .trail-snowpack { fill: none; stroke: #d3dcea; stroke-width: 1.5; stroke-linecap: round; opacity: calc(var(--snow) * .95); }
 .trail-blaze { fill: #3c70c4; stroke: #1c3a6c; stroke-width: .06; opacity: calc(.85 - var(--snow) * .6); }
+/* The old trails (Phase 4, Stage 7): a faint, overgrown line until Trail Day reopens one (.open) */
+.trail-edge.old-trail:not(.open) { opacity: 0; }
+.trail-dirt.old-trail:not(.open) { stroke-width: 1.5; stroke-dasharray: 1.4 1.5; opacity: .7; }
+.trail-ink.old-trail:not(.open) { stroke-dasharray: 1.5 6; opacity: .35; }
+.trail-snowpack.old-trail:not(.open) { opacity: 0; }
 /* understory */
 .fl { opacity: var(--flowers); } .fl0 { fill: var(--fl-0); } .fl1 { fill: var(--fl-1); } .fl2 { fill: var(--fl-2); } .fl3 { fill: var(--fl-3); }
 .grass { fill: none; stroke: var(--grass-c); stroke-width: .09; stroke-linecap: round; opacity: calc(.8 - var(--snow) * .7); }
@@ -796,6 +801,33 @@ svg#map:active { cursor: grabbing; }
 .toast.sweet { border-left-color: #d9668a; }
 .pp-tier.ro { background: color-mix(in oklab, #e7849a 30%, var(--panel)); color: var(--ink); }
 .ro-heart { color: #d9668a; font-weight: 700; }
+/* Events (Phase 4, Stage 7): the Here tab's card, the comp's scorecard, the scenes, ribbons */
+.event-card { margin: 14px 0 4px; padding: 10px 13px 12px; border: 1.5px solid var(--gold); border-left: 4px solid var(--gold); border-radius: 10px; background: color-mix(in oklab, var(--gold) 6%, var(--raised)); }
+.event-card h3 { margin: 2px 0 4px; }
+.event-card h4 { margin: 10px 0 4px; font: 800 11px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.event-card.soon { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; }
+.event-card .btn { margin-top: 6px; }
+.comp-card, .comp-board { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+.comp-card li, .comp-board li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dashed var(--rule); font-variant-numeric: tabular-nums; }
+.comp-board li.me { font-weight: 800; color: var(--ink); background: color-mix(in oklab, var(--gold) 14%, transparent); border-radius: 6px; padding-inline: 6px; }
+.comp-board li.gap { justify-content: center; color: var(--muted); border: 0; }
+.comp-board.final { margin: 6px 0 10px; }
+.event-scene { margin: -2px 0 12px; border-radius: 12px; overflow: hidden; border: 2px solid var(--ink); line-height: 0; }
+.event-art { width: 100%; height: auto; display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .event-art .ev-flame { transform-box: fill-box; transform-origin: 50% 100%; animation: ev-flicker 1.4s ease-in-out infinite alternate; }
+  .event-art .ev-spark { animation: ev-spark 2.2s ease-out infinite; }
+  .event-art .ev-spark:nth-of-type(2n) { animation-delay: .8s; }
+}
+@keyframes ev-flicker { from { transform: scaleY(.94) skewX(-2deg); } to { transform: scaleY(1.05) skewX(2deg); } }
+@keyframes ev-spark { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-16px); } }
+.events-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.events-list li { display: flex; gap: 10px; align-items: center; }
+.ribbon { flex: none; width: 22px; height: 30px; position: relative; }
+.ribbon::before { content: ""; position: absolute; left: 3px; top: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--rb, #c9b48a); border: 1.5px solid var(--ink); }
+.ribbon::after { content: ""; position: absolute; left: 5px; top: 14px; width: 12px; height: 15px; background: var(--rb, #c9b48a); border: 1.5px solid var(--ink); border-top: 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%); }
+.ribbon.r1 { --rb: #d8a93a; } .ribbon.r2 { --rb: #b9c0c8; } .ribbon.r3 { --rb: #c98a52; }
+.ribbon.none::before { background: transparent; border-style: dashed; } .ribbon.none::after { display: none; }
 .sunset { margin: -2px 0 12px; border-radius: 12px; overflow: hidden; border: 2px solid var(--ink); line-height: 0; }
 .sunset-art { width: 100%; height: auto; display: block; }
 .sunset .ss-heart { opacity: 0; transform-box: fill-box; transform-origin: center; }
@@ -954,6 +986,10 @@ tr.lb-me td { background: var(--gold-soft); }
 .plan .cl.wet { color: var(--minus); }
 .plan .sky { font-size: 14px; color: var(--ink-2); }
 .plan .body { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.35; font-variant-numeric: tabular-nums; }
+/* Events (Phase 4, Stage 7): flagged on the forecast */
+.plan.event { border-color: var(--gold); box-shadow: 0 2px 0 color-mix(in oklab, var(--gold) 55%, transparent); background: color-mix(in oklab, var(--gold) 7%, var(--raised)); }
+.plan .ev { font-size: 11.5px; font-weight: 800; color: var(--gold); line-height: 1.2; margin-bottom: 4px; }
+.event-soon { color: var(--gold); font-weight: 700; margin-top: 8px; }
 .toasts {
   position: fixed; z-index: 30; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none;
@@ -1148,16 +1184,16 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=53"></script>
-<script src="art.js?v=53"></script>
-<script src="world.js?v=53"></script>
-<script src="knowledge.js?v=53"></script>
-<script src="social.js?v=53"></script>
-<script src="portraits.js?v=53"></script>
-<script src="talk.js?v=53"></script>
-<script src="illustrate.js?v=53"></script>
-<script src="paint.js?v=53"></script>
-<script src="paper.js?v=53"></script>
-<script src="travel.js?v=53"></script>
-<script src="scene.js?v=53"></script>
-<script src="game.js?v=53"></script>
+<script src="mechanics.js?v=55"></script>
+<script src="art.js?v=55"></script>
+<script src="world.js?v=55"></script>
+<script src="knowledge.js?v=55"></script>
+<script src="social.js?v=55"></script>
+<script src="portraits.js?v=55"></script>
+<script src="talk.js?v=55"></script>
+<script src="illustrate.js?v=55"></script>
+<script src="paint.js?v=55"></script>
+<script src="paper.js?v=55"></script>
+<script src="travel.js?v=55"></script>
+<script src="scene.js?v=55"></script>
+<script src="game.js?v=55"></script>

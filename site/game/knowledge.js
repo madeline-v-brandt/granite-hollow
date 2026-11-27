@@ -232,6 +232,57 @@
       if (n.kind === "classic") return 2;
       return 1;
     }
+    // ---- events and stories (Phase 4, Stage 7), worked out from the calendar and the ledger ----
+    const ORD = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+    const ordinal = n => ORD[n] || `${n}th`;
+    const short = (w, nm) => (w && w.startsWith("n:") ? World.whoName(D, w).replace(/^Ranger /, "").replace(/^the /, "").split(" ")[0] : nm);
+    // The comp's results on a day: the field, with you in it if you climbed (G.events).
+    function compResults(date) {
+      const g = G(), field = World.compField(D, g, date).map(x => ({ ...x, short: short(x.who, x.name) }));
+      const mine = g.events && g.events[date];
+      if (mine && (World.eventOn(date) || {}).comp && mine.score > 0) field.push({ who: "you", name: "You", short: "you", score: mine.score, sends: [] });
+      field.sort((a, b) => b.score - a.score || (a.who === "you" ? -1 : b.who === "you" ? 1 : 0));
+      return field;
+    }
+    function eventBuzz(since) {
+      const g = G(), out = [];
+      const ahead = World.nextEvent(World.addDays(g.date, 1), 13);
+      if (ahead) {
+        const day = new Date(ahead.date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+        out.push({ date: g.date, kind: "poster", go: null, text: `Gus has put up a poster at the kiosk: ${ahead.name}, ${day}.${ahead.comp ? " Every problem in the park counts." : ""}` });
+      }
+      for (let d = since; d < g.date; d = World.addDays(d, 1)) {
+        const e = World.eventOn(d); if (!e) continue;
+        let text;
+        if (e.comp) {
+          const f = compResults(d), at = f.findIndex(x => x.who === "you");
+          if (f.length < 3) continue;
+          const nm = x => (x.who === "you" ? "you" : x.short);
+          text = `${e.name} went to ${nm(f[0])}, with ${f[0].score.toLocaleString("en-US")} points; ${nm(f[1])} came second and ${nm(f[2])} third.`;
+          if (at >= 3) text += ` You came ${ordinal(at + 1)}, with ${f[at].score.toLocaleString("en-US")}.`;
+        } else text = {
+          bonfire: "Half the Hollow turned up for the Solstice Bonfire. The Bishop's story about 1977 got longer again.",
+          trail: (t => (t ? `On Trail Day, Gus and a crowd of volunteers reopened ${t.name}, the old path between ${area(t.a) >= 1 ? t.a : (World.AREAS[t.a] || {}).hint || "two of the areas"} and ${area(t.b) >= 1 ? t.b : (World.AREAS[t.b] || {}).hint || "further out"}. It's on the trail map.` : "Gus and a crowd of volunteers cut back the summer's growth along the trails on Trail Day."))(World.oldTrailOn(d)),
+          midsummer: "The Midsummer Dusk Session went on until the headlamps came out. Otis made forty sandwiches.",
+        }[e.key];
+        out.push({ date: d, kind: "event", go: null, text });
+      }
+      return out;
+    }
+    // Grade disputes: a regular who's repeated a line thinks it's a grade off.
+    function gradeBuzz(since) {
+      const g = G(), out = [];
+      for (const [p, e] of Object.entries(g.world.est)) for (const l of e.logs || []) {
+        const [who, d, , , sugg] = l;
+        if (sugg == null || sugg === e.grade || d < since || d > g.date || !who.startsWith("n:") || !World.NAMED[who.slice(2)] || e.by === who) continue;
+        const pr = D.problems[+p], s = D.boulders[pr.b].sector, seen = line(+p) === "est" && boulder(pr.b) >= 1, nm = short(who);
+        const soft = sugg < e.grade ? "soft" : "sandbagged";
+        const fa = e.by === "you" ? " You put it up, so it's your call." : e.by.startsWith("n:") && World.NAMED[e.by.slice(2)] ? ` ${short(e.by)}, who put it up, does not agree.` : "";
+        out.push({ date: d, kind: "grade", by: who, p: seen ? +p : null, go: goFor(s, pr.b),
+          text: seen ? `${nm} reckons ${name(+p)} (V${e.grade}) is ${soft}: more like V${sugg}.${fa}` : `${nm} reckons ${stiff(e.grade)} ${where(s, pr.b)} is ${soft}: more like V${sugg}.${fa}` });
+      }
+      return out;
+    }
     function buzz(opts = {}) {
       if (all() || !World) return [];
       const g = G(), since = World.addDays(g.date, -(opts.days ?? 21)), cand = [];
@@ -239,6 +290,10 @@
         if (n.dev || n.date < since || n.date > g.date) continue;
         const it = buzzItem(n);
         if (it) cand.push([score(n, it), it]);
+      }
+      if (World.eventOn) {
+        for (const it of eventBuzz(since)) cand.push([it.kind === "poster" ? 11 : 9, it]);
+        for (const it of gradeBuzz(since)) cand.push([5, it]);
       }
       cand.sort((a, b) => b[0] - a[0] || (a[1].date < b[1].date ? 1 : a[1].date > b[1].date ? -1 : 0));
       const out = [], perDate = {}, perWho = {};
@@ -257,7 +312,7 @@
 
     return { all, v2, est, area, boulder, line, visible, name, grade, boulderName, stats, knownBoulders, linesOn, guidebook,
       boulderStats, areaStats, canGo, canSpot, mapView, visitArea, visitBoulder, identify, tell, inspect, spottable,
-      inspected, lookAgain, identified, sameName, hearOf, toldOf, meet, met, pet, chat, buzz,
+      inspected, lookAgain, identified, sameName, hearOf, toldOf, meet, met, pet, chat, buzz, compResults,
       legend: p => (World && visible(p) ? World.legendOf(D, p) : null), faText: p => (World ? World.faText(D, est(p)) : "") };
   }
   const Know = { make };

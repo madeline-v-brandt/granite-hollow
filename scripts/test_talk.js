@@ -261,6 +261,50 @@ test("Bea is only ever a friend: nobody but Rowan has anything playful or sweet"
   for (const [k, lib] of Object.entries(Talk.LINES)) if (k !== "rowan") for (const [tp, ls] of Object.entries(lib)) for (const ln of ls) assert(!ln.sweet && tp !== "sunset" && tp !== "playful", `${k} ${ln.id}`);
   assert(Talk.PLAYFUL.every(x => !/Bea/.test(x.label({ proj: 1, part: "morning", cold: true, wx: {}, sentToday: 1 }))), "the playful lines are Rowan's");
 });
+// ---- events and stories (Stage 7) ----
+test("events: every regular's event-day hello, for every event, renders (first, on the day)", () => {
+  const { g, K } = saves[2], keep = g.date;
+  try {
+    for (const d of ["2026-11-01", "2026-12-21", "2027-04-01", "2027-06-21", "2027-08-07"]) {
+      g.date = d;
+      for (const w of [...World.REG, "n:bishop"]) {
+        const xs = Talk.everyLine(env(g, K), w).filter(x => /\.h\.ev$/.test(x.id));
+        assert(xs.length === 1 && xs[0].t && xs[0].t.length < 330, `${w} ${d}: ${xs.map(x => x.t)}`);
+        if (/rowan/i.test(xs[0].t) || w === "n:rowan") assert(!Talk.GENDERED.test(xs[0].t), xs[0].t);
+        const o = Talk.opening(env(g, K), w); assert(o.length && /\.h\.ev$/.test(o[0].id), `${w} opens with the event: ${o.map(b => b.id)}`);
+      }
+    }
+  } finally { g.date = keep; }
+});
+test("the comp, after: results, your place, theirs; grade disputes; a big first ascent celebrated", () => {
+  const { g, K } = saves[1];             // mid-November 2025: the comp was a fortnight ago at most
+  const keepEv = g.events, keepDate = g.date;
+  try {
+    g.date = "2025-11-04";
+    let n = 0;
+    for (const mine of [null, { k: "comp", score: 99999 }, { k: "comp", score: 10 }]) {
+      g.events = mine ? { "2025-11-01": mine } : undefined;
+      for (const w of World.REG) {
+        const c = Talk.context(env(g, K), w);
+        assert(c.comp && c.comp.ago === 3 && c.comp.winner, `${w} knows the comp`);
+        if (mine && mine.score > 9999) assert(c.comp.you === 1 && c.comp.winner === "you", JSON.stringify(c.comp));
+        for (const x of Talk.everyLine(env(g, K), w).filter(x => /\.e\./.test(x.id))) { n++; assert(x.t && !/undefined|null|NaN/.test(x.t), x.id); if (/rowan/i.test(x.t) || w === "n:rowan") assert(!Talk.GENDERED.test(x.t), `${x.id}: ${x.t}`); }
+      }
+    }
+    assert(n >= 12, `${n} comp lines`);
+    // A grade dispute, both ways, and a celebration.
+    const [p, e] = Object.entries(g.world.est).find(([, e]) => e.by === "n:dez") || Object.entries(g.world.est)[0];
+    const keepE = JSON.stringify(e);
+    e.by = "n:dez"; e.date = World.addDays(g.date, -2); e.grade = Math.max(e.grade, 8);
+    e.logs.unshift(["n:hollis", World.addDays(g.date, -1), "S", 3, e.grade - 1]);
+    const hol = Talk.everyLine(env(g, K), "n:hollis").filter(x => /\.g\./.test(x.id)), dez = Talk.everyLine(env(g, K), "n:dez").filter(x => /\.g\./.test(x.id));
+    assert(hol.some(x => x.id === "hol.g.mine" && /soft/.test(x.t)), hol.map(x => x.t).join(" / "));
+    assert(dez.some(x => x.id === "dez.g.theirs" && /Hollis/.test(x.t)), dez.map(x => x.t).join(" / "));
+    for (const w of ["n:gus", "n:hollis", "n:otis", "n:rowan", "n:bea"]) assert(Talk.everyLine(env(g, K), w).some(x => /\.o\.party$/.test(x.id) && /Dez/.test(x.t)), `${w} celebrates Dez's new one`);
+    assert(Talk.everyLine(env(g, K), "n:bishop").some(x => x.id === "bis.h.grade"), "the Bishop has views on grades");
+    Object.assign(e, JSON.parse(keepE)); e.logs = JSON.parse(keepE).logs;
+  } finally { g.events = keepEv; g.date = keepDate; }
+});
 if (process.argv.includes("--show")) {
   const { g, K } = saves[2];
   for (const w of WHO) {

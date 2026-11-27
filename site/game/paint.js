@@ -507,7 +507,11 @@
     const trailUnder = ground.append("g").attr("class", "trails");
     // Every edge first, then every trail's dirt over them, so where trails meet no
     // edge is drawn across another trail's tread (the little outlines at junctions).
+    // The old trails (Phase 4, Stage 7): faint and overgrown until Trail Day reopens them (setOldTrails).
+    const OT = S.oldTrails || [];
+    for (const t of OT) trailUnder.append("path").attr("class", "trail-edge old-trail").attr("data-old", t.old).attr("d", trailD(t));
     for (const t of S.trails) trailUnder.append("path").attr("class", "trail-edge").attr("d", trailD(t));
+    for (const t of OT) trailUnder.append("path").attr("class", "trail-dirt old-trail").attr("data-old", t.old).attr("d", trailD(t));
     for (const t of S.trails) trailUnder.append("path").attr("class", "trail-dirt").attr("d", trailD(t));
     const baldG = ground.append("g").attr("class", "bald-g");
     baldG.append("path").attr("class", "bald-fringe").attr("d", ringD(S.bald.ring(1.04)));
@@ -570,10 +574,18 @@
       }
     }
     trailG.append("path").attr("class", "trail-blaze lod-a").attr("d", blazes.join(""));
+    for (const t of OT) trailG.append("path").attr("class", "trail-ink only-park old-trail").attr("data-old", t.old).attr("d", trailD(t));
 
     // ---- snow over the ground (trails stay as packed tracks)
     snowL.append("rect").attr("class", "snow-cover").attr("x", bx0 - 400).attr("y", -by1 - 400).attr("width", W + 800).attr("height", H + 800);
     for (const t of S.trails) snowL.append("path").attr("class", "trail-snowpack").attr("d", trailD(t));
+    for (const t of OT) snowL.append("path").attr("class", "trail-snowpack old-trail").attr("data-old", t.old).attr("d", trailD(t));
+    // Which old trails are open: a class on their few paths (once a day at most).
+    let oldOpen = "";
+    function setOldTrails(ids) {
+      const key = (ids || []).join(","); if (key === oldOpen) return; oldOpen = key;
+      svg.selectAll(".old-trail").classed("open", function () { return (ids || []).includes(this.getAttribute("data-old")); });
+    }
 
     // ---- water: brooks, Mill Pond, the reservoir and its dam, the quarry's swimming hole. Drawn over
     // the snow, so in winter the ice still reads.
@@ -2102,7 +2114,7 @@
       if (t.k > T.k * 1.15 || !inView) go(t, 700);
     }
     draw();
-    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
+    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, setOldTrails, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
       zoomBy: f => { commitSlide(); svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f); },
       setFollow, following: () => follow, setOutfit, setPeople, setDog, dogShown: () => !!dogSt, personAt: who => personAt.get(who) || null, toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],
       tilesPending: () => pending.size + (building ? 1 : 0) };

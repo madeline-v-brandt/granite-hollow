@@ -284,6 +284,81 @@
     bea: d => (!schoolDay(d) ? { p: 0.75, t: [570, 1170] } : weekend(d) ? { p: 0.8, t: [540, 1170] } : { p: 0.3, t: [900, 1170] }),   // weekends and after school; all summer
     dez: d => (weekend(d) ? { p: 0.55, t: [390, 1110] } : { p: 0.5, t: [360, 810] }),  // early mornings; longer at weekends
   };
+  // ---- the seasonal events (Phase 4, Stage 7; docs/phase4/stage7-events.md) ----------------
+  // Five a year, each on a fixed date: two comps (fall and spring, scored the same way: comp),
+  // the Solstice Bonfire, the Midsummer Dusk Session, and Trail Day in high summer. Its day is always dry (game.js sees to the forecast),
+  // and every regular comes out for it, whatever their routine (routineOn).
+  const firstSat = (y, m) => { const d = new Date(Date.UTC(y, m - 1, 1)); d.setUTCDate(1 + ((6 - d.getUTCDay() + 7) % 7)); return d.toISOString().slice(0, 10); };
+  const EVENTS = {
+    comp: { name: "The Granite Hollow Bouldering Comp", short: "the comp", season: "fall", comp: true, gather: true, on: y => `${y}-11-01`, hours: [540, 1260] },
+    bonfire: { name: "The Solstice Bonfire", short: "the Solstice Bonfire", season: "winter", gather: true, on: y => `${y}-12-21`, hours: [600, 1260] },
+    spring: { name: "The Granite Hollow Spring Comp", short: "the spring comp", season: "spring", comp: true, gather: true, on: y => `${y}-04-01`, hours: [540, 1260] },
+    trail: { name: "Trail Day", short: "Trail Day", season: "summer", gather: false, on: y => firstSat(y, 8), hours: [480, 1020] },
+    midsummer: { name: "The Midsummer Dusk Session", short: "the Midsummer Dusk Session", season: "summer", gather: true, on: y => `${y}-06-21`, hours: [660, 1320] },
+  };
+  // The event on a day ({ key, date, name, short, season, gather, hours }), or null.
+  function eventOn(d) {
+    if (typeof d !== "string" || !/^\d{4}-\d\d-\d\d$/.test(d) || d < REOPENED) return null;
+    const y = +d.slice(0, 4);
+    for (const [key, e] of Object.entries(EVENTS)) if (e.on(y) === d) { const { on, ...rest } = e; return { key, date: d, ...rest }; }
+    return null;
+  }
+  // The next event from a day (today included), within so many days, or null.
+  function nextEvent(d, within = 14) { for (let k = 0; k <= within; k++) { const e = eventOn(addDays(d, k)); if (e) return { ...e, in: k }; } return null; }
+  // The old trails (Trail Day): paths from the quarry and mill days, lost under the leaves
+  // since before the closure, each joining two areas the trail map doesn't. The volunteers
+  // reopen one every Trail Day, from 2026. Until then they're on the map as faint, overgrown
+  // paths; from that day on they're trails, and walks use them. Worked out from the date.
+  const OLD_TRAILS = [
+    { id: "quarrymen", a: "Hawkwatch", b: "Millrace Caves", name: "the Quarrymen's Path", year: 2026 },
+    { id: "cart", a: "Bracken Gully", b: "The Grout Piles", name: "the old Cart Track", year: 2027 },
+    { id: "wall", a: "Back Forty", b: "The Grout Piles", name: "the Wall Path", year: 2028 },
+    { id: "miller", a: "The Spillway", b: "Bracken Gully", name: "the Miller's Path", year: 2029 },
+  ];
+  const trailOpens = t => EVENTS.trail.on(t.year);
+  // The old trails open by a day (ids), and the one that opens on it (on that year's Trail Day).
+  const oldTrailsOpen = d => (typeof d === "string" ? OLD_TRAILS.filter(t => d >= trailOpens(t)).map(t => t.id) : []);
+  const oldTrailOn = d => OLD_TRAILS.find(t => trailOpens(t) === d) || null;
+  // A regular's routine on a day: their own, or (on an event day) out for all of it.
+  const routineOn = (key, d) => { const e = eventOn(d); return e ? { p: 1, t: e.hours, rain: true } : ROUTINES[key](d); };
+  // The comp's field: the climbing regulars and some of the community's strongest who've
+  // arrived, each with their five best sends of the day (graded like the Rankings: 100 a
+  // V-grade, 50 more for a flash), when they sent them, and their total. From its own
+  // stream, so it's the same on every reload and never moves anything else. Nobody
+  // climbs harder than the hardest line established by then.
+  // nerves: how much further below their best someone climbs on comp day (Dez gets nervous:
+  // the review asked for Dez to be a little easier to beat at the second comp).
+  const COMP = { off: [0.8, 1.3, 1.8, 2.2, 2.6], noise: 1.1, flash: 0.5, strangers: 9, from: 570, nerves: { "n:dez": 0.45 } };
+  function compField(D, G, d) {
+    const W = G && G.world; if (!W || !W.est) return [];
+    const r = stream(W.seed, "comp|" + d), out = [];
+    let cap = 0; for (const e of Object.values(W.est)) if (e.date <= d && e.grade > cap) cap = e.grade;
+    const who = CLIMBING_REGULARS.filter(w => W.npc[w] && W.npc[w].arrived <= d);
+    const locals = Object.keys(W.npc).filter(w => /^c\d+$/.test(w) && W.npc[w].arrived <= d && D.climbers[+w.slice(1)] && ["local_hero", "regular"].includes(D.climbers[+w.slice(1)][2]))
+      .map(w => [w, r()]).sort((a, b) => a[1] - b[1]).slice(0, COMP.strangers).map(x => x[0]);
+    for (const w of [...who, ...locals]) {
+      const L = (w.startsWith("n:") ? levelOn(w, d) : +D.climbers[+w.slice(1)][3] || 0) - (COMP.nerves[w] || 0);
+      const sends = COMP.off.map(o => {
+        const g = Math.max(0, Math.min(cap, Math.round(L - o + (r() - 0.5) * COMP.noise)));
+        const flash = g <= L - 2 && r() < COMP.flash;
+        return { g, flash, t: COMP.from + Math.floor(r() * 420) };
+      }).sort((a, b) => a.t - b.t);
+      out.push({ who: w, name: w.startsWith("n:") ? whoName(D, w) : D.climbers[+w.slice(1)][0], sends, score: sends.reduce((a, x) => a + 100 * x.g + (x.flash ? 50 : 0), 0) });
+    }
+    return out.sort((a, b) => b.score - a.score || (a.who < b.who ? -1 : 1));
+  }
+  // Your comp score: your five best sends of the day, each line once, repeats included.
+  // sends: [{ p, style }] (G.day.sends); grade(p) is the grade it counts at.
+  function compScore(sends, grade) {
+    const best = new Map();
+    for (const s of sends || []) {
+      if (!s || !Number.isInteger(s.p)) continue;
+      const pts = 100 * grade(s.p) + (s.style === "Flash" ? 50 : 0);
+      if (!best.has(s.p) || best.get(s.p).pts < pts) best.set(s.p, { p: s.p, pts, flash: s.style === "Flash" });
+    }
+    const top = [...best.values()].sort((a, b) => b.pts - a.pts).slice(0, 5);
+    return { top, score: top.reduce((a, x) => a + x.pts, 0) };
+  }
   // Grades a year they get stronger by (for two years), on top of NAMED's level.
   const GROWTH = { gus: 0.2, hollis: 0.4, otis: 0.3, rowan: 1.2, bea: 1.5, dez: 0.4 };
   const RP = {
@@ -356,7 +431,7 @@
       if (!W.npc[w]) continue;
       const R = W.reg[w] || (W.reg[w] = regFromLedger(W, w));
       if (R.recent.some(s => s.d === d)) continue;                       // already simulated (on load)
-      const key = w.slice(2), r = stream(W.seed, "reg|" + w + "|" + d), rt = ROUTINES[key](d), n = NAMED[key];
+      const key = w.slice(2), r = stream(W.seed, "reg|" + w + "|" + d), rt = routineOn(key, d), n = NAMED[key];
       const out = r(), pa = r(), pb = r();                                // always drawn, in this order
       if (out >= rt.p * (wet && !rt.rain ? RP.wetOut : 1)) continue;
       const L = levelOn(w, d);
@@ -784,6 +859,7 @@
   }
 
   const World = { REOPENED, BEFORE, PARAMS, NAMED, CLIMBING_REGULARS, NOTEBOOK, LEGENDS, AREAS, KIOSK_AREAS, REG, ROUTINES, GROWTH, RP,
+    EVENTS, COMP, OLD_TRAILS, eventOn, nextEvent, routineOn, compField, compScore, oldTrailsOpen, oldTrailOn, trailOpens,
     ensureReg, regOf, sessionOn, levelOn, validateReg, knowsLine,
     create, initialKnow, step, recordSend, migrate, validate, check, cleanName, isMine, nameFa, faCount, isWho, whoInfo, whoName,
     faText, legendOf, devRevealAll, devEstablish, seedFrom, newSeed, stream, addDays, daysBetween, notebook: D => dataOf(D).notebook };

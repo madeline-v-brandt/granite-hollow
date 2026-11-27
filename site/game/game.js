@@ -109,6 +109,8 @@
   // ====================================================================== data
   function prepData() {
     D.sectorBy = new Map(D.sectors.map(s => [s.name, s]));
+    // The old trails (Phase 4, Stage 7), for the map to draw (faint until Trail Day reopens them).
+    D.oldTrails = World.OLD_TRAILS.map(t => { const a = D.sectorBy.get(t.a), b = D.sectorBy.get(t.b); return a && b ? { to: "old:" + t.id, old: t.id, start: [a.x, a.y], end: [b.x, b.y] } : null; }).filter(Boolean);
     D.sectorProblems = new Map(D.sectors.map(s => [s.name, []]));
     D.boulders.forEach((b, i) => { b.id = i; });
     D.problems.forEach((p, i) => {
@@ -188,13 +190,16 @@
       if (!G.forecast.some(f => f.date === date)) G.forecast.push({ date, ...Mech.forecastDay(monthOf(date)) });
     }
     G.forecast.sort((a, b) => (a.date < b.date ? -1 : 1));
+    if (v2()) G.forecast = G.forecast.map(f => eventWeather(f));        // an event's day is always dry (Stage 7)
     return G.forecast.slice(0, FORECAST_DAYS);
   }
   function startDay(forward, rest, first = false) {
     if (!first) G.date = addDays(G.date, forward);
     // The forecast's odds are rolled now: rain comes with exactly the chance it gave.
     const fc = !first && (G.forecast || []).find(f => f.date === G.date);
-    let w = fc ? Mech.realize(fc) : Mech.weather(monthOf(G.date));
+    const ev = v2() ? World.eventOn(G.date) : null;                    // a seasonal event: always dry (Stage 7)
+    let w = fc ? Mech.realize(ev ? eventWeather(fc, G.date) : fc) : Mech.weather(monthOf(G.date));
+    if (ev && !fc) { while (Mech.rainStart(w) != null) w = Mech.weather(monthOf(G.date)); w = eventWeather(w, G.date); }
     if (first) while (Mech.rainStart(w) === 0) w = Mech.weather(monthOf(G.date));   // day one is always climbable
     if (first) w = Mech.atLeast(w, 0.2);           // and good: plenty goes on your first day (play-test, 2026-11-26)
     G.forecast = (G.forecast || []).filter(f => f.date > G.date);
@@ -206,14 +211,21 @@
     if (!G.visited.includes(START_AREA)) G.visited.push(START_AREA);
     UI.recenter = true;                                   // the camera starts the day on you
     G.day = { no: G.dayNo, minute: 9 * 60 + Math.floor(Math.random() * 40), weather: w, startEnergy: s.energy,
-      attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null, bishop: Math.random() < 0.13,
+      attempts: 0, sends: [], xp: 0, highpoints: 0, gains: {}, ach: [], met: [], encounter: null, last: null, bishop: !!ev || Math.random() < 0.13,
       over: false, warned: false, levelBefore: Mech.levelOf(G.player).level };
     const intro = first && v2()
       ? `You pull into the Granite Hollow lot on ${an(w.sky.toLowerCase())} September morning, ${w.temp}°F. The park reopened to climbing last week, after nearly forty years. The kiosk's trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch. Beside it, under glass, is a page from the old climbers' notebook listing four problems by the lot. Everything else is waiting for a first ascent.`
       : first
       ? `You pull into the Granite Hollow lot on ${an(w.sky.toLowerCase())} September morning, ${w.temp}°F. The boulders at The Tailgate are right beside the car. The trail map (press M) shows the rest of the park: The Schoolhouse is 5 minutes up the trail.`
       : `${w.sky}, ${w.temp}°F. ${w.note}`;
-    G.day.last = { kind: "info", title: first ? "Welcome to Granite Hollow" : `Day ${G.dayNo}`, text: intro };
+    G.day.last = { kind: "info", title: first ? "Welcome to Granite Hollow" : ev ? ev.name : `Day ${G.dayNo}`, text: intro };
+    // Events (Stage 7): today's, or a poster for the next one; a busy lot on a prime weekend.
+    if (ev && !first) G.day.last.text += " " + EVENT_INTRO[ev.key] + (ev.key === "trail" ? trailDayWords() : "");
+    else if (v2() && !first) {
+      const n = World.nextEvent(addDays(G.date, 1), 6);
+      if (n) G.day.last.text += ` Gus has put up a poster at the kiosk: ${n.name}, ${n.in === 0 ? "tomorrow" : longDay(n.date)}.`;
+      if (w.label === "Prime" && [0, 6].includes(toDate(G.date).getUTCDay()) && Mech.rainStart(w) == null) { G.day.busy = true; G.day.last.text += " Word's out that it's prime: the lot's busier than usual."; }
+    }
     // Rained out: no climbing on wet granite, but the park's open (since the polish
     // after Phase 3): look around, find boulders, talk to people, brush lines for
     // when it dries. A day without climbing counts as rest.
@@ -389,6 +401,7 @@
       else if (first && v2() && G.world.est[i] && G.world.est[i].by !== "you") text += " " + ascentLine(i);
       if (tip && first) text += ` Good beta from ${whoOf(tip.from)}.`;
       if (pal) text += " " + pick(partnerSays(pal, "cheer"));
+      if (eventToday() && eventToday().comp) text += ` Your comp card: ${World.compScore(G.day.sends, compGrade).score.toLocaleString("en-US")} points.`;
       G.day.last = { kind: "send", title: fa ? `First ascent on ${p.boulder.name}, V${p.grade}` : `${style === "Repeat" ? "Repeat" : "Sent"}: ${titleOf(i)}`, text, xp, gains, tick: G.ticks.length - 1, p: i };
       note(`${fa ? "First ascent:" : style} ${pname(i)}${vg(i) ? ` (${vg(i)})` : ""}, +${fmt(xp)} XP.`);
       if (fa) UI.faNote = G.feed[0];                        // renamed along with the problem
@@ -751,7 +764,7 @@
   function duskOut() {
     const out = M && M.minutesToLot ? M.minutesToLot() : 0;
     if (M && M.toLot) M.toLot();
-    endDay(out > 1 ? `The light's going, so you follow the trail back to the lot, ${out} minutes in the last of the daylight.` : "The light's gone, and the park closes at dusk.");
+    endDay(out > 1 ? `The light's going, so you follow the trail back to the lot, ${out} minutes in the last of the daylight.` : "The light's gone, and the park closes at dusk.", { dusk: true });
   }
 
   // What you know about rain today: a coming shower once the clouds roll in,
@@ -840,21 +853,23 @@
     return `${a.boulders} ${a.boulders === 1 ? "boulder" : "boulders"} you know here${a.n ? `, ${a.n} documented ${a.n === 1 ? "problem" : "problems"} from V${a.lo} to V${a.hi}` : ""}${a.open ? `, ${a.open} unclimbed ${a.open === 1 ? "line" : "lines"}` : ""}. You've sent ${a.sent} here.`;
   }
 
-  function endDay(reason) {
+  function endDay(reason, opts = {}) {
     let dogLine = ""; safely("Pickles", () => { dogLine = dogAtCar(); });
     if (partnerNow() === "n:rowan" && togetherNow()) dogLine = " Rowan walks you to your car." + dogLine;   // (Stage 6)
     G.day.over = true; G.day.reason = reason + dogLine;
     note(`Headed home: ${G.day.sends.filter(s => s.style !== "Repeat").length} new sends, +${fmt(G.day.xp)} XP.`);
+    let ev = null; if (v2()) safely("the event", () => { ev = eventAtEnd(opts); });     // the comp's results, a gathering (Stage 7)
     save(); renderAll();
-    if (UI.levelPending || modalOpen()) UI.summaryPending = true;   // it opens once the naming and level-up have closed
+    if (ev) { openModal(ev); UI.summaryPending = true; }
+    else if (UI.levelPending || modalOpen()) UI.summaryPending = true;   // it opens once the naming and level-up have closed
     else showSummary();
   }
 
   // ============================================================== encounters
   function maybeEncounter(sector) {
-    if (G.day.met.filter(x => typeof x === "number").length >= 3) return;      // strangers: three a day at most
+    if (G.day.met.filter(x => typeof x === "number").length >= (G.day.busy ? 5 : 3)) return;      // strangers: three a day at most (five on a busy day)
     if (v2()) { const w = regularFor(sector); if (w) { G.day.met.push(w); G.day.encounter = buildRegular(w, sector); return; } }
-    if (Math.random() > 0.55) return;
+    if (Math.random() > (G.day.busy || eventToday() ? 0.8 : 0.55)) return;
     const pool = D.npcsBySector.get(sector).filter(ci => !G.day.met.includes(ci) && (!v2() || G.world.npc["c" + ci]));
     if (!pool.length) return;
     const weight = ci => ({ local_hero: 4, regular: 2.5, occasional: 1, tourist: 1 })[D.climbers[ci][2]] || 1;
@@ -1115,6 +1130,208 @@
     }));
   }
 
+  // ---- events (Phase 4, Stage 7; docs/phase4/stage7-events.md) ------------------------------
+  // One a season (World.EVENTS), each on a fixed date: always dry, and everyone comes out for
+  // it. The fall comp scores your five best sends of the day; the Solstice Bonfire and the
+  // Midsummer Dusk Session gather everyone at The Tailgate at dusk; on Trail Day you can help
+  // Gus. Missing one costs nothing: it's in Local Buzz, and people talk about it.
+  // G.events[date]: what you did (a comp: { k, score, place, of, there }; { k, there };
+  // { k: "trail", helped, area }); G.day.trail: you helped today.
+  const eventToday = () => (v2() && G.day ? World.eventOn(G.date) : null);
+  const compGrade = p => (G.world && G.world.est[p] ? G.world.est[p].grade : D.problems[p].grade);
+  const ORDS = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+  const ordWord = n => ORDS[n] || ordinal(n);
+  const longDay = d => toDate(d).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" });
+  // An event's day is dry and at least Good (the bonfire's crisp: Prime). On a forecast.
+  function eventWeather(f, date = f.date) {
+    const e = World.eventOn(date); if (!e || f.rainAt === 0 && f.label === "Wet") return f;
+    const dry = { ...f, pop: 0, rainWhen: null, rainAt: null, note: String(f.note || "").replace(/^.*?(rain|snow)[^.]*\.\s*/i, "") };
+    if ("rainFrom" in f) dry.rainFrom = null;
+    return Mech.atLeast(dry, e.key === "bonfire" ? 0.3 : 0.05);
+  }
+  const EVENT_INTRO = {
+    comp: "It's the Granite Hollow Bouldering Comp! Gus is at the kiosk with a clipboard and a coffee tin of pencils. Every problem in the park counts, repeats too: your five best sends today score, 100 a V-grade and 50 more for a flash. Results by the lot at dusk.",
+    bonfire: "It's the shortest day of the year, and the Solstice Bonfire: cold, crisp friction while the light lasts, then everyone gathers round the fire at The Tailgate at dusk.",
+    spring: "It's the Granite Hollow Spring Comp, and no, Gus says, it isn't an April Fool. Every problem in the park counts, repeats too: your five best sends today score, 100 a V-grade and 50 more for a flash. Results by the lot at dusk.",
+    trail: "It's Trail Day. Gus has a trailer full of loppers and rakes and a clipboard.",
+    midsummer: "It's the longest day of the year, and the Midsummer Dusk Session: everyone's climbing until the light goes, then it's headlamps and sandwiches at The Tailgate.",
+  };
+  // The comp, live: your scorecard, and the leaders so far.
+  function compStandings() {
+    const me = World.compScore(G.day.sends, compGrade), m = G.day.minute;
+    const field = World.compField(D, G, G.date).map(x => { const sofar = x.sends.filter(s => s.t <= m); return { who: x.who, name: x.who.startsWith("n:") ? callName(x.who) : x.name, score: sofar.reduce((a, s) => a + 100 * s.g + (s.flash ? 50 : 0), 0) }; });
+    field.push({ who: "you", name: G.player.name || "You", score: me.score });
+    field.sort((a, b) => b.score - a.score || (a.who === "you" ? -1 : b.who === "you" ? 1 : 0));
+    return { me, field, place: field.findIndex(x => x.who === "you") + 1 };
+  }
+  function eventHtml() {
+    if (!v2() || G.day.over) return "";
+    const e = eventToday(), dusk = clock(G.day.weather.dusk);
+    if (!e) {
+      const n = World.nextEvent(addDays(G.date, 1), 9);
+      return n ? `<div class="event-card soon"><span class="label-sm">Coming up</span><b>${esc(n.name)}</b><span class="meta">${esc(longDay(n.date))}, ${n.in === 0 ? "tomorrow" : `in ${n.in + 1} days`}</span></div>` : "";
+    }
+    if (e.comp) {
+      const { me, field, place } = compStandings();
+      const card = me.top.length ? `<ol class="comp-card">${me.top.map(x => `<li><span>${esc(pname(x.p))} <span class="meta">V${compGrade(x.p)}${x.flash ? ", flashed" : ""}</span></span><b>${x.pts.toLocaleString("en-US")}</b></li>`).join("")}</ol>`
+        : `<p class="meta">Nothing on your card yet. Any send counts, repeats too.</p>`;
+      const top = field.slice(0, 5), mine = place > 5 ? [field[place - 1]] : [];
+      const row = (x, i) => `<li class="${x.who === "you" ? "me" : ""}"><span>${i + 1}. ${esc(x.name)}</span><b>${x.score.toLocaleString("en-US")}</b></li>`;
+      return `<div class="event-card comp"><span class="label-sm">Today</span><h3>${esc(e.name)}</h3>
+        <p class="meta">Every problem in the park counts, repeats too. Your five best sends score: 100 a V-grade, 50 more for a flash. Results by the lot at dusk, ${esc(dusk)}.</p>
+        <h4>Your card: ${me.score.toLocaleString("en-US")} points</h4>${card}
+        <h4>Leaders so far</h4><ol class="comp-board">${top.map(row).join("")}${mine.length ? `<li class="gap">…</li>${row(mine[0], place - 1)}` : ""}</ol></div>`;
+    }
+    if (e.key === "trail") {
+      const w = G.day.weather, late = G.day.minute > w.dusk - 120;
+      const done = G.day.trail ? `<p class="meta">You helped. Gus is delighted, and trying not to show it.</p>` : "";
+      const ot = World.oldTrailOn(G.date);
+      return `<div class="event-card trail"><span class="label-sm">Today</span><h3>${esc(e.name)}</h3><p class="meta">${ot ? `Gus and a crowd of volunteers are reopening ${esc(trailWords(ot))}. It's on the map from today.` : "Gus and a crowd of volunteers are cutting back the summer's growth along the trails."}</p>
+        ${done || `<button type="button" class="btn" data-trail ${late || UI.busy ? "disabled" : ""}>Help with Trail Day · 2 hours</button>${late ? `<p class="meta">They're packing up for the day.</p>` : ""}`}</div>`;
+    }
+    const what = e.key === "bonfire" ? `Climb while the light lasts: at dusk, ${dusk}, everyone gathers round the bonfire at The Tailgate, and Gus and the Bishop tell stories.`
+      : `Everyone's climbing until the light goes, ${dusk}. Then it's headlamps and Otis's sandwiches at The Tailgate.`;
+    return `<div class="event-card ${e.key}"><span class="label-sm">Today</span><h3>${esc(e.name)}</h3><p class="meta">${esc(what)} Stay till dusk to be there.</p></div>`;
+  }
+  // Trail Day: the volunteers reopen one of the old trails (World.OLD_TRAILS) each year. It's open
+  // from that morning, whether or not you help. Helping: two hours with Gus; dirty lines you've
+  // found get brushed, and he walks you along the new trail.
+  const areaWord = s => (K.area(s) >= 1 ? s : (World.AREAS[s] && World.AREAS[s].hint) || "somewhere further out");
+  const trailWords = t => `${t.name}, the old path between ${areaWord(t.a)} and ${areaWord(t.b)}`;
+  function trailDayWords() {
+    const t = World.oldTrailOn(G.date);
+    return t ? ` This year the volunteers are reopening ${trailWords(t)}, lost under the leaves since before the closure. Help out for a couple of hours and Gus will be delighted (it's in the Here tab).`
+      : " The volunteers are cutting back the summer's growth along the trails. Help out for a couple of hours and Gus will be delighted (it's in the Here tab).";
+  }
+  function helpTrail() {
+    const e = eventToday(), w = G.day.weather;
+    if (!e || e.key !== "trail" || G.day.trail || UI.busy || G.day.over || G.day.minute > w.dusk - 120) return;
+    G.day.trail = true; G.day.minute += 120; G.player.energy = Math.max(7, G.player.energy - 8);
+    bond("n:gus", "brush"); bond("n:gus", "event");
+    for (const x of peopleToday()) if (x.who !== "n:gus" && K.met(x.who)) bond(x.who, "event");
+    const walk = i => (D.sectors.find(s => s.name === D.problems[i].sector) || {}).walk_min || 0;
+    const dirty = D.problems.map((p, i) => i).filter(i => isDirty(i) && K.visible(i)).sort((a, b) => walk(a) - walk(b)).slice(0, 6);
+    for (const i of dirty) pstate(i).clean = true;
+    const t = World.oldTrailOn(G.date);
+    if (t) for (const a of [t.a, t.b]) if (K.area(a) < 1 && K.hearOf(a, "n:gus", G.date)) toast(`New area: ${a}`, "The new trail goes there. It's on your trail map now.", "find");
+    const text = `You spend two hours with Gus and the volunteers, cutting back brambles, rebuilding a set of steps and brushing the summer's growth off the boulders.${dirty.length ? ` ${dirty.length === 1 ? "A line you'd found is" : `${dirty.length} lines you'd found are`} brushed clean, ready to try.` : ""}`
+      + (t ? ` By the end of it, ${t.name} is a trail again, and Gus walks you the length of it, from ${t.a} to ${t.b}. “Saves going round by the lot,” he says, very pleased with everybody.` : "");
+    (G.events = G.events || {})[G.date] = { k: "trail", helped: true, ...(t ? { trail: t.id } : {}) };
+    if (t) toast("A new trail", `${upFirst(t.name)} joins ${t.a} and ${t.b}. It's on your trail map.`, "find");
+    G.day.last = { kind: "info", title: "Trail Day", text };
+    note(`Helped on Trail Day.${t ? ` ${upFirst(t.name)} is open again, between ${t.a} and ${t.b}.` : ""}`);
+    afterAction();
+  }
+  // Small illustrations for the end of an event day.
+  function eventArt(kind, top = []) {
+    const W = 360, H = 150;
+    if (kind === "comp") {
+      const step = [[150, 70, 46, 1], [96, 82, 34, 2], [210, 88, 28, 3]];
+      const fig = (x, y, c) => `<circle cx="${x}" cy="${y - 25}" r="6" fill="#e0b48c" stroke="#3b3226" stroke-width="1.2"/><path d="M${x - 8},${y} C${x - 8},${y - 12} ${x - 6},${y - 18} ${x},${y - 18} C${x + 6},${y - 18} ${x + 8},${y - 12} ${x + 8},${y} Z" fill="${c}" stroke="#3b3226" stroke-width="1.2"/>`;
+      const arms = (x, y) => `<path d="M${x - 7},${y - 15} L${x - 13},${y - 27} M${x + 7},${y - 15} L${x + 13},${y - 27}" stroke="#3b3226" stroke-width="2" stroke-linecap="round"/>`;
+      return `<svg class="event-art" viewBox="0 0 ${W} ${H}" role="img" aria-label="The podium, with Pickles sitting in front" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="ev-dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6f7fb0"/><stop offset=".6" stop-color="#e9a77f"/><stop offset="1" stop-color="#f3cf8e"/></linearGradient></defs>
+        <rect width="${W}" height="${H}" fill="url(#ev-dusk)"/><path d="M0,118 C60,110 120,114 180,108 C250,102 300,112 360,106 V150 H0 Z" fill="#7d8a5a"/>
+        ${step.map(([x, y, h, n], i) => `<rect x="${x}" y="${y + 46 - h + 24}" width="54" height="${h}" fill="#efe3c6" stroke="#3b3226" stroke-width="1.4"/><text x="${x + 27}" y="${y + 46 - h + 24 + h / 2 + 6}" text-anchor="middle" font-family="Fraunces, serif" font-weight="700" font-size="16" fill="#3b3226">${n}</text>`
+          + (top[i] ? fig(x + 27, y + 46 - h + 24, top[i]) + (i === 0 ? arms(x + 27, y + 46 - h + 24) : "") : "")).join("")}
+        <g transform="translate(284 136)"><ellipse cx="0" cy="8" rx="13" ry="3" fill="#3b3226" fill-opacity=".2"/><path d="M-9,7 C-10,-2 -6,-8 0,-8 C6,-8 9,-2 8,7 Z" fill="#9c9a94" stroke="#3b3226" stroke-width="1.1"/><circle cx="1" cy="-11" r="6" fill="#9c9a94" stroke="#3b3226" stroke-width="1.1"/><path d="M-4,-15 L-7,-8 L-2,-11 Z M5,-15 L8,-8 L3,-11 Z" fill="#6a6862" stroke="#3b3226" stroke-width=".8"/><circle cx="1" cy="-9" r="1.3" fill="#2b2622"/><path d="M-6,0 Q0,3 6,0" stroke="#b5462e" stroke-width="1.6" fill="none"/></g></svg>`;
+    }
+    if (kind === "bonfire") {
+      const people = [[118, "#5f6b2d"], [146, "#9b3b2f"], [214, "#c46a3a"], [244, "#5f7fa6"], [96, "#b0436e"], [268, "#3b3f46"]];
+      return `<svg class="event-art" viewBox="0 0 ${W} ${H}" role="img" aria-label="Everyone round the bonfire at dusk" xmlns="http://www.w3.org/2000/svg">
+        <defs><radialGradient id="ev-glow" cx=".5" cy=".75" r=".55"><stop offset="0" stop-color="#f6b25a" stop-opacity=".75"/><stop offset="1" stop-color="#f6b25a" stop-opacity="0"/></radialGradient></defs>
+        <rect width="${W}" height="${H}" fill="#22263f"/>${[[30, 20], [80, 34], [140, 14], [200, 28], [262, 12], [320, 30], [300, 52], [50, 60]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.1" fill="#f3ecd8"/>`).join("")}
+        <path d="M0,100 C70,90 140,96 200,92 C270,88 320,96 360,92 V150 H0 Z" fill="#2c3448"/><rect width="${W}" height="${H}" fill="url(#ev-glow)"/>
+        ${people.map(([x, c]) => `<circle cx="${x}" cy="${104}" r="6" fill="#3a2a22"/><path d="M${x - 9},126 C${x - 9},114 ${x - 6},110 ${x},110 C${x + 6},110 ${x + 9},114 ${x + 9},126 Z" fill="${c}" fill-opacity=".85"/>`).join("")}
+        <path d="M162,128 L198,118 M160,120 L200,128" stroke="#5a3a26" stroke-width="5" stroke-linecap="round"/>
+        <path class="ev-flame" d="M180,124 C166,116 170,104 176,96 C176,104 180,106 182,100 C184,92 190,90 190,84 C198,96 196,108 190,116 C194,112 196,108 196,104 C200,114 194,122 180,124 Z" fill="#f2a03a" stroke="#c0552a" stroke-width="1"/>
+        <path d="M180,122 C174,116 176,110 180,106 C181,111 184,112 185,108 C188,114 186,120 180,122 Z" fill="#fbe08a"/>
+        ${[[176, 78], [188, 70], [170, 62]].map(([x, y]) => `<circle class="ev-spark" cx="${x}" cy="${y}" r="1.4" fill="#fbd26a"/>`).join("")}
+        <g transform="translate(206 134)"><path d="M-12,6 C-12,0 -4,-4 4,-4 C10,-4 12,0 12,6 Z" fill="#9c9a94"/><circle cx="12" cy="0" r="4.5" fill="#9c9a94"/></g></svg>`;
+    }
+    // midsummer: headlamps coming on in the long dusk, people at the foot of two boulders
+    const lamps = [[92, 1, "#c46a3a"], [128, -1, "#e0b04a"], [226, 1, "#3f7fa6"], [262, -1, "#b0436e"], [304, -1, "#5f7fa6"]];
+    return `<svg class="event-art" viewBox="0 0 ${W} ${H}" role="img" aria-label="Headlamps coming on at the foot of the boulders in the long midsummer dusk" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="ev-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d3a6b"/><stop offset=".72" stop-color="#7a6a9e"/><stop offset="1" stop-color="#e8a070"/></linearGradient>
+        <radialGradient id="ev-pool"><stop offset="0" stop-color="#fff3b8" stop-opacity=".75"/><stop offset="1" stop-color="#fff3b8" stop-opacity="0"/></radialGradient></defs>
+      <rect width="${W}" height="${H}" fill="url(#ev-mid)"/>${[[40, 18], [120, 12], [200, 24], [282, 10], [340, 30]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1" fill="#f3ecd8"/>`).join("")}
+      <path d="M0,104 C70,96 150,102 220,96 C290,90 330,98 360,96 V150 H0 Z" fill="#2b2f3f"/>
+      <path d="M58,134 C60,96 82,74 112,72 C140,70 160,90 164,134 Z M194,134 C196,100 222,80 252,80 C284,80 308,100 316,134 Z" fill="#454a60" stroke="#2b2f3f" stroke-width="1.5"/>
+      <rect y="132" width="${W}" height="18" fill="#2b2f3f"/>
+      ${lamps.map(([x, d, c]) => { const hx = x, hy = 117, tx = x - d * 4, ty = 92; return `<path d="M${hx},${hy} L${tx - 11},${ty} L${tx + 11},${ty + 4} Z" fill="#fff3b8" fill-opacity=".22"/><ellipse cx="${tx}" cy="${ty + 2}" rx="13" ry="8" fill="url(#ev-pool)"/>
+        <path d="M${x - 6},135 C${x - 6},126 ${x - 4},122 ${x},122 C${x + 4},122 ${x + 6},126 ${x + 6},135 Z" fill="${c}"/><circle cx="${x}" cy="117" r="4.6" fill="#2a2230"/><circle cx="${x - d * 2.6}" cy="115.6" r="1.6" fill="#fff6c8"/>`; }).join("")}</svg>`;
+  }
+  const BONFIRE_TALES = {
+    gus: ["Gus tells the story of the winter of '96, when the quarry pond froze solid and he skated the whole length of it to fix a fence. “Nobody's ever believed me. Pickles wasn't born yet, so I've no witnesses.”",
+      "Gus tells you about the first climber he caught in the park after the closure, in 1991: a teenager with a bath towel for a crash pad. “I should have thrown them out. I showed them the good holds instead.”",
+      "Gus tells everyone how Pickles turned up: a scruffy puppy asleep on the kiosk step one October morning, who simply never left. “I put up posters. Nobody called. I've always been a bit glad.”"],
+    bishop: ["The Bishop tells the story of the first ascent of The Billboard. It was 1974, or 1977, and either Dot spotted him or he spotted Dot, and at some point there was a mule. Hollis takes notes on what's changed since last time.",
+      "The Bishop tells a story about climbing by moonlight in 1979 that ends, somehow, with him made an honorary member of the volunteer fire brigade.",
+      "The Bishop says the boulders in the woods are older than the hills they sit on. Then he says something about a bear that Gus says is definitely not true."],
+  };
+  function gatherModal(e) {
+    const out = peopleToday().filter(x => K.met(x.who)), names = out.map(x => firstName(x.who)).filter(n => n !== "Gus");
+    const extra = [];
+    if (togetherNow() && out.some(x => x.who === "n:rowan")) extra.push(e.key === "bonfire" ? "Rowan shares your blanket, and draws the fire by its own light. It's still impossible to draw." : "Rowan sits beside you on the pad, drawing the headlamps as they come on.");
+    if (Social.dog(G).adopted) extra.push(e.key === "bonfire" ? "Pickles falls asleep with his nose nearly in the fire, and has to be moved." : "Pickles chases moths through the headlamp beams.");
+    const lede = e.key === "bonfire"
+      ? [`At dusk everyone gathers at The Tailgate, where Gus has a bonfire going${names.length ? `: ${names.slice(0, 4).join(", ")}${names.length > 4 ? " and more" : ""}, and climbers you only half know` : ""}. The light goes early on the shortest day, and it's cold, and nobody minds.`, pick(BONFIRE_TALES.gus), pick(BONFIRE_TALES.bishop), ...extra]
+      : [`As the light goes, the headlamps come on one by one across the boulders, like slow fireflies. Otis hands round sandwiches.`, "Somebody's still trying the last problem by the light of three headlamps and a phone. Everyone cheers when it goes.", ...extra];
+    return () => modal(`<div class="event-scene">${eventArt(e.key)}</div><span class="label-sm">${esc(e.name)}</span><h2>${e.key === "bonfire" ? "Round the fire" : "Headlamps on"}</h2>
+      ${lede.map(t => `<p class="lede">${esc(t)}</p>`).join("")}<div class="acts"><button type="button" class="btn primary" data-close>Head home</button></div>`, (root, close) => { root.querySelector("[data-close]").onclick = close; });
+  }
+  function compModal(there) {
+    const f = K.compResults(G.date), at = f.findIndex(x => x.who === "you"), you = at >= 0 ? f[at] : null;
+    const colour = x => (x.who === "you" ? outfitFor().shirt || "#3f7fa6" : x.who.startsWith("n:") ? (LOOKS[x.who.slice(2)] || {}).shirt || "#6b7a8f" : ["#3f6f9a", "#7a8f4a", "#9b5a3c", "#5a4f7a", "#2f6b62"][x.name.length % 5]);
+    const nm = x => (x.who === "you" ? (G.player.name && G.player.name.trim().toLowerCase() !== "you" ? `${esc(G.player.name)} (you)` : "You") : esc(x.who.startsWith("n:") ? callName(x.who) : x.name));
+    const lines = f.slice(0, 8).map((x, i) => `<li class="${x.who === "you" ? "me" : ""}"><span>${i + 1}. ${nm(x)}</span><b>${x.score.toLocaleString("en-US")}</b></li>`).join("")
+      + (at >= 8 ? `<li class="gap">…</li><li class="me"><span>${at + 1}. ${nm(you)}</span><b>${you.score.toLocaleString("en-US")}</b></li>` : "");
+    const youLine = !you ? "You didn't send anything today, so you're not on the board. There's always next year."
+      : at < 3 ? `You came ${ordWord(at + 1)}, with ${you.score.toLocaleString("en-US")} points! ${at === 0 ? "Gus reads your name out twice." : "Gus reads your name out and everyone cheers."} There's a ribbon for you on your Climber page.`
+      : `You came ${ordWord(at + 1)} of ${f.length}, with ${you.score.toLocaleString("en-US")} points.`;
+    const lede = there ? "At dusk everyone gathers by the lot. Gus climbs onto the picnic table with his clipboard, clears his throat twice, and reads out the results. Three people step up onto the podium, and Pickles sits in front of it, very proud of everybody."
+      : "You'd headed home by the time the results came out, but Gus texts them round that evening, with a photo of the podium. Pickles is sitting in front of it, very proud of everybody.";
+    return () => modal(`<div class="event-scene">${eventArt("comp", f.slice(0, 3).map(colour))}</div><span class="label-sm">${esc((eventToday() || {}).name || "The comp")}</span><h2>The results</h2>
+      <p class="lede">${esc(lede)}</p><ol class="comp-board final">${lines}</ol><p class="lede">${esc(youLine)}</p>
+      <div class="acts"><button type="button" class="btn primary" data-close>${there ? "Head home" : "Close"}</button></div>`, (root, close) => { root.querySelector("[data-close]").onclick = close; });
+  }
+  // The end of an event's day: the comp's results; a gathering if you were there at dusk.
+  function eventAtEnd(opts = {}) {
+    const e = eventToday(); if (!e) return null;
+    const there = !!opts.dusk || G.day.minute >= G.day.weather.dusk - 30;
+    G.events = G.events || {};
+    if (e.comp) {
+      const me = World.compScore(G.day.sends, compGrade);
+      G.events[G.date] = { k: e.key, score: me.score, ...(there ? { there: true } : {}) };
+      if (me.score > 0) {
+        const f = K.compResults(G.date), place = f.findIndex(x => x.who === "you") + 1;
+        Object.assign(G.events[G.date], { place, of: f.length });
+        note(`${e.name}: you came ${ordWord(place)} of ${f.length}, with ${me.score.toLocaleString("en-US")} points.`);
+      }
+      if (there) for (const x of peopleToday()) if (K.met(x.who)) bond(x.who, "event");
+      return compModal(there);
+    }
+    if (!e.gather) return null;
+    if (!there) { note(`You headed home before ${e.short}.`); return null; }
+    G.events[G.date] = { k: e.key, there: true };
+    for (const x of peopleToday()) if (K.met(x.who)) bond(x.who, "event");
+    note(e.key === "bonfire" ? "Stayed for the Solstice Bonfire." : "Stayed for the Midsummer Dusk Session.");
+    return gatherModal(e);
+  }
+  // Your ribbons and the events you've been to (the Climber tab).
+  function eventsHtml() {
+    const evs = Object.entries(G.events || {}).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+    if (!evs.length) return "";
+    const rows = evs.map(([d, r]) => {
+      const e = World.eventOn(d); if (!e) return "";
+      const yr = d.slice(0, 4);
+      if (e.comp) return `<li>${r.place && r.place <= 3 ? `<span class="ribbon r${r.place}" aria-hidden="true"></span>` : `<span class="ribbon none" aria-hidden="true"></span>`}<div><b>${esc(e.name)} ${yr}</b><div class="meta" style="margin:0">${r.place ? `${upFirst(ordWord(r.place))} of ${r.of}, ${r.score.toLocaleString("en-US")} points` : "Went along, didn't score"}</div></div></li>`;
+      if (r.k === "trail") { const t = World.OLD_TRAILS.find(x => x.id === r.trail); return `<li><span class="ribbon none" aria-hidden="true"></span><div><b>${esc(e.name)} ${yr}</b><div class="meta" style="margin:0">You helped${t ? ` reopen ${esc(t.name)}` : ""}</div></div></li>`; }
+      return `<li><span class="ribbon none" aria-hidden="true"></span><div><b>${esc(e.name)} ${yr}</b><div class="meta" style="margin:0">You were there</div></div></li>`;
+    }).join("");
+    return `<h3>Ribbons and gatherings</h3><ul class="events-list">${rows}</ul>`;
+  }
+
   // ---- invitations (Stage 4): a friend who's out today leaves a note on your windscreen ----
   // At most one a day, from someone who's at least a friend, in an area you know, and
   // never the same person two days running. Ignoring one costs nothing.
@@ -1181,7 +1398,7 @@
         const area = n.home[Math.floor(pa * n.home.length)], bs = D.boulders.filter(x => x.sector === area);
         if (!bs.length) continue;
         b = bs[Math.floor(pb * bs.length)].id;
-      } else { s = World.sessionOn(G, w, G.date); if (!s) continue; b = s.b; t = World.ROUTINES[key2] ? World.ROUTINES[key2](G.date).t : s.t; }   // their hours as the routine has them now
+      } else { s = World.sessionOn(G, w, G.date); if (!s) continue; b = s.b; t = World.ROUTINES[key2] ? World.routineOn(key2, G.date).t : s.t; }   // their hours as the routine has them now
       list.push({ who: w, name: n.name.replace(/^the /, "The "), b, side: ps < .5 ? -1 : 1, look: LOOKS[key2] || {}, from: t[0], to: Math.min(t[1], G.day.weather.dusk), s });
     }
     peopleCache = { key, list };
@@ -1777,8 +1994,24 @@
     const LOT = PARK_SPOT;                               // your car, in the lot
     // Two planners: trips the game walks for you keep to the trails at the old pace
     // (Wk); walking yourself (keys, a tap) is a little quicker and takes shortcuts (Wm).
-    const trailPts = S.trails.map(t => t.pts), wet = p => S.inWater(p, 0);
-    const Wk = Travel.make({ trails: trailPts, blocked: wet }), Wm = Travel.make({ trails: trailPts, blocked: wet, rate: Travel.MANUAL });
+    // The old trails join the network once Trail Day has reopened them (Stage 7): syncTrails
+    // rebuilds both planners (and the map's drawing) when the open set changes.
+    const wet = p => S.inWater(p, 0);
+    let Wk, Wm, openOld = [], trailsKey = null, trailsDate = null;
+    const minutesCache = new Map();
+    function syncTrails() {
+      const date = G && G.date;
+      if (date === trailsDate && Wk) return;              // (called on every map update: only a new day can change it)
+      trailsDate = date;
+      const ids = v2() && G && G.date ? World.oldTrailsOpen(G.date) : [], key = ids.join(",");
+      if (key === trailsKey) return;
+      trailsKey = key; openOld = (S.oldTrails || []).filter(t => ids.includes(t.old));
+      const pts = [...S.trails, ...openOld].map(t => t.pts);
+      Wk = Travel.make({ trails: pts, blocked: wet }); Wm = Travel.make({ trails: pts, blocked: wet, rate: Travel.MANUAL });
+      minutesCache.clear();
+      if (P.setOldTrails) P.setOldTrails(ids);
+    }
+    syncTrails();
     const SPEED = { trail: 20, off: 14 };                // metres a second on screen (about the clock's 50 : 35)
     const [bx0, bx1, by0, by1] = S.bounds, edge = 60;
     const inPark = p => p[0] > bx0 + edge && p[0] < bx1 - edge && p[1] > by0 + edge * .6 && p[1] < by1 - edge;
@@ -1787,7 +2020,7 @@
     const cars = S.marks.filter(m => m.kind === "car").map(m => ({ x0: m.x - 2.1, x1: m.x + 2.1, y0: m.y - (m.rot ? 3.5 : 1.2), y1: m.y + (m.rot ? 1.2 : 3.5) }));
     const carAt = p => cars.some(c => p[0] > c.x0 && p[0] < c.x1 && p[1] > c.y0 && p[1] < c.y1);
     const solid = p => !inPark(p) || S.inWater(p, -.4) || !!boulderAt(p) || carAt(p);
-    const onTrail = p => S.trailDist(p, 4) < 2.6;
+    const onTrail = p => S.trailDist(p, 4) < 2.6 || openOld.some(t => Illu.polyDist(p, t.pts) < 2.6);
     // Where you stand to climb a boulder: in front of it (south-west), on open ground.
     function approach(id) {
       const bo = S.boulders[id], R = bo.form.R;
@@ -1850,9 +2083,9 @@
       const dest = Array.isArray(to) ? to : pointOf(to);
       // Both keep to the trails for anything far (past Travel.DIRECT_OK); a tap
       // nearby walks straight there. Only the keys cut through the woods.
+      syncTrails();
       return manual ? Wm.plan(G.pos, dest, { trails: true }) : Wk.plan(G.pos, dest, { trails: true });
     };
-    const minutesCache = new Map();
     // Minutes to walk from where you are to a place ({ sector, boulder }): 0 if you're there, at least 1 otherwise.
     // Go there's time by default; manual is the time a click on the map would take.
     function minutesTo(to, manual = false) {
@@ -2054,7 +2287,7 @@
           const at = P.personAt(x.who) || { x: D.boulders[x.b].x, y: D.boulders[x.b].y }, key = x.who.slice(2);
           return { who: x.who, name: x.who === "n:pickles" ? "Pickles" : firstName(x.who), x: at.x, y: at.y, color: key === "pickles" ? "#c9a46a" : (LOOKS[key] || {}).shirt, where: x.who === partnerNow() ? "with you" : whereIs(x.b).text.replace(/^at /, "") };
         });
-      paper.open({ areas, here: G.loc.sector, me: G.pos, view: P.viewBox(), people,
+      paper.open({ areas, here: G.loc.sector, me: G.pos, view: P.viewBox(), people, oldTrails: v2() ? World.oldTrailsOpen(G.date) : [],
         footnote: hidden ? "Locals say there's more climbing deeper in the woods than the kiosk map shows." : "",
         onPick: w => { P.setFollow(false); $("#map-me").classList.add("lost"); (w.sector ? P.flyTo(w.sector, 9, 800) : P.centerOn(w.x, w.y, P.view().k, 700)); },
         onGo: G.day.over ? null : name => { if (K.canGo({ sector: name })) travel({ sector: name, boulder: null }); } });
@@ -2062,6 +2295,7 @@
     const lookAtMe = (ms = 0) => { P.setFollow(true, ms); $("#map-me").classList.remove("lost"); };
     let knownKey = "all", outfitKey = "", peopleKey = "";
     function update() {
+      syncTrails();                                        // an old trail reopened on Trail Day (Stage 7)
       if (!validPos(G.pos)) G.pos = pointOf(G.loc);       // a save from before Stage 4, or a loaded file
       if (UI.recenter) { UI.recenter = false; P.setMe(G.pos, pose(false)); P.setFollow(true, 0); }
       // Label only what the player knows (only when that has changed).
@@ -2369,7 +2603,7 @@
 
   function renderPanel() {
     const el = $("#tabbody");
-    el.innerHTML = { here: () => hereHtml() + inviteHtml() + outTodayHtml(), climber: climberHtml, logbook: logbookHtml, craglog: cragHtml, journal: journalHtml }[UI.tab]();
+    el.innerHTML = { here: () => hereHtml() + eventHtml() + inviteHtml() + outTodayHtml(), climber: climberHtml, logbook: logbookHtml, craglog: cragHtml, journal: journalHtml }[UI.tab]();
     bindPanel(el);
   }
 
@@ -2571,7 +2805,7 @@
         <div><b>${G.bestGrade >= 0 ? "V" + G.bestGrade : "–"}</b><span>hardest send</span></div><div><b>${sends.length}</b><span>problems sent</span></div>
         <div><b>${G.ticks.filter(t => t.style === "Flash").length}</b><span>flashes</span></div><div><b>${G.dayNo}</b><span>days at the crag</span></div>
         ${v2() ? `<div><b>${World.faCount(G)}</b><span>first ascents</span></div>` : ""}<div><b>${Object.keys(G.ach).length}</b><span>achievements</span></div></div>
-      ${v2() ? yourPeopleHtml() : ""}
+      ${v2() ? yourPeopleHtml() + eventsHtml() : ""}
       <h3>How leveling works</h3>
       <p class="lede">Every first send earns XP: more for harder grades, extra when it's above your level, and less the further below your level it is. Flashes, tips from locals, new hardest sends and projects that took several sessions earn bonuses. Falling earns nothing, and repeats count a little, a few times a day. To move up a grade you also need three sends at your level or harder, so your level is always a grade you climb.</p>
       <h3>Style skills</h3>
@@ -2768,7 +3002,7 @@
     const projects = Object.entries(G.ps).filter(([, s]) => !s.sent && s.att > 0).map(([i, s]) => [+i, s]).sort((a, b) => b[1].best - a[1].best || b[1].att - a[1].att);
     const rows = [...G.ticks].reverse().slice(0, 80).map(t => {
       const p = D.problems[t.p];
-      return `<tr><td>${shortDate(t.date)}</td><td class="grade" style="font-size:15px">${vg(t.p) || "?"}</td><td><button type="button" class="linklike" data-cl="${t.p}">${esc(pname(t.p))}</button><div class="meta" style="margin:0">${esc(p.sector)}</div></td><td>${t.style}${v2() && World.isMine(G, t.p) && G.world.est[t.p].date === t.date && t.style !== "Repeat" ? " · FA" : ""}${t.with && v2() ? `<div class="meta" style="margin:0">with ${esc(firstName(t.with))}</div>` : ""}</td><td class="num stars">${t.stars ? "★".repeat(t.stars) : ""}</td></tr>`;
+      return `<tr><td>${shortDate(t.date)}</td><td class="grade" style="font-size:15px">${vg(t.p) || "?"}</td><td><button type="button" class="linklike" data-cl="${t.p}">${esc(pname(t.p))}</button><div class="meta" style="margin:0">${esc(p.sector)}</div></td><td>${t.style}${v2() && World.isMine(G, t.p) && G.world.est[t.p].date === t.date && t.style !== "Repeat" ? " · FA" : ""}${v2() && (World.eventOn(t.date) || {}).comp ? `<div class="meta" style="margin:0">at ${esc(World.eventOn(t.date).short)}</div>` : ""}${t.with && v2() ? `<div class="meta" style="margin:0">with ${esc(firstName(t.with))}</div>` : ""}</td><td class="num stars">${t.stars ? "★".repeat(t.stars) : ""}</td></tr>`;
     }).join("");
     const fas = v2() ? Object.entries(G.world.est).filter(([, e]) => e.by === "you").map(([i, e]) => [+i, e]).sort((a, b) => (a[1].date < b[1].date ? 1 : a[1].date > b[1].date ? -1 : b[0] - a[0])) : [];
     const faHtml = !v2() ? "" : `<h3>Your first ascents</h3>${fas.length ? `<p class="meta">${fas.length} ${fas.length === 1 ? "problem" : "problems"} in Granite Hollow's guidebook ${fas.length === 1 ? "carries" : "carry"} your name.</p>
@@ -3042,6 +3276,7 @@
     on("[data-go-sector]", n => travel({ sector: n.dataset.goSector, boulder: null }));
     on("[data-go-boulder]", n => { const b = D.boulders[+n.dataset.goBoulder]; travel({ sector: b.sector, boulder: b.id }); });
     on("[data-find]", n => { if (!UI.busy && M.findPerson) M.findPerson(n.dataset.find); });
+    on("[data-trail]", () => safely("Trail Day", helpTrail));
     on("[data-go-problem]", n => {
       const p = D.problems[+n.dataset.goProblem];
       if (!K.canGo({ sector: p.sector, boulder: p.b })) { toast("You don't know the way", "Nobody has told you where it is yet.", "info"); return; }
@@ -3146,7 +3381,8 @@
       const b = preview(n), ra = Mech.rainStart(f);
       const chance = f.pop != null ? Mech.rainChance(f) : ra === 0 ? `${f.precip || "Rain"} all day` : ra != null && ra < f.dusk ? `${f.precip || "Rain"} from ${clock(ra)}` : "";
       const rainLine = chance ? `<span class="rain">${esc(chance.charAt(0).toUpperCase() + chance.slice(1))}</span>` : `<span class="dry">Dry</span>`;
-      return `<button type="button" class="plan" data-next="${n}">
+      const ev = v2() ? World.eventOn(f.date) : null;
+      return `<button type="button" class="plan${ev ? " event" : ""}" data-next="${n}">${ev ? `<span class="ev">★ ${esc(ev.name)}</span>` : ""}
         <span class="when">${n === 0 ? "Climb tomorrow" : `Rest ${n} ${n === 1 ? "day" : "days"}`}</span>
         <span class="date">${esc(wkday(f.date))}</span>
         <span class="cl ${esc(f.label.toLowerCase())}">${esc(f.label)}</span>
@@ -3160,7 +3396,7 @@
       ${d.ach.length ? `<p class="lede" style="margin-top:10px">Achievements: <b>${d.ach.map(esc).join(", ")}</b></p>` : ""}
       ${d.no - (G.backup ? G.backup.dayNo : 0) >= 10 ? `<p class="meta" style="margin-top:12px">It's been ${G.backup ? `${d.no - G.backup.dayNo} days since your last save file` : "a while and you haven't downloaded a save file yet"}. <button type="button" class="linklike" data-export>Download one now</button></p>` : ""}
       <p class="lede" style="margin-top:12px">Skin ${G.player.skin.toFixed(0)}%. Here's the forecast. When do you climb next?</p>
-      <div class="plan-grid">${plans}</div>
+      <div class="plan-grid">${plans}</div>${(() => { const n = v2() && World.nextEvent(addDays(G.date, FORECAST_DAYS + 1), 10); return n ? `<p class="meta event-soon">★ Coming up: ${esc(n.name)}, ${esc(longDay(n.date))}.</p>` : ""; })()}
       <p class="meta" style="margin-top:8px">Nobody climbs wet granite. Morning rain soaks the rock for the whole day; afternoon rain ends the climbing when it starts. Either way you can stay and explore, and a day without climbing counts as rest.</p>`,
       (root, close) => {
         const ex = root.querySelector("[data-export]");
@@ -3821,6 +4057,21 @@
       && num_(g.day.invite.from) && num_(g.day.invite.to) && typeof g.day.invite.text === "string" && g.day.invite.text.length <= 400)) delete g.day.invite;
     // Pickles (Stage 5): the day you became his human, and where he is today.
     if (g.dog != null && !(g.dog && typeof g.dog === "object" && (g.dog.adopted == null || day_(g.dog.adopted)))) delete g.dog;
+    // Events (Stage 7): what you did at each, checked (save files are untrusted).
+    if (g.events != null) {
+      const ok = {}, int = x => Number.isInteger(x) && x >= 0 && x < 1e6;
+      if (g.events && typeof g.events === "object" && !Array.isArray(g.events)) for (const [d, r] of Object.entries(g.events).slice(-40)) {
+        const e = World.eventOn(d); if (!e || !r || r.k !== e.key) continue;
+        const c = { k: e.key };
+        if (int(r.score)) c.score = r.score; if (int(r.place) && r.place > 0) c.place = r.place; if (int(r.of) && r.of > 0) c.of = r.of;
+        if (r.there === true) c.there = true; if (r.helped === true) c.helped = true;
+        if (typeof r.trail === "string" && World.OLD_TRAILS.some(t => t.id === r.trail)) c.trail = r.trail;
+        ok[d] = c;
+      }
+      if (Object.keys(ok).length) g.events = ok; else delete g.events;
+    }
+    if (g.day && g.day.trail != null && g.day.trail !== true) delete g.day.trail;
+    if (g.day && g.day.busy != null && g.day.busy !== true) delete g.day.busy;
     // Rowan (Stage 6): G.romance checked and cleaned; today's sunset state only if it's one we know.
     if (g.romance != null) { const r = Social.cleanRomance(g.romance); if (r) g.romance = r; else delete g.romance; }
     if (g.day && g.day.sunset != null && !["asked", "no", "yes", "told", "watched"].includes(g.day.sunset)) delete g.day.sunset;

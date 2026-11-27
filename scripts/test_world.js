@@ -458,11 +458,86 @@ console.log("the regulars' lives (Phase 4, Stage 0)");
     const proj = W.news.find(n => n.kind === "proj");
     assert(proj, "a project went down");
     const g2 = clone(g); g2.world.news = [{ ...proj, date: g2.date }]; const K2 = Know.make(D, () => g2);
-    const it = K2.buzz()[0];
+    const it = K2.buzz().find(x => x.kind === "proj");
     assert(it && /finally sent/.test(it.text) && /(sessions|weeks) on it/.test(it.text), it && it.text);
   });
 }
 
+// ---- events (Phase 4, Stage 7) ----
+const season = (seed, days) => { const g = newSave(seed), K = Know.make(D, () => g); playDays(g, K, days); return g; };
+test("events: five a year, on their dates (Trail Day the first Saturday in August), and none before the reopening", () => {
+  assert.strictEqual(World.eventOn("2025-11-01").key, "comp");
+  assert.strictEqual(World.eventOn("2025-12-21").key, "bonfire");
+  assert.strictEqual(World.eventOn("2026-04-01").key, "spring");
+  assert.ok(World.eventOn("2026-04-01").comp && World.eventOn("2025-11-01").comp && !World.eventOn("2025-12-21").comp, "two comps");
+  assert.strictEqual(World.eventOn("2026-08-01").key, "trail");
+  assert.strictEqual(World.eventOn("2027-08-07").key, "trail");
+  for (const d of ["2026-08-01", "2027-08-07", "2028-08-05"]) assert.strictEqual(new Date(d + "T12:00:00Z").getUTCDay(), 6, d);
+  assert.strictEqual(World.eventOn("2026-06-21").key, "midsummer");
+  assert.strictEqual(World.eventOn("2026-06-22"), null);
+  assert.strictEqual(World.eventOn("2024-11-01"), null);
+  assert.strictEqual(World.eventOn("<b>"), null);
+  const n = World.nextEvent("2025-10-25"); assert.strictEqual(n.key, "comp"); assert.strictEqual(n.in, 7);
+  assert.strictEqual(World.nextEvent("2025-10-01", 14), null);
+  assert.deepStrictEqual(World.routineOn("rowan", "2025-11-01"), { p: 1, t: World.EVENTS.comp.hours, rain: true });
+});
+test("the old trails: one reopens each Trail Day, between two areas the trails don't join, clear of water, and walks get shorter", () => {
+  assert.deepStrictEqual(World.oldTrailsOpen("2026-07-31"), []);
+  assert.deepStrictEqual(World.oldTrailsOpen("2026-08-01"), ["quarrymen"]);
+  assert.deepStrictEqual(World.oldTrailsOpen("2029-12-01"), World.OLD_TRAILS.map(t => t.id));
+  assert.strictEqual(World.oldTrailOn("2027-08-07").id, "cart");
+  assert.strictEqual(World.oldTrailOn("2027-08-08"), null);
+  global.Art = require(path.join(G_DIR, "art.js")); const Illu = require(path.join(G_DIR, "illustrate.js"));
+  const sec = n => D.sectors.find(s => s.name === n);
+  const D2 = { ...D, oldTrails: World.OLD_TRAILS.map(t => ({ to: "old:" + t.id, old: t.id, start: [sec(t.a).x, sec(t.a).y], end: [sec(t.b).x, sec(t.b).y] })) };
+  const S = Illu.parkScene(D2);
+  assert.strictEqual(S.oldTrails.length, World.OLD_TRAILS.length);
+  const before = Travel.make({ trails: S.trails.map(t => t.pts), blocked: p => S.inWater(p, 0) });
+  const after = Travel.make({ trails: [...S.trails, ...S.oldTrails].map(t => t.pts), blocked: p => S.inWater(p, 0) });
+  for (const t of World.OLD_TRAILS) {
+    assert.ok(!D.trails.some(x => (x.to === t.a && x.start[0] === sec(t.b).x) || (x.to === t.b && x.start[0] === sec(t.a).x)), `${t.id}: not already joined`);
+    const o = S.oldTrails.find(x => x.old === t.id);
+    assert.ok(o.pts.every(p => !S.inWater(p, 1)), `${t.id} keeps out of the water`);
+    const A = [sec(t.a).x, sec(t.a).y], B = [sec(t.b).x, sec(t.b).y], m0 = before.plan(A, B, { trails: true }).minutes, m1 = after.plan(A, B, { trails: true }).minutes;
+    assert.ok(m1 < m0 - 3, `${t.id}: ${m0.toFixed(1)} → ${m1.toFixed(1)} min`);
+  }
+});
+test("events: every regular comes out for one", () => {
+  const g = season("events-a", 70);              // through mid-November 2025
+  for (const w of World.REG) if (g.world.npc[w]) assert.ok(World.sessionOn(g, w, "2025-11-01"), `${w} at the comp`);
+});
+test("the comp: the same field on every reload; scores are the five best sends; Dez is beatable", () => {
+  const g = season("events-b", 70);
+  const f = World.compField(D, g, "2025-11-01"), f2 = World.compField(D, clone(g), "2025-11-01");
+  assert.deepStrictEqual(f, f2);
+  assert.ok(f.length >= 8 && f.some(x => x.who === "n:dez") && !f.some(x => x.who === "n:gus" || x.who === "n:bishop"), f.map(x => x.who).join());
+  for (const x of f) { assert.strictEqual(x.sends.length, 5); assert.strictEqual(x.score, x.sends.reduce((a, s) => a + 100 * s.g + (s.flash ? 50 : 0), 0)); }
+  const cap = Math.max(...Object.values(g.world.est).filter(e => e.date <= "2025-11-01").map(e => e.grade));
+  assert.ok(f.every(x => x.sends.every(s => s.g <= cap)), "nobody climbs harder than what's established");
+  const dez = f.find(x => x.who === "n:dez");
+  assert.ok(dez.score < 5 * 1300, `Dez ${dez.score}: a strong climber can beat that with five V13s`);
+  assert.ok(World.COMP.nerves["n:dez"] > 0, "Dez gets nervous at comps");
+  const grade = p => [0, 5, 7, 7, 6, 3, 9][p];
+  const me = World.compScore([{ p: 1, style: "Send" }, { p: 2, style: "Flash" }, { p: 2, style: "Repeat" }, { p: 3, style: "Send" }, { p: 4, style: "Repeat" }, { p: 5, style: "Send" }, { p: 6, style: "Repeat" }], grade);
+  assert.deepStrictEqual(me.top.map(x => x.p), [6, 2, 3, 4, 1], "each line once, best first, repeats count");
+  assert.strictEqual(me.score, 900 + 750 + 700 + 600 + 500);
+  assert.strictEqual(World.compScore([], grade).score, 0);
+});
+test("Local Buzz: a poster before an event, the comp's results after, and grade disputes", () => {
+  const g = season("events-c", 50), K = Know.make(D, () => g);
+  g.date = "2025-10-26";
+  assert.ok(K.buzz().some(x => x.kind === "poster" && /Bouldering Comp/.test(x.text)), "a poster");
+  const h = season("events-d", 70), Kh = Know.make(D, () => h);
+  const res = Kh.buzz().find(x => x.kind === "event");
+  assert.ok(res && /Bouldering Comp went to/.test(res.text), JSON.stringify(Kh.buzz().map(x => x.kind)));
+  h.events = { "2025-11-01": { k: "comp", score: 99999 } };
+  assert.ok(/went to you,/.test(Kh.buzz().find(x => x.kind === "event").text), "with you in it");
+  // A dispute: a regular's log suggests another grade.
+  const [p, e] = Object.entries(h.world.est).find(([, e]) => e.by !== "n:hollis");
+  e.logs.unshift(["n:hollis", World.addDays(h.date, -1), "S", 3, e.grade + 1]);
+  const gr = Kh.buzz({ max: 20, perDay: 9 }).find(x => x.kind === "grade" && x.by === "n:hollis");
+  assert.ok(gr && /Hollis reckons/.test(gr.text) && /sandbagged/.test(gr.text), gr && gr.text);
+});
 if (process.argv.includes("--curve")) {
   console.log("\nhow the crag develops with a player climbing 2 days in 3 at the current pacing (seed 'curve')");
   const g = newSave("curve"), K = Know.make(D, () => g);

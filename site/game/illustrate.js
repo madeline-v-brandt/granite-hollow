@@ -566,7 +566,10 @@
 
     // ---- lines on the ground: trails, brooks, stone walls
     const trails = D.trails.map(t => ({ to: t.to, pts: trailPoints(t) }));
-    let trailDist = lineIndex(trails.map(t => t.pts));
+    // The old trails (Phase 4, Stage 7; D.oldTrails, set by the game from World.OLD_TRAILS): drawn
+    // faint until Trail Day reopens them. The trees keep off them either way: they're old paths.
+    const oldTrails = (D.oldTrails || []).map(t => ({ to: t.to, old: t.old, pts: trailPoints(t) }));
+    let trailDist = lineIndex([...trails, ...oldTrails].map(t => t.pts));
     // The path from the lot: straight from its north-east corner to the Tailgate's trail
     // junction (it replaces the Tailgate trail's first stretch, which began in the old
     // lot's middle). Put in after the trees, which keep their places; they're kept off it.
@@ -974,8 +977,8 @@
     // The trail index learns the lot's path only now, so the landmarks and cairns placed
     // above (the junction's signpost among them) keep their places; the ground's
     // details, drawn tile by tile later, and walking (on the trail or not) use it.
-    trailDist = lineIndex(trails.map(t => t.pts));
-    const out = { bounds, tiles, zones, bald, baldC: bald.c, baldR, water, quarry, field, lot, road, streams, walls, trails, bridges, trees, boulders, landmarks, cairns, washes,
+    trailDist = lineIndex(trails.map(t => t.pts));            // (the open trails: the game adds the old ones once they reopen)
+    const out = { bounds, tiles, zones, bald, baldC: bald.c, baldR, water, quarry, field, lot, road, streams, walls, trails, oldTrails, bridges, trees, boulders, landmarks, cairns, washes,
       rockGrid, rockAt, ROCK_T, openAt, inWater, trailDist, streamDist, wallDist, blocked, nearBoulder, elevAt, crowdedAt, detail, tIndex, marks: AS.marks, ms: 0 };
     out.ms = Date.now() - t0;
     return out;

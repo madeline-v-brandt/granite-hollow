@@ -24,6 +24,7 @@
 // on a wet or greasy day), dyno (Bea: you tried a dyno near her), hard (Dez: you
 // tried something hard near Dez), quiet (Rowan: you sat and talked on a quiet day).
 // Rowan only (Stage 6): flirt (you said something playful), sunset (you watched the sunset together).
+// event (Stage 7): you were at a seasonal event together (the comp, a gathering, Trail Day).
 //   up  { key, date }  a friendship that's just deepened, for them to mention next
 //       time you talk (cleared once they have)
 // Saves from before Phase 4 start from what they already record: the days you've
@@ -32,7 +33,7 @@
 (function (root) {
   "use strict";
   const KINDS = { met: 1, chat: 2, climb: 3, sendWith: 3, beta: 1, proj: 0, pet: 1, lesson: 2, invite: 2, walk: 0,
-    brush: 0, fa: 0, wet: 0, dyno: 0, hard: 0, quiet: 0, flirt: 1, sunset: 2 };
+    brush: 0, fa: 0, wet: 0, dyno: 0, hard: 0, quiet: 0, flirt: 1, sunset: 2, event: 2 };
   // Each regular's own: what's worth more to them (added to KINDS), and how you'd notice.
   const LIKES = {
     "n:gus": { kinds: { brush: 3, lesson: 1 }, words: "Gus notices when you look after the park: brushing the holds, leaving it better than you found it." },
