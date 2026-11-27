@@ -581,6 +581,9 @@
     for (const t of S.trails) snowL.append("path").attr("class", "trail-snowpack").attr("d", trailD(t));
     for (const t of OT) snowL.append("path").attr("class", "trail-snowpack old-trail").attr("data-old", t.old).attr("d", trailD(t));
     // Which old trails are open: a class on their few paths (once a day at most).
+    // Gus's poster on the trailhead kiosk: a class on the map (once a day at most).
+    let posterUp = null;
+    function setPoster(on) { on = !!on; if (on === posterUp) return; posterUp = on; wrap.classList.toggle("poster-up", on); }
     let oldOpen = "";
     function setOldTrails(ids) {
       const key = (ids || []).join(","); if (key === oldOpen) return; oldOpen = key;
@@ -1125,6 +1128,11 @@
           g.append("path").attr("class", "notice n1").attr("d", "M-.3,-2.55H.55V-1.95H-.3Z");
           g.append("path").attr("class", "notice n2 lod-a").attr("d", "M.7,-2.45H1.15V-1.4H.7Z");
           g.append("path").attr("class", "kiosk-roof").attr("d", "M-1.75,-2.6L0,-3.4L1.75,-2.6L1.6,-2.45L0,-3.15L-1.6,-2.45Z");
+          // Gus's poster for the next event (after Phase 4): drawn always, shown by a class on the map (setPoster).
+          g.append("path").attr("class", "kiosk-poster").attr("d", "M-.42,-2.58H.66V-1.3H-.42Z");
+          g.append("path").attr("class", "kiosk-poster-band").attr("d", "M-.42,-2.58H.66V-2.28H-.42Z");
+          g.append("path").attr("class", "kiosk-poster-ink").attr("d", "M-.27,-2.08H.5M-.27,-1.88H.38M-.27,-1.68H.5M-.27,-1.48H.16");
+          g.append("path").attr("class", "kiosk-hit").attr("d", "M-2.1,-3.7H2.1V.5H-2.1Z");      // a click reads it
           break;
         }
         case "bins": {
@@ -1650,6 +1658,7 @@
     }
     const rockAt = e => { const el = e.target.closest && e.target.closest("g.boulder, g.far-rock"); return el ? +el.dataset.id : null; };
     const personOf = e => (e.target.closest && e.target.closest("g.person")) || null;
+    const kioskOf = e => !!(opts.onKiosk && e.target.closest && e.target.closest("g.lm-kiosk"));
     let tipTimer = null;
     function placeTip(e) {
       const r = wrap.getBoundingClientRect();
@@ -1670,6 +1679,11 @@
       const per = personOf(e);
       if (per && e.pointerType !== "touch" && personTip(e, per.dataset.who)) {
         if (ui.hover != null) { ui.hover = null; markBoulders(); placeLabels(); }
+        return;
+      }
+      if (kioskOf(e) && e.pointerType !== "touch" && tip && opts.kioskTipHtml) {
+        if (ui.hover != null) { ui.hover = null; markBoulders(); placeLabels(); }
+        clearTimeout(tipTimer); tip.innerHTML = opts.kioskTipHtml(); tip.hidden = false; placeTip(e);
         return;
       }
       const id = rockAt(e);
@@ -1700,6 +1714,7 @@
           else if (tip) tip.hidden = true;
           return opts.onPerson(who.dataset.who);
         }
+        if (kioskOf(e)) { if (tip) tip.hidden = true; return opts.onKiosk(); }
         const id = rockAt(e);
         if (id == null) {
           const [gx, gy] = d3.pointer(e);
@@ -2180,7 +2195,7 @@
       if (t.k > T.k * 1.15 || !inView) go(t, 700);
     }
     draw();
-    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, setOldTrails, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
+    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, setOldTrails, setPoster, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
       zoomBy: f => { commitSlide(); svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f); },
       setFollow, following: () => follow, setOutfit, setPeople, setDog, setPal, dogShown: () => !!dogSt,
       personAt: who => personAt.get(who) || (palSt && palSt.who === who ? { x: palSt.pos[0], y: palSt.pos[1], side: palSt.facing === "l" ? -1 : 1 } : null), toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],

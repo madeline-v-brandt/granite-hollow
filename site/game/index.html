@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=62">
+<link rel="stylesheet" href="scene.css?v=63">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -592,6 +592,11 @@ g.person.crowd { pointer-events: none; }   /* Ade's group (after Phase 4): figur
 /* landmarks across the park */
 .notice.n0 { fill: #fff; } .notice.n1 { fill: #f2d16a; } .notice.n2 { fill: #c9e0f0; }
 .notice, .kiosk-roof { stroke: #4a3218; stroke-width: .4px; vector-effect: non-scaling-stroke; } .kiosk-roof { fill: #7a3a28; }
+/* Gus's poster on the kiosk for the next event (after Phase 4): shown while one's coming (setPoster), and a click reads the kiosk */
+.kiosk-poster { fill: #fffaf0; stroke: #4a3218; stroke-width: .4px; vector-effect: non-scaling-stroke; } .kiosk-poster-band { fill: #c0412a; }
+.kiosk-poster-ink { fill: none; stroke: #5a4a38; stroke-width: .07; stroke-linecap: round; }
+#mapwrap:not(.poster-up) :is(.kiosk-poster, .kiosk-poster-band, .kiosk-poster-ink) { display: none; }
+.kiosk-hit { fill: transparent; pointer-events: all; cursor: pointer; }
 .bin { stroke: #2a2420; stroke-width: .5px; vector-effect: non-scaling-stroke; } .bin.bin0 { fill: #3f6a4a; } .bin.bin1 { fill: #6a5a4a; } .bin-lid { fill: #2f2a26; }
 .raccoon { fill: #7d7872; stroke: #2a2420; stroke-width: .4px; vector-effect: non-scaling-stroke; } .raccoon-mask { fill: #1e1c1a; }
 .dog { fill: #9c9a94; stroke: #34322e; stroke-width: .5px; vector-effect: non-scaling-stroke; } .dog-ear { fill: #6a6862; } .dog-patch { fill: #e8e6e0; } .dog-shadow { fill: #1e222c; opacity: .22; } .dog-line { fill: none; stroke: #34322e; stroke-width: .4px; stroke-linecap: round; vector-effect: non-scaling-stroke; } .dog-nose { fill: #34322e; }
@@ -1065,6 +1070,25 @@ tr.lb-me td { background: var(--gold-soft); }
   .notebook .nb-head { display: flex; justify-content: space-between; column-gap: 12px; font-family: var(--hand); font-size: 18px; line-height: 24px; color: #9a3b2e; border-bottom: 1.5px solid rgba(44, 53, 80, .35); margin-bottom: 2px; }
   .notebook .nb-margin { font-family: var(--hand); font-size: 19px; line-height: 1; color: #9a3b2e; text-align: right; transform: rotate(-3deg); margin: 2px 6px 2px 0; }
 
+  /* the trailhead kiosk's board (after Phase 4): Gus's poster for the next event, results or a thank-you, his notices.
+     Paper colours of their own in both themes, like the notebook page. */
+  .kiosk-board { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin: 12px 0 4px; padding: 14px; border-radius: 4px;
+    background: #b08a5e linear-gradient(135deg, rgba(255, 255, 255, .08), rgba(0, 0, 0, .08)); box-shadow: inset 0 0 0 4px #6b5136, inset 0 2px 8px rgba(0, 0, 0, .3); }
+  .kiosk-poster-card { flex: 1 1 220px; margin: 0; padding: 0 0 10px; background: #fffaf0; color: #3b3226; border-radius: 1px; transform: rotate(-1deg);
+    box-shadow: 0 2px 6px rgba(30, 20, 5, .3); text-align: center; overflow: hidden; }
+  .kiosk-poster-card .kp-band { padding: 8px 10px; background: #c0412a; color: #fff8ea; font: 700 19px/1.15 var(--serif); }
+  .kiosk-poster-card .kp-when { margin: 8px 10px 2px; font: 800 14px var(--body); letter-spacing: .04em; text-transform: uppercase; color: #9a3b2e; }
+  .kiosk-poster-card p { margin: 4px 14px; font-size: 14px; line-height: 1.4; }
+  .kiosk-poster-card .kp-doodle { font-family: var(--hand); font-size: 19px; color: #48506a; }
+  .kiosk-note { flex: 1 1 150px; max-width: 240px; padding: 8px 12px 6px; background: #f6edcf; color: #2c3550; border-radius: 1px; transform: rotate(.8deg); box-shadow: 0 2px 5px rgba(30, 20, 5, .28); }
+  .kiosk-note.tilt { transform: rotate(-1.4deg); background: #eef3f6; }
+  .kiosk-note.results { max-width: none; flex-basis: 200px; background: #fffaf0; }
+  .kiosk-note p { margin: 0; font-family: var(--hand); font-size: 19px; line-height: 1.2; }
+  .kiosk-note .kn-head { display: block; font: 700 15px var(--serif); color: #3b3226; margin-bottom: 4px; }
+  .kiosk-note .kn-sign { display: block; text-align: right; font-family: var(--hand); font-size: 17px; color: #9a3b2e; }
+  .kiosk-note .comp-board { margin: 0; color: #3b3226; }
+  .kiosk-note .comp-board li { border-bottom-color: rgba(59, 50, 38, .25); } .kiosk-note .comp-board li.me { color: #3b3226; }
+
   /* ---- the paper trail map (paper.js): a folded park map opened over the game.
      It keeps its own printed colours in both themes. */
   .paper-back { position: fixed; inset: 0; z-index: 70; background: rgba(38, 31, 20, .5); display: grid; place-items: center; padding: 18px; }
@@ -1181,16 +1205,16 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=62"></script>
-<script src="art.js?v=62"></script>
-<script src="world.js?v=62"></script>
-<script src="knowledge.js?v=62"></script>
-<script src="social.js?v=62"></script>
-<script src="portraits.js?v=62"></script>
-<script src="talk.js?v=62"></script>
-<script src="illustrate.js?v=62"></script>
-<script src="paint.js?v=62"></script>
-<script src="paper.js?v=62"></script>
-<script src="travel.js?v=62"></script>
-<script src="scene.js?v=62"></script>
-<script src="game.js?v=62"></script>
+<script src="mechanics.js?v=63"></script>
+<script src="art.js?v=63"></script>
+<script src="world.js?v=63"></script>
+<script src="knowledge.js?v=63"></script>
+<script src="social.js?v=63"></script>
+<script src="portraits.js?v=63"></script>
+<script src="talk.js?v=63"></script>
+<script src="illustrate.js?v=63"></script>
+<script src="paint.js?v=63"></script>
+<script src="paper.js?v=63"></script>
+<script src="travel.js?v=63"></script>
+<script src="scene.js?v=63"></script>
+<script src="game.js?v=63"></script>

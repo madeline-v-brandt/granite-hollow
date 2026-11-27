@@ -1924,6 +1924,15 @@
         if (G.pos && Math.hypot(G.pos[0] - at.x, G.pos[1] - at.y) < 7) { if (meetNearby(G.pos)) { save(); renderAll(); } return; }
         goToPoint([at.x + 1.6, at.y - .5]);
       },
+      // The trailhead kiosk (after Phase 4): a click walks you over and reads it.
+      onKiosk: () => {
+        if (!v2() || G.day.over || climbing()) return;
+        if (nearKiosk(G.pos)) { openModal(() => showKiosk()); return; }
+        const p = kioskSpot(); if (!p) return;
+        goToPoint(p);
+        if (M.walking()) UI.toKiosk = true;
+      },
+      kioskTipHtml,
       onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
         const mins0 = minutesTo({ sector: b.sector, boulder: b.id }, true);
@@ -1963,6 +1972,7 @@
       const date = G && G.date;
       if (date === trailsDate && Wk) return;              // (called on every map update: only a new day can change it)
       trailsDate = date;
+      if (P.setPoster) P.setPoster(!!kioskBoard().next); // Gus's poster on the kiosk
       const ids = v2() && G && G.date ? World.oldTrailsOpen(G.date) : [], key = ids.join(",");
       if (key === trailsKey) return;
       trailsKey = key; openOld = (S.oldTrails || []).filter(t => ids.includes(t.old));
@@ -2112,6 +2122,7 @@
     function moved_(quiet = false) {
       if (!quiet && meetNearby(G.pos)) { save(); renderAll(); showPrompt(); }
       else if (G.day.encounter && walkedAway(G.day.encounter)) { G.day.encounter = null; renderTalk(); save(); }   // walked off mid-conversation
+      if (nearKiosk(G.pos) !== kioskNear) showPrompt();
       const now = locAt(G.pos, G.loc);
       if (sameLoc(now, G.loc)) return;
       const prev = { ...G.loc };
@@ -2180,9 +2191,11 @@
       arrive(w.from, now, { quiet: sameLoc(w.from, now) });
       meetNearby(G.pos);                                 // walked over to someone
       save(); renderAll(); showPrompt();
+      if (UI.toKiosk) { UI.toKiosk = false; if (nearKiosk(G.pos) && !G.day.over) openModal(() => showKiosk()); }
     }
     // Stop a trip where it is (keys take over, the day ends, a new trip starts).
     function stop() {
+      UI.toKiosk = false;
       if (!walk) return;
       const w = walk; walk = null; UI.busy = false; fade.classList.remove("on");
       const now = locAt(G.pos, G.loc); arrive(w.from, now, { quiet: sameLoc(w.from, now) });
@@ -2206,6 +2219,7 @@
         if (walk) stop();
         if (!keys.has(dir)) { keys.add(dir); if (!P.following()) P.setFollow(true); kick(); }
       } else if (k === "e" && !blockedKeys() && G.loc.boulder != null && K.boulder(G.loc.boulder) < 1 && !UI.busy) { e.preventDefault(); inspectBoulder(G.loc.boulder); }
+      else if (k === "e" && !blockedKeys() && v2() && !UI.busy && nearKiosk(G.pos)) { e.preventDefault(); openModal(() => showKiosk()); }
     });
     document.addEventListener("keyup", e => { const dir = KEY[e.key.toLowerCase()]; if (dir) keys.delete(dir); });
     window.addEventListener("blur", () => keys.clear());
@@ -2213,12 +2227,18 @@
 
     // ---- the prompt over the map at an unfamiliar boulder, and a first-day hint
     const prompt = $("#map-prompt");
+    let kioskNear = false;
     function showPrompt() {
       const b = G.loc.boulder, show = !G.day.over && b != null && !K.all() && K.boulder(b) < 1;
-      prompt.hidden = !show;
+      kioskNear = nearKiosk(G.pos);
+      const kiosk = !show && kioskNear && !walk && v2() && !G.day.over && !climbing();
+      prompt.hidden = !show && !kiosk;
       if (show) {
         prompt.innerHTML = `<span>Unfamiliar boulder</span><button type="button" class="btn small primary" data-map-inspect ${UI.busy ? "disabled" : ""}>Inspect <kbd>E</kbd></button>`;
         prompt.querySelector("[data-map-inspect]").onclick = () => inspectBoulder(b);
+      } else if (kiosk) {
+        prompt.innerHTML = `<span>The trailhead kiosk</span><button type="button" class="btn small primary" data-map-kiosk>Read <kbd>E</kbd></button>`;
+        prompt.querySelector("[data-map-kiosk]").onclick = () => openModal(() => showKiosk());
       }
     }
     const touchOnly = matchMedia("(hover: none) and (pointer: coarse)").matches;
@@ -3282,7 +3302,7 @@
       UI.expanded.add(p.id); travel({ sector: p.sector, boulder: p.b });
     });
     on("[data-inspect]", n => inspectBoulder(+n.dataset.inspect));
-    on("[data-kiosk]", () => openModal(showKiosk));
+    on("[data-kiosk]", () => openModal(() => showKiosk()));
     on("[data-rename]", n => openModal(() => nameDialog(+n.dataset.rename)));
     on("[data-old]", exportOldCopy);
     on("[data-lb-bucket]", n => { UI.lbBucket = +n.dataset.lbBucket; UI.lbGrade = null; renderPanel(); });
@@ -3453,22 +3473,96 @@
   }
 
   // The trailhead kiosk: the trail map, and the one surviving page of the old
-  // climbers' notebook. It greets a new climber, and is there to reread at The Tailgate.
-  function showKiosk() {
+  // climbers' notebook. It greets a new climber; afterwards you read it by clicking
+  // it on the map or standing by it (after Phase 4), or from The Tailgate's Here tab.
+  // It also has what Gus has pinned up: a poster for the next event (from a fortnight
+  // before; drawn on the kiosk too), the last comp's results or a thank-you for a
+  // week after an event, and a couple of notices that change with the season and week.
+  const KIOSK_POSTER = {
+    comp: "Every problem in the park counts, repeats too. Your five best sends score. Sign in with Gus at the kiosk from 9. Results by the lot at dusk.",
+    spring: "Every problem in the park counts, repeats too. Your five best sends score. Not an April Fool. Results by the lot at dusk.",
+    bonfire: "The longest night of the year. Climb while the light lasts, then fire, cocoa and stories at The Tailgate from dusk. Bring a mug.",
+    midsummer: "The longest day of the year. Climb till the light goes, then headlamps and sandwiches at The Tailgate.",
+    trail: "Volunteers wanted! Loppers, rakes and gloves provided. Something old is coming back. Meet Gus at the kiosk from 8.",
+  };
+  const KIOSK_SEASON = [
+    [[12, 1, 2], "Cold rock, good friction. Cold fingers, less so. The ranger's truck has a thermos if you ask nicely."],
+    [[3, 4], "Mud season. Please keep to the trails while the ground's soft."],
+    [[5, 6, 7, 8], "Ticks are out. Check yourself after walking through the long grass."],
+    [[9, 10, 11], "Hunting season in the woods next door. Wear something bright off the trails."],
+  ];
+  const KIOSK_NOTES = [
+    "Pack out what you pack in. That includes tape.",
+    "Lost: one left climbing shoe. Found: one left climbing shoe. Different shoes. Both in the box under the bench.",
+    "The lot gate is locked at dark. You know who you are.",
+    "Please brush off your chalk tick marks when you're done.",
+    "Chalk is fine. Chalk handprints on the welcome sign are not.",
+    "Spotted the barred owl? Please give her some room.",
+  ];
+  const kioskLm = () => (M && M.paint && M.paint.scene.landmarks.find(l => l.kind === "kiosk")) || null;
+  const kioskSpot = () => { const k = kioskLm(); return k && [k.x + 3.2, k.y - 1.2]; };   // beside it, so you can see the poster
+  const nearKiosk = pos => { const k = kioskLm(); return !!(k && pos && Math.hypot(pos[0] - k.x, pos[1] - (k.y - 1.5)) < 6); };
+  // What's pinned up today: the next event (within a fortnight, or today's), and the one just gone.
+  function kioskBoard() {
+    if (!v2()) return { next: null, past: null };
+    const next = World.nextEvent(G.date, 14);
+    let past = null;
+    for (let k = 1; k <= 7 && !past; k++) { const e = World.eventOn(addDays(G.date, -k)); if (e) past = e; }
+    return { next, past };
+  }
+  function kioskTipHtml() {
+    const { next } = kioskBoard();
+    return `<strong>The trailhead kiosk</strong>${next ? `<div class="sub">A poster: ${esc(next.name)}, ${next.in === 0 ? "today" : esc(longDay(next.date))}</div>` : `<div class="sub">The trail map, the old notebook page and Gus's notices</div>`}`;
+  }
+  function kioskPosterHtml(n) {
+    const when = n.in === 0 ? "Today!" : n.in === 1 ? `Tomorrow, ${longDay(n.date)}` : longDay(n.date);
+    const doodle = n.in === 1 ? `<p class="kp-doodle">Somebody has drawn Pickles in the corner.</p>` : "";
+    return `<figure class="kiosk-poster-card"><div class="kp-band">${esc(n.name.replace(/^The /, ""))}</div><p class="kp-when">${esc(when)}</p><p>${esc(KIOSK_POSTER[n.key] || "")}</p>${doodle}</figure>`;
+  }
+  function kioskPastHtml(e) {
+    if (e.comp) {
+      const f = K.compResults(e.date); if (f.length < 3) return "";
+      const nm = x => (x.who === "you" ? "You" : x.who.startsWith("n:") ? callName(x.who) : x.name);
+      const at = f.findIndex(x => x.who === "you");
+      const rows = f.slice(0, 5).map((x, i) => `<li class="${x.who === "you" ? "me" : ""}"><span>${i + 1}. ${esc(nm(x))}</span><b>${x.score.toLocaleString("en-US")}</b></li>`).join("")
+        + (at >= 5 ? `<li class="me"><span>${at + 1}. You</span><b>${f[at].score.toLocaleString("en-US")}</b></li>` : "");
+      return `<div class="kiosk-note results"><span class="kn-head">${esc(e.name.replace(/^The /, ""))}: results</span><ol class="comp-board">${rows}</ol><span class="kn-sign">Gus</span></div>`;
+    }
+    const t = e.key === "trail" ? World.oldTrailOn(e.date) : null;
+    const text = e.key === "bonfire" ? "Thank you to everyone who came out to the bonfire. Somebody left a mitten. It's in the box under the bench."
+      : e.key === "midsummer" ? "What an evening. Thanks for coming out to the dusk session, and for taking your headlamps home."
+      : t ? `${t.name.replace(/^the /, "The ")} is open again, for the first time since before the closure. Thank you, trail crew!`
+      : "Thank you, trail crew! The trails have never looked better.";
+    return `<div class="kiosk-note"><p>${esc(text)}</p><span class="kn-sign">Gus</span></div>`;
+  }
+  function showKiosk(first = false) {
     const page = World.notebook(D).map(n => {
       const p = D.problems[n.p], who = n.by === "n:anon" ? "?" : World.whoName(D, n.by).replace(/^the /, "");
       return `<li><span class="nb-name">${esc(p.name)}</span><span class="nb-what">${esc(p.boulder.name.replace(/^The /, ""))} · V${p.grade} · ${esc(who)}${n.by === "n:anon" ? "" : ` '${String(n.year).slice(2)}`}</span></li>`;
     }).join("");
-    modal(`<span class="label-sm">The trailhead kiosk</span><h2>Welcome to Granite Hollow</h2>
-      <p class="lede">Climbing reopened here on September 1, after nearly forty years. The kiosk has the park's trail map, the new climbing rules, and, pinned under glass, the only page of the old climbers' notebook anyone has found.</p>
-      <figure class="notebook" aria-label="A page from the old kiosk notebook"><div class="nb-head"><span>Boulder name</span><span>Location / grade / FA</span></div><ol>${page}</ol></figure>
-      <p class="lede">Those four are the whole guidebook so far. Everything else in the park is waiting for someone to climb it first.</p>
-      <p class="meta">The trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch.</p>
-      <div class="acts"><button type="button" class="btn primary" data-close>Go climbing</button><button type="button" class="btn" data-paper>Open the trail map</button></div>`,
-      (root, close) => {
-        root.querySelector("[data-close]").onclick = close;
-        root.querySelector("[data-paper]").onclick = () => { close(); safely("trail map", M.togglePaper); };
-      });
+    const notebook = `<figure class="notebook" aria-label="A page from the old kiosk notebook"><div class="nb-head"><span>Boulder name</span><span>Location / grade / FA</span></div><ol>${page}</ol></figure>`;
+    const acts = `<div class="acts"><button type="button" class="btn primary" data-close>Go climbing</button><button type="button" class="btn" data-paper>Open the trail map</button></div>`;
+    const bind = (root, close) => {
+      root.querySelector("[data-close]").onclick = close;
+      root.querySelector("[data-paper]").onclick = () => { close(); safely("trail map", M.togglePaper); };
+    };
+    if (first) {
+      modal(`<span class="label-sm">The trailhead kiosk</span><h2>Welcome to Granite Hollow</h2>
+        <p class="lede">Climbing reopened here on September 1, after nearly forty years. The kiosk has the park's trail map, the new climbing rules, and, pinned under glass, the only page of the old climbers' notebook anyone has found.</p>
+        ${notebook}
+        <p class="lede">Those four are the whole guidebook so far. Everything else in the park is waiting for someone to climb it first.</p>
+        <p class="meta">The trail map (press M) marks three climbing areas: The Tailgate, right here by the car, The Schoolhouse and Hawkwatch.</p>${acts}`, bind);
+      return;
+    }
+    const { next, past } = kioskBoard(), mo = toDate(G.date).getUTCMonth() + 1;
+    const week = Math.floor((toDate(G.date) - toDate(World.REOPENED)) / (7 * 864e5));
+    const season = (KIOSK_SEASON.find(([ms]) => ms.includes(mo)) || [null, ""])[1];
+    const dog = G.dog && G.dog.adopted ? "Pickles has a home now. Please still don't feed him." : "Please don't feed the dog. He has had three breakfasts.";
+    const notes = [season, [...KIOSK_NOTES, dog][((week % 7) + 7) % 7]].filter(Boolean)
+      .map((t, i) => `<div class="kiosk-note${i ? " tilt" : ""}"><p>${esc(t)}</p><span class="kn-sign">Gus</span></div>`).join("");
+    modal(`<span class="label-sm">The trailhead kiosk</span><h2>${next ? "Something's coming up" : "Gus's notices"}</h2>
+      <div class="kiosk-board">${next ? kioskPosterHtml(next) : ""}${past && !(next && next.in === 0) ? kioskPastHtml(past) : ""}${notes}</div>
+      ${notebook}${acts}`, bind);
   }
 
   // A climber from before the reopening, converted on load: what changed.
@@ -3913,7 +4007,7 @@
     if (G.day.climb && !G.day.over) safely("the climbing scene", showClimb); else if (G.day.climb) G.day.climb = null;   // reloaded mid-climb
     if (v2() && !G.day.over && G.day.sunset === "yes") safely("the sunset", watchSunset);                                   // reloaded mid-sunset
     else if (v2() && !G.day.over && (G.day.sunset === "told" || G.day.sunset === "watched")) safely("the sunset", sunsetEnd);
-    if (UI.kiosk) { UI.kiosk = false; openModal(showKiosk); }
+    if (UI.kiosk) { UI.kiosk = false; openModal(() => showKiosk(true)); }
     if (G.day.over) openModal(showSummary);
   }
 
