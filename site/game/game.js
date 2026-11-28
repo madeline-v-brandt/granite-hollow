@@ -195,6 +195,13 @@
   }
   function startDay(forward, rest, first = false) {
     if (!first) G.date = addDays(G.date, forward);
+    // A climbing trip (after Phase 4): if it's time, you're away for two weeks and back this morning.
+    let trip = null;
+    if (!first && v2() && G.tripOffer && G.date >= G.tripOffer.leave) {
+      if (G.tripOffer.yes && G.date < G.tripOffer.back) safely("the trip", () => { trip = goAway(); });
+      G.tripOffer = null;
+      if (trip) { G.date = trip.back; rest = Math.max(rest, 3); }
+    }
     // The forecast's odds are rolled now: rain comes with exactly the chance it gave.
     const fc = !first && (G.forecast || []).find(f => f.date === G.date);
     const ev = v2() ? World.eventOn(G.date) : null;                    // a seasonal event: always dry (Stage 7)
@@ -249,7 +256,9 @@
         note(`${who} made the first ascent of ${pname(it.p)}, a line you'd spotted.`);
       }
     });
-    if (v2()) safely("an invitation", makeInvite);
+    if (trip) safely("the trip", () => backFromTrip(trip));
+    else if (v2()) safely("a climbing trip", makeTripOffer);
+    if (v2() && !G.day.tripNote) safely("an invitation", makeInvite);
     if (v2()) safely("Pickles", startDogDay);
     // (Pickles used to be "waiting by the car" here while the map drew him asleep at
     // his rock. He's only ever where he's drawn now: go and find him. Phase 4, Stage 0.)
@@ -1321,6 +1330,87 @@
     const btn = iv.met ? `<span class="v">Found</span>` : gone ? `<span class="v">Gone</span>` : here && K.area(sec) >= 1 ? `<span class="v">Find</span>` : `<span class="v">Later</span>`;
     const tag = here && !iv.met && !gone && K.area(sec) >= 1 ? `button type="button" class="rowbtn" data-find="${esc(iv.who)}"` : `div class="rowbtn" style="cursor:default"`;
     return `<h3>A note on your windscreen</h3><ul class="rowlist invite"><li><${tag}><span><span class="t">${esc(firstName(iv.who))}</span><span class="s note-hand">“${esc(iv.text)}”</span></span>${btn}</${tag.split(" ")[0]}></li></ul>`;
+  }
+
+  // ---- climbing trips (after Phase 4): a friend invites you away for two weeks ----
+  // trips.js has the places (real areas, their real classics), the words and what you send.
+  // An invitation comes about once a season from a friend whose place is in season, a week or
+  // so ahead, never over an event (G.tripOffer; G.tripLast). Saying yes, you leave that Saturday
+  // and are back two weeks later: the sends are first sends (XP, and proof for your level), and
+  // the friend's away from the crag too (world.js). G.trips keeps every trip.
+  const dayGap = (a, b) => Math.round((toDate(b) - toDate(a)) / 864e5);
+  const monthDay = d => toDate(d).toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
+  const tripDates = o => `${monthDay(o.leave)} to ${monthDay(addDays(o.back, -1))}`;
+  function makeTripOffer() {
+    if (G.tripOffer || G.dayNo < 10 || (G.tripLast && dayGap(G.tripLast, G.date) < Trips.GAP) || Math.random() >= 0.3) return;
+    const who = Object.keys(Trips.DEST_OF).filter(w => K.met(w) && G.world.npc[w] && (Social.tier(G, w) || { n: 0 }).n >= 2).sort(() => Math.random() - 0.5);
+    const o = who.length && Trips.offer(G.date, who); if (!o) return;
+    const t = Trips.DESTS[o.key];
+    G.tripOffer = { ...o, made: G.date }; G.tripLast = G.date; G.day.tripNote = true;
+    G.day.last.text += " " + t.note(tripDates(o), { together: o.who === "n:rowan" && togetherNow() });
+    note(`An invitation from ${firstName(o.who)}: ${t.name}, ${tripDates(o)}.`);
+  }
+  function tripHtml() {
+    const o = G.tripOffer; if (!v2() || !o) return "";
+    const t = Trips.DESTS[o.key]; if (!t) return "";
+    if (o.yes) return `<div class="event-card trip soon"><span class="label-sm">Climbing trip</span><b>${esc(t.name)}, ${esc(t.where)}</b><span class="meta">With ${esc(firstName(o.who))}, ${esc(tripDates(o))} <button type="button" class="linklike" data-trip="no">Change of plans</button></span></div>`;
+    return `<div class="event-card trip"><span class="label-sm">An invitation</span><h3>${esc(t.ask)}</h3><p class="meta" style="margin:0">${esc(tripDates(o))}: two weeks of ${esc(t.rock)}.</p>
+      <div class="trip-acts"><button type="button" class="btn small primary" data-trip="yes">Count me in</button><button type="button" class="btn small" data-trip="no">Not this time</button></div></div>`;
+  }
+  function answerTrip(yes) {
+    const o = G.tripOffer; if (!o) return;
+    if (yes) { o.yes = true; toast(`${firstName(o.who)} is delighted`, `You're off to ${Trips.DESTS[o.key].name} on ${monthDay(o.leave)}.`, "find"); }
+    else { G.tripOffer = null; toast("Maybe next time", `${firstName(o.who)} says there's always next year.`, "info"); }
+    save(); renderAll();
+  }
+  // Away: what you send (on the morning you leave), recorded straight away.
+  function goAway() {
+    const o = G.tripOffer, t = Trips.DESTS[o.key]; if (!t) return null;
+    const before = levelNow().level;
+    const r = Trips.plan(G.player, o.key, ((G.world && G.world.seed) || G.id || "") + "|" + o.leave);
+    const tales = Trips.tales(o.key, ((G.world && G.world.seed) || "") + o.leave, { together: o.who === "n:rowan" && togetherNow(), dog: !!(G.dog && G.dog.adopted) });
+    const rec = { key: o.key, who: o.who, leave: o.leave, back: o.back, sends: r.sends, xp: r.xp, tales };
+    G.player.xp += r.xp;
+    const tops = G.player.tops = G.player.tops || [];
+    for (const s of r.sends) tops[s.g] = (tops[s.g] || 0) + 1;
+    G.trips = [...(G.trips || []), rec];
+    G.dayNo += Trips.DAYS;                      // the climbing days (regulars arrive by your climbing days)
+    return { ...rec, before };
+  }
+  // Home again: the morning you're back.
+  function backFromTrip(tr) {
+    const t = Trips.DESTS[tr.key], after = levelNow().level;
+    bond(tr.who, "trip");
+    if (tr.who === "n:rowan" && !togetherNow() && Social.romance(G).n >= 1) Social.flirt(G, G.date);   // two weeks together doesn't cool anything
+    G.day.tripNote = true;
+    G.day.last = { kind: "info", title: `Back from ${t.name}`, text: `You're home from two weeks in ${t.name} with ${firstName(tr.who)}. ` + G.day.last.text };
+    note(`Back from ${t.name}, ${t.where}: ${tr.sends.length} sends, +${fmt(tr.xp)} XP.`);
+    openModal(() => tripModal({ ...tr, after }));
+    if (after > tr.before) { (G.lvlOn = G.lvlOn || {})[after] = G.date; openModal(() => showLevelUp(after)); }
+  }
+  function tripModal(tr) {
+    const t = Trips.DESTS[tr.key], named = tr.sends.filter(s => s.n).sort((a, b) => b.g - a.g), more = tr.sends.filter(s => !s.n);
+    const lo = more.length ? Math.min(...more.map(s => s.g)) : 0, hi = more.length ? Math.max(...more.map(s => s.g)) : 0, fl = more.filter(s => s.flash).length;
+    const rows = named.map(s => `<li><div class="rowbtn" style="cursor:default"><span><span class="t">${esc(s.n)} <span class="g">${esc(Trips.gradeLabel(tr.key, s))}</span></span><span class="s">${s.flash ? "Flashed" : "Sent"}</span></span><span class="v" style="color:var(--gold)">+${fmt(s.xp)} XP</span></div></li>`).join("");
+    modal(`<div class="postcard pc-${esc(tr.key)}" aria-hidden="true"><span class="pc-from">Greetings from</span><span class="pc-name">${esc(t.name)}</span><span class="pc-where">${esc(t.where)}</span></div>
+      <span class="label-sm">Two weeks away with ${esc(firstName(tr.who))}</span><h2>Back from ${esc(t.name)}</h2>
+      <p class="lede">${esc(t.lede)}</p>
+      ${rows ? `<ul class="rowlist trip-sends">${rows}</ul>` : ""}
+      ${more.length ? `<p class="meta">…and ${more.length} more ${more.length === 1 ? "problem" : "problems"}, ${lo === hi ? `V${lo}` : `V${lo} to V${hi}`}${fl ? `, ${fl === more.length ? "all" : fl} of them flashed` : ""}.</p>` : ""}
+      <p class="lede trip-xp"><b>+${fmt(tr.xp)} XP</b>${tr.after > tr.before ? `, and you're V${tr.after} now` : ""}.</p>
+      <ul class="trip-tales">${tr.tales.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+      <div class="acts"><button type="button" class="btn primary" data-close>Back to Granite Hollow</button></div>`,
+      (root, close) => { root.querySelector("[data-close]").onclick = close; });
+  }
+  function tripsHtml() {
+    const ts = (G.trips || []).slice().reverse(); if (!ts.length) return "";
+    const rows = ts.map(tr => {
+      const t = Trips.DESTS[tr.key]; if (!t) return "";
+      const top = tr.sends.slice().sort((a, b) => b.g - a.g || (b.n ? 1 : 0) - (a.n ? 1 : 0))[0];
+      const when = toDate(tr.leave).toLocaleDateString("en-US", { timeZone: "UTC", month: "long", year: "numeric" });
+      return `<li><span class="stamp" aria-hidden="true"></span><div><b>${esc(t.name)}, ${esc(t.where)}</b><div class="meta" style="margin:0">${esc(when)}, with ${esc(firstName(tr.who))} · ${tr.sends.length} sends${top ? `, hardest ${top.n ? `${esc(top.n)}, ${esc(Trips.gradeLabel(tr.key, top))}` : `V${top.g}`}` : ""}</div></div></li>`;
+    }).join("");
+    return `<h3>Climbing trips</h3><ul class="events-list trips-list">${rows}</ul>`;
   }
 
   // ---- the regulars (Stage 5): people you get to know. Who's around, where,
@@ -2627,7 +2717,7 @@
 
   function renderPanel() {
     const el = $("#tabbody");
-    el.innerHTML = { here: () => hereHtml() + eventHtml() + inviteHtml() + outTodayHtml(), climber: climberHtml, logbook: logbookHtml, craglog: cragHtml, journal: journalHtml }[UI.tab]();
+    el.innerHTML = { here: () => hereHtml() + eventHtml() + tripHtml() + inviteHtml() + outTodayHtml(), climber: climberHtml, logbook: logbookHtml, craglog: cragHtml, journal: journalHtml }[UI.tab]();
     bindPanel(el);
   }
 
@@ -2829,7 +2919,7 @@
         <div><b>${G.bestGrade >= 0 ? "V" + G.bestGrade : "–"}</b><span>hardest send</span></div><div><b>${sends.length}</b><span>problems sent</span></div>
         <div><b>${G.ticks.filter(t => t.style === "Flash").length}</b><span>flashes</span></div><div><b>${G.dayNo}</b><span>days at the crag</span></div>
         ${v2() ? `<div><b>${World.faCount(G)}</b><span>first ascents</span></div>` : ""}<div><b>${Object.keys(G.ach).length}</b><span>achievements</span></div></div>
-      ${v2() ? yourPeopleHtml() + eventsHtml() : ""}
+      ${v2() ? yourPeopleHtml() + eventsHtml() + tripsHtml() : ""}
       <h3>Style skills</h3>
       ${skills.map(([t, v]) => {
         const left = Math.min(x(0), x(v)), width = Math.abs(x(v) - x(0));
@@ -3296,6 +3386,7 @@
     on("[data-go-boulder]", n => { const b = D.boulders[+n.dataset.goBoulder]; travel({ sector: b.sector, boulder: b.id }); });
     on("[data-find]", n => { if (!UI.busy && M.findPerson) M.findPerson(n.dataset.find); });
     on("[data-trail]", () => safely("Trail Day", helpTrail));
+    on("[data-trip]", b => answerTrip(b.dataset.trip === "yes"));
     on("[data-go-problem]", n => {
       const p = D.problems[+n.dataset.goProblem];
       if (!K.canGo({ sector: p.sector, boulder: p.b })) { toast("You don't know the way", "Nobody has told you where it is yet.", "info"); return; }
@@ -3395,7 +3486,12 @@
     const gains = Object.entries(d.gains).filter(([, g]) => g >= 0.02).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const fc = forecast(); save();
     const wkday = s => toDate(s).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+    const tr = v2() && G.tripOffer && G.tripOffer.yes ? G.tripOffer : null, tt = tr && Trips.DESTS[tr.key];
     const plans = fc.map((f, n) => {
+      // A trip you've said yes to: the day you leave is the trip, and the days after it aren't yours to plan.
+      if (tt && f.date > tr.leave) return "";
+      if (tt && f.date === tr.leave) return `<button type="button" class="plan trip" data-next="${n}"><span class="ev">✈ ${esc(tt.name)}</span>
+        <span class="when">Off on the trip</span><span class="date">${esc(wkday(f.date))}</span><span class="sky">Two weeks with ${esc(firstName(tr.who))}</span></button>`;
       const b = preview(n), ra = Mech.rainStart(f);
       const chance = f.pop != null ? Mech.rainChance(f) : ra === 0 ? `${f.precip || "Rain"} all day` : ra != null && ra < f.dusk ? `${f.precip || "Rain"} from ${clock(ra)}` : "";
       const rainLine = chance ? `<span class="rain">${esc(chance.charAt(0).toUpperCase() + chance.slice(1))}</span>` : `<span class="dry">Dry</span>`;
@@ -4116,7 +4212,9 @@
   // recounted from the ticks, which are the record).
   function regrade(g) {
     const grade = p => D.problems[p].grade;
-    if (g.bal === BAL_NOW) { g.player.tops = Mech.topsOf(g.ticks || [], grade); return false; }
+    // Sends on climbing trips (trips.js) are proof too, and their XP isn't in the ticks.
+    const addTrips = pl => { const t = Trips.tops(g.trips); t.forEach((n, i) => { if (n) pl.tops[i] = (pl.tops[i] || 0) + n; }); };
+    if (g.bal === BAL_NOW) { g.player.tops = Mech.topsOf(g.ticks || [], grade); addTrips(g.player); return false; }
     const pl = g.player;
     let oldXp = pl.xp, was = 0; for (let need = 100; oldXp >= need && was < 16; was++) { oldXp -= need; need *= 1.6; }   // the old curve
     const r = Mech.replay(g.ticks || [], {
@@ -4125,7 +4223,7 @@
       tip: p => (g.tips || []).some(t => t.p === p && t.done),
       repeatsPerDay: REPEATS_XP,
     });
-    pl.xp = r.xp; pl.tops = r.tops;
+    pl.xp = r.xp + (g.trips || []).reduce((a, t) => a + (t.xp || 0), 0); pl.tops = r.tops; addTrips(pl);
     // Never lower a level: top up the XP to the old level if the replay came out lower.
     if (Mech.levelOf(pl).level < was) { let xp = 0; for (let n = 0; n < was; n++) xp += Mech.levelCost(n); pl.xp = Math.max(pl.xp, xp); }
     const oldSkills = { ...pl.skills };
@@ -4164,7 +4262,12 @@
       }
       if (Object.keys(ok).length) g.events = ok; else delete g.events;
     }
-    if (g.poster != null && !(typeof g.poster === "string" && World.eventOn(g.poster))) delete g.poster;   // the event whose poster you've seen (Stage 8)
+    if (g.poster != null && !(typeof g.poster === "string" && World.eventOn(g.poster))) delete g.poster;
+    // Climbing trips (after Phase 4): the ones you've been on, an invitation, when the last one came.
+    if (g.trips != null) { const t = Trips.clean(g.trips); if (t.length) g.trips = t; else delete g.trips; }
+    if (g.tripOffer != null) { const o = g.tripOffer, ok = o && Trips.DESTS[o.key] && Trips.DESTS[o.key].who === o.who && day_(o.leave) && o.back === Trips.addDays(o.leave, Trips.LENGTH) && day_(o.made);
+      if (ok) g.tripOffer = { key: o.key, who: o.who, leave: o.leave, back: o.back, made: o.made, ...(o.yes === true ? { yes: true } : {}) }; else delete g.tripOffer; }
+    if (g.tripLast != null && !day_(g.tripLast)) delete g.tripLast;   // the event whose poster you've seen (Stage 8)
     if (g.day && g.day.trail != null && g.day.trail !== true) delete g.day.trail;
     if (g.day && g.day.busy != null && g.day.busy !== true) delete g.day.busy;
     // Rowan (Stage 6): G.romance checked and cleaned; today's sunset state only if it's one we know.

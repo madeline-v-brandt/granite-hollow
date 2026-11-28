@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=63">
+<link rel="stylesheet" href="scene.css?v=64">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -831,6 +831,19 @@ g.person.crowd { pointer-events: none; }   /* Ade's group (after Phase 4): figur
 .ribbon::after { content: ""; position: absolute; left: 5px; top: 14px; width: 12px; height: 15px; background: var(--rb, #c9b48a); border: 1.5px solid var(--ink); border-top: 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%); }
 .ribbon.r1 { --rb: #d8a93a; } .ribbon.r2 { --rb: #b9c0c8; } .ribbon.r3 { --rb: #c98a52; }
 .ribbon.none::before { background: transparent; border-style: dashed; } .ribbon.none::after { display: none; }
+/* climbing trips (after Phase 4): an invitation in the Here tab, a stamp on the Climber page, a postcard when you're back */
+.event-card.trip { border-color: #3f7fa6; border-left-color: #3f7fa6; background: color-mix(in oklab, #3f7fa6 6%, var(--raised)); }
+.trip-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; } .trip-acts .btn { min-height: 36px; }
+.stamp { flex: none; width: 22px; height: 26px; border-radius: 2px; background: #f3e9cf; border: 1.5px solid var(--ink); box-shadow: inset 0 0 0 2.5px #f3e9cf, inset 0 0 0 4px #3f7fa6; }
+.trip-sends .g { font-weight: 600; color: var(--ink-2); margin-left: 4px; }
+.trip-xp { margin-top: 6px; }
+.trip-tales { margin: 10px 0 14px; padding-left: 20px; } .trip-tales li { margin: 6px 0; color: var(--ink-2); line-height: 1.45; }
+.postcard { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0; margin: 0 0 12px; padding: 14px 18px 16px; border-radius: 4px; color: #fff8ea; overflow: hidden;
+  background: var(--pc, #3f7fa6) linear-gradient(160deg, rgba(255, 255, 255, .14), rgba(0, 0, 0, .18)); box-shadow: inset 0 0 0 5px rgba(255, 248, 234, .85), 0 4px 12px rgba(30, 20, 5, .2); transform: rotate(-.6deg); }
+.postcard .pc-from { font-family: var(--hand); font-size: 20px; line-height: 1; }
+.postcard .pc-name { font: 700 32px/1.05 var(--serif); letter-spacing: .01em; }
+.postcard .pc-where { font: 800 11px var(--body); letter-spacing: .14em; text-transform: uppercase; opacity: .9; }
+.pc-rocklands { --pc: #c0622e; } .pc-hueco { --pc: #b5733a; } .pc-magicwood { --pc: #3d6e52; } .pc-font { --pc: #8a7a4a; } .pc-joes { --pc: #a8563a; } .pc-bishop { --pc: #5a6f93; }
 .sunset { margin: -2px 0 12px; border-radius: 12px; overflow: hidden; border: 2px solid var(--ink); line-height: 0; }
 .sunset-art { width: 100%; height: auto; display: block; }
 .sunset .ss-heart { opacity: 0; transform-box: fill-box; transform-origin: center; }
@@ -991,6 +1004,7 @@ tr.lb-me td { background: var(--gold-soft); }
 /* Events (Phase 4, Stage 7): flagged on the forecast */
 .plan.event { border-color: var(--gold); box-shadow: 0 2px 0 color-mix(in oklab, var(--gold) 55%, transparent); background: color-mix(in oklab, var(--gold) 7%, var(--raised)); }
 .plan .ev { font-size: 11.5px; font-weight: 800; color: var(--gold); line-height: 1.2; margin-bottom: 4px; }
+.plan.trip { border-color: var(--sky, #3f7fa6); background: color-mix(in oklab, #3f7fa6 8%, var(--raised)); } .plan.trip .ev { color: #3f7fa6; }
 .event-soon { color: var(--gold); font-weight: 700; margin-top: 8px; }
 .toasts {
   position: fixed; z-index: 30; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
@@ -1205,16 +1219,17 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=63"></script>
-<script src="art.js?v=63"></script>
-<script src="world.js?v=63"></script>
-<script src="knowledge.js?v=63"></script>
-<script src="social.js?v=63"></script>
-<script src="portraits.js?v=63"></script>
-<script src="talk.js?v=63"></script>
-<script src="illustrate.js?v=63"></script>
-<script src="paint.js?v=63"></script>
-<script src="paper.js?v=63"></script>
-<script src="travel.js?v=63"></script>
-<script src="scene.js?v=63"></script>
-<script src="game.js?v=63"></script>
+<script src="mechanics.js?v=64"></script>
+<script src="art.js?v=64"></script>
+<script src="world.js?v=64"></script>
+<script src="knowledge.js?v=64"></script>
+<script src="social.js?v=64"></script>
+<script src="portraits.js?v=64"></script>
+<script src="talk.js?v=64"></script>
+<script src="trips.js?v=64"></script>
+<script src="illustrate.js?v=64"></script>
+<script src="paint.js?v=64"></script>
+<script src="paper.js?v=64"></script>
+<script src="travel.js?v=64"></script>
+<script src="scene.js?v=64"></script>
+<script src="game.js?v=64"></script>

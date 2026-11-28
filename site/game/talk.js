@@ -185,6 +185,16 @@
       const d = addDays(date, -k), e = G.events[d], ev = World.eventOn ? World.eventOn(d) : null;
       if (e && ev && e.k === ev.key && (((e.k === "bonfire" || e.k === "midsummer") && e.there) || (e.k === "trail" && e.helped && e.trail))) { c.wasThere = { key: e.k, ago: k }; break; }
     }
+    // Climbing trips (after Phase 4, trips.js): their invitation (asked, or you've said yes), back from
+    // one with them (10 days), or back from one with someone else (a week).
+    const TR = root.Trips || (typeof require !== "undefined" ? require("./trips.js") : null);
+    const o = G.tripOffer, lastTrip = Array.isArray(G.trips) && G.trips.length ? G.trips[G.trips.length - 1] : null;
+    if (TR && o && o.who === who && TR.DESTS[o.key] && date < o.leave) c[o.yes ? "tripGoing" : "tripAsk"] = { key: o.key, name: TR.DESTS[o.key].name };
+    if (TR && lastTrip && TR.DESTS[lastTrip.key]) {
+      const ago = days(lastTrip.back, date), it = { key: lastTrip.key, name: TR.DESTS[lastTrip.key].name, with: lastTrip.who };
+      if (ago >= 0 && ago <= 10 && lastTrip.who === who) c.tripBack = it;
+      else if (ago >= 0 && ago <= 7 && lastTrip.who !== who) c.away = it;
+    }
     if (c.youFa) { const p = +myFa[0]; c.youFa.grade = D.problems[p].grade; c.youFa.hard = D.problems[p].grade >= 4 && D.problems[p].grade >= (G.bestGrade ?? 0) - 1; }
     const lv = G.lvlOn && typeof G.lvlOn === "object" ? Object.entries(G.lvlOn).filter(([, d]) => typeof d === "string" && days(d, date) <= 6 && days(d, date) >= 0).map(([l]) => +l).sort((a, b) => b - a)[0] : null;
     if (lv != null && lv >= 2) c.youLevel = { level: lv };
@@ -252,6 +262,7 @@
         l("gus.h.yours", "happy", c => c.yours, () => "How's my— your dog? Our dog. The dog. He looks happy. That's all I wanted.", { w: 3 }),
         l("gus.h.gap", "happy", c => c.gap >= 21, c => `Well, look who it is! ${c.gap >= 45 ? "I was about to put up a missing poster." : "Thought you'd found another park."} Good to have you back.`, { w: 6 }),
         l("gus.h.ev", "happy", c => !!c.event, c => ({"spring": "Spring comp! And before you ask: no, it's not an April Fool. I checked the date twice. Five best sends, same as the fall.", "comp": "Comp day! I've got the clipboard, a coffee tin of pencils and no idea how the scoring works. Five best sends, they tell me. Results at the lot at dusk.", "bonfire": "Shortest day of the year. Climb while it's light; bonfire at The Tailgate at dusk. I've been saving the good logs.", "trail": "Trail Day! Grab a rake. Or a brush. Or a sandwich: Otis brought hundreds.", "midsummer": "Longest day of the year. Everyone's staying till the light goes. Otis has sandwiches. Of course Otis has sandwiches."})[c.event], { w: 8 }),
+        l("gus.h.away", "happy", c => !!c.away, c => `There you are! ${c.away.name}, I hear. The lot was too quiet without you. Don't tell me the weather was nice; I don't want to know.`, { w: 6, story: true }),
         l("gus.h.ro", "happy", c => c.rowanSweet, () => "Rowan's asked me what time the park closes twice this week. Looking at you, both times. Just an observation.", { w: 3, story: true }),
         l("gus.h.us", "happy", c => c.rowanUs, () => "So. You and Rowan. Pickles told me. Well, Pickles and everyone else in the lot. About time, if you ask me.", { w: 5, story: true }),
         l("gus.h.drill", "happy", T, () => "Pack it in, pack it out. You know the drill."),
@@ -369,6 +380,10 @@
         l("hol.h.dog", "happy", c => c.yours && c.dogWith, () => "Hello, Pickles. I've given him a CragLog profile, you know. He has more followers than I do.", { w: 3 }),
         l("hol.h.gap", "excited", c => c.gap >= 21, c => `There you are! Your account had gone quiet. ${c.gap >= 45 ? "I was about to send you one of those emails. “We miss you!” I hate those emails." : "I'd marked it “inactive”. Provisionally."} Welcome back.`, { w: 6 }),
         l("hol.h.ev", "excited", c => !!c.event, c => ({ spring: "The spring comp! Live scores on CragLog this year. In theory. Signal permitting.", comp: "I'm running live results on CragLog, as a check on Gus's clipboard. Not that I doubt Gus. I doubt clipboards.", bonfire: "If the Bishop tells the mule story again, I'm logging what's changed. There's a version history.", trail: "Trail Day! I'll update the trail map in CragLog tonight. I've already written the release notes.", midsummer: "The longest day. CragLog's busiest, too. I've asked the server to be brave." })[c.event], { w: 8 }),
+        l("hol.h.tripask", "excited", c => !!c.tripAsk, () => "Did you get my note? Bishop! I've already made a CragLog list for it. Several lists. One of them is just bakeries.", { w: 8 }),
+        l("hol.h.tripgo", "excited", c => !!c.tripGoing, () => "Bishop countdown! I've started packing. The laptop has its own bag. The laptop has two bags.", { w: 6 }),
+        l("hol.h.tripback", "thoughtful", c => !!c.tripBack, () => "I've been home for days and I still look up expecting to see the Sierra. I put all our Bishop sends on a map. It's the most beautiful thing I've ever coded.", { w: 6, story: true }),
+        l("hol.h.away", "thoughtful", c => !!c.away, c => `Welcome back! CragLog couldn't log any of your ${c.away.name} sends: it only knows the park. I'm thinking about that. I'm thinking about it a lot.`, { w: 5, story: true }),
         l("hol.h.ro", "thoughtful", c => c.rowanSweet, () => "Rowan asked me whether CragLog lets you follow just one person. It does. Rowan's following one person. I'm saying nothing.", { w: 3, story: true }),
         l("hol.h.us", "happy", c => c.rowanUs, () => "I've updated the database. You and Rowan are linked records now. It's the most romantic thing I know how to do.", { w: 5, story: true }),
         l("hol.h.log", "thoughtful", c => c.tierN <= 1, () => "Please make sure to log your sends! Every one. Even the easy ones. Especially the easy ones: nobody logs the easy ones."),
@@ -490,6 +505,7 @@
         l("oti.h.dog", "excited", c => c.yours && c.dogWith, () => "Pickles! Perfect dog weather. Here, he can have the crust.", { w: 3 }),
         l("oti.h.gap", "excited", c => c.gap >= 21, () => "Look who it is! You picked a perfect day to come back. Every day's perfect, but still.", { w: 6 }),
         l("oti.h.ev", "excited", c => !!c.event, c => ({"spring": "Spring comp! The friction's perfect. Well. It's always perfect. Today it's really perfect.", "comp": "Comp day! Perfect comp weather. I'm not going to win. I'm going to have a perfect time.", "bonfire": "I brought marshmallows. And a backup bag of marshmallows.", "trail": "Perfect trail-building weather!", "midsummer": "I made forty sandwiches. Forty-one. I ate one on the drive."})[c.event], { w: 8 }),
+        l("oti.h.away", "happy", c => !!c.away, c => `You're back from ${c.away.name}! I saved you a sandwich. Well, I made you a new one. The first one went to the geese. Don't tell Gus.`, { w: 5, story: true }),
         l("oti.h.ro", "happy", c => c.rowanSweet, () => "Rowan's been drawing the same crash pad all morning. Your crash pad. Perfect drawing weather, I suppose.", { w: 3, story: true }),
         l("oti.h.us", "excited", c => c.rowanUs, () => "You and Rowan! Perfect. Perfect weather for it. Every weather is, really, but especially this one.", { w: 5, story: true }),
         l("oti.h.perfect", "happy", T, () => "Perfect sending weather!"),
@@ -619,6 +635,10 @@
         l("row.h.year", "smitten", c => c.us && c.usDays >= 365 && c.usDays <= 380, () => "A year since the sunset. I've filled four sketchbooks since then. You're in most of them.", { w: 9, sweet: true, story: true }),
         l("row.h.gap", "happy", c => c.gap >= 21, () => "Oh! You're back. I kept looking up whenever someone came down the trail. Anyway. Hi.", { w: 6 }),
         l("row.h.ev", "happy", c => !!c.event, c => ({"spring": "I'm going to draw everyone's first go of the season. Nobody's warmed up yet. It's lovely.", "comp": "I'm mostly here to draw everyone looking nervous. I might climb a bit.", "bonfire": "The light goes so early today. I'm going to try to draw the fire later. Fire's impossible to draw.", "trail": "Trail Day! Gus gave me a rake and I've no idea what to do with it.", "midsummer": "The light goes on forever today. I've drawn the same boulder four times as it changes."})[c.event], { w: 8 }),
+        l("row.h.tripask", "happy", c => !!c.tripAsk, c => c.us ? "Did you find my note? Magic Wood. Two weeks, a forest, a river and us. I've been looking at the maps every night." : "Did you find my note? Magic Wood. I've been looking at maps of it all week. I'd really like it if you came.", { w: 8 }),
+        l("row.h.tripgo", "excited", c => !!c.tripGoing, () => "I've packed and unpacked my bag three times. Every time there are more maps in it.", { w: 6 }),
+        l("row.h.tripback", "happy", c => !!c.tripBack, () => "When it's quiet I can still hear that river. I've drawn the forest about twenty times since we got back. You're in most of them.", { w: 6, story: true }),
+        l("row.h.away", "happy", c => !!c.away, c => `You're back! The park's been so quiet. Tell me everything about ${c.away.name}. Start with the rock, then the food.`, { w: 5, story: true }),
         l("row.h.back", "happy", T, () => "Hey, you're back! I was hoping someone would come up here."),
         l("row.h.light", "thoughtful", c => c.part === "morning", () => "The light's doing something lovely on the rock this morning. I've drawn it three times and it's still wrong.", { w: 2 }),
         l("row.h.glow", "happy", c => c.part !== "morning", () => "The afternoon light makes everything look like it's glowing. Even the chalk.", { w: 2 }),
@@ -750,6 +770,10 @@
         l("bea.h.dog", "excited", c => c.yours && c.dogWith, () => "PICKLES!! Oh, and hi. Hi. But PICKLES.", { w: 3 }),
         l("bea.h.gap", "excited", c => c.gap >= 21, () => "WHERE HAVE YOU BEEN. Okay, sorry. Hi. I've learned SO many dynos since.", { w: 6 }),
         l("bea.h.ev", "excited", c => !!c.event, c => ({"spring": "SPRING COMP. I trained ALL WINTER. On a pull-up bar in my closet.", "comp": "COMP DAY. I've been training since September. Mostly dynos. Okay, only dynos.", "bonfire": "Bonfire! My mom says I can stay till it's over. Over-over.", "trail": "We get to MOVE ROCKS. On purpose!", "midsummer": "Climbing till dark!! With HEADLAMPS!"})[c.event], { w: 8 }),
+        l("bea.h.tripask", "excited", c => !!c.tripAsk, () => "Did you see my note?! ROCKLANDS!! Mum's already looked at the flights. Say yes. Please say yes.", { w: 8 }),
+        l("bea.h.tripgo", "excited", c => !!c.tripGoing, () => "I've made a list of every problem I want to do in Rocklands. It's three pages. Mum says that's too many. It's not too many.", { w: 6 }),
+        l("bea.h.tripback", "excited", c => !!c.tripBack, () => "I MISS ROCKLANDS. I told everyone about the baboons and nobody believes me. You were there! Tell them!", { w: 6, story: true }),
+        l("bea.h.away", "excited", c => !!c.away, c => `You were away!! ${c.away.name}?! That\'s SO cool. Did you do anything famous? Show me the photos!`, { w: 5, story: true }),
         l("bea.h.ro", "excited", c => c.rowanSweet, () => "Rowan drew you AGAIN. I saw. Are you two— no. Never mind. Forget I said anything. (Are you, though?)", { w: 3, story: true }),
         l("bea.h.us", "excited", c => c.rowanUs, () => "OH MY GOD. You and ROWAN? I KNEW it. I called it weeks ago. Nobody ever listens to me.", { w: 5, story: true }),
         l("bea.h.almost", "excited", T, () => "Did you see that? I almost stuck it! Almost!"),
@@ -863,6 +887,10 @@
         l("dez.h.dog", "happy", c => c.yours && c.dogWith, () => "Hey, Pickles. …And you.", { w: 3 }),
         l("dez.h.gap", "happy", c => c.gap >= 21, () => "Hey. Been a while. Good to see you.", { w: 6 }),
         l("dez.h.ev", "happy", c => !!c.event, c => ({"spring": "Comp again. …Good.", "comp": "Comp. …Good.", "bonfire": "Bonfire later. I'll stay for a bit.", "trail": "Trail Day. Brought gloves.", "midsummer": "Long day. Good."})[c.event], { w: 8 }),
+        l("dez.h.tripask", "neutral", c => !!c.tripAsk, () => "Hueco. You coming?", { w: 8 }),
+        l("dez.h.tripgo", "neutral", c => !!c.tripGoing, () => "Pack tape. Lots of tape.", { w: 6 }),
+        l("dez.h.tripback", "happy", c => !!c.tripBack, () => "Still got Hueco on my fingertips. Good trip.", { w: 6, story: true }),
+        l("dez.h.away", "neutral", c => !!c.away, c => `${c.away.name}. Good?`, { w: 5, story: true }),
         l("dez.h.ro", "thoughtful", c => c.rowanSweet, () => "Rowan keeps looking over here. Not at me.", { w: 3, story: true }),
         l("dez.h.us", "happy", c => c.rowanUs, () => "Heard about you and Rowan. …Good. Really.", { w: 5, story: true }),
         l("dez.h.mm", "neutral", T, () => "Mm. Good conditions."),
@@ -970,6 +998,10 @@
         l("mag.h.dog", "happy", c => c.yours && c.dogWith, () => "Pickles! Sit. Good boy. You see? Thirty-four years of classrooms. Dogs are easy.", { w: 3 }),
         l("mag.h.gap", "happy", c => c.gap >= 21, c => `Well! I was about to mark you absent. ${c.gap >= 45 ? "Twice." : ""} Welcome back, dear.`, { w: 6 }),
         l("mag.h.ev", "excited", c => !!c.event, c => ({ spring: "The spring comp! I'm entering. I shan't win. I'm entering so the young ones can see what sixty-eight looks like.", comp: "Comp day. I've brought a flask and a folding chair, and I'm climbing three problems. Possibly four. Don't tell my knees.", bonfire: "The bonfire! I've brought scones. Gus always forgets the scones.", trail: "Trail Day. I've brought my good gardening gloves. Thirty years of roses. Brambles don't frighten me.", midsummer: "The longest day. I'm staying for the headlamps this year. My granddaughter's lent me hers. It's pink." })[c.event], { w: 8 }),
+        l("mag.h.tripask", "excited", c => !!c.tripAsk, () => "Did you get my note? Fontainebleau! The gîte has a garden, and there's the bicycle, though I wouldn't trust it downhill.", { w: 8 }),
+        l("mag.h.tripgo", "happy", c => !!c.tripGoing, () => "I've been practising my French on Gus. He's been very patient. He doesn't speak French.", { w: 6 }),
+        l("mag.h.tripback", "happy", c => !!c.tripBack, () => "I still dream about that bakery. And the orange circuit. In that order, I'm ashamed to say.", { w: 6, story: true }),
+        l("mag.h.away", "happy", c => !!c.away, c => `Welcome home, dear. ${c.away.name}! How lovely. Did you keep a diary? You should always keep a diary.`, { w: 5, story: true }),
         l("mag.h.ro", "thoughtful", c => c.rowanSweet, () => "I've seen the way Rowan looks over when you're climbing. I taught teenagers for thirty-four years. I know that look.", { w: 3, story: true }),
         l("mag.h.us", "happy", c => c.rowanUs, () => "You and Rowan! Oh, that's lovely. I said so to Gus. Gus claims to have said it first. Gus did not.", { w: 5, story: true }),
         l("mag.h.tea", "happy", T, () => "Tea? I've brought far too much, as usual. Earl Grey. It's good for the forearms. I've decided."),
@@ -1088,6 +1120,7 @@
         l("jun.h.dog", "happy", c => c.yours && c.dogWith, () => "Pickles! You've got a dog now? A dog's basically a moss detector. I'm so jealous.", { w: 3 }),
         l("jun.h.gap", "excited", c => c.gap >= 21, c => `You're back! I've ${c.gap >= 45 ? "put up about nine new lines" : "found three new lines"} while you were gone. Just saying. Welcome back.`, { w: 6 }),
         l("jun.h.ev", "excited", c => !!c.event, c => ({ spring: "Spring comp! I'm only doing it because the far boulders are too wet to clean. Don't tell anyone.", comp: "Comp day! Every problem in the park counts, Gus says. Including mine. Especially mine.", bonfire: "Bonfire tonight. I'm bringing the brush. Not for the fire. I just always have it.", trail: "Trail Day! A new trail means everything out there is suddenly closer. I've got a list.", midsummer: "Longest day of the year. I was out at four-thirty. I've cleaned two lines already." })[c.event], { w: 8 }),
+        l("jun.h.away", "happy", c => !!c.away, c => `You were gone two weeks and I brushed four new lines. Don\'t worry, I left you one. Probably. How was ${c.away.name}?`, { w: 5, story: true }),
         l("jun.h.ro", "happy", c => c.rowanSweet, () => "Rowan asked me which line you were working on. Then asked again, to be sure. I'm just reporting what I saw.", { w: 3, story: true }),
         l("jun.h.us", "excited", c => c.rowanUs, () => "You and Rowan! Finally. Half the Hollow had a bet on it. I had October.", { w: 5, story: true }),
         l("jun.h.dawn", "happy", T, () => "I've been out since first light. First light, first ascent. That's the motto. It's my motto. I made it up."),
@@ -1207,6 +1240,10 @@
         l("ade.h.dog", "excited", c => c.yours && c.dogWith, () => "Pickles! My group love Pickles. Half of them only come out for Pickles.", { w: 3 }),
         l("ade.h.gap", "excited", c => c.gap >= 21, c => `Welcome back! ${c.gap >= 45 ? "Did you take the winter off? That's allowed. Rest is training." : "A little break? Good. Rest is training."}`, { w: 6 }),
         l("ade.h.ev", "excited", c => !!c.event, c => ({ spring: "Spring comp! I've told my lot it's about having fun. I've also made them a training plan. Both things are true.", comp: "Comp day! I've brought the whole group. Two of them have never been outside. This should be very good or very loud.", bonfire: "The bonfire! I've promised the group there'll be stories. Please tell me the Bishop's coming.", trail: "Trail Day! I've brought six teenagers and six rakes. Only one rake's broken so far.", midsummer: "Longest day! Headlamps, snacks and nobody's had to be carried down yet." })[c.event], { w: 8 }),
+        l("ade.h.tripask", "excited", c => !!c.tripAsk, () => "Did you get the note? Joe's Valley! The group's buzzing. I need someone who knows how to spot properly, and that's you.", { w: 8 }),
+        l("ade.h.tripgo", "happy", c => !!c.tripGoing, () => "Van checklist: pads, tape, first aid, snacks, more snacks. The group are in charge of snacks. I'm worried.", { w: 6 }),
+        l("ade.h.tripback", "happy", c => !!c.tripBack, () => "The group still won't stop talking about Joe's. One of them made a playlist of the trip. It's nine hours long.", { w: 6, story: true }),
+        l("ade.h.away", "happy", c => !!c.away, c => `Back from ${c.away.name}! Hope you stretched. Did you stretch? You didn\'t stretch.`, { w: 5, story: true }),
         l("ade.h.ro", "happy", c => c.rowanSweet, () => "One of my group asked me if you and Rowan were climbing partners. I said I didn't know. Then I watched for a minute. I know now.", { w: 3, story: true }),
         l("ade.h.us", "excited", c => c.rowanUs, () => "You and Rowan! That's brilliant. The whole group cheered when they heard. They're very invested.", { w: 5, story: true }),
         l("ade.h.group", "happy", c => c.weekend, () => "I've got the Saturday group on the warm-ups. They think outdoor V2 is a typo. They're learning.", { w: 3 }),

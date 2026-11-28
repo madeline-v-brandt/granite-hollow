@@ -131,6 +131,27 @@ An illustrated, explorable map with hidden boulders and trails; seasonal changes
     - On it: Gus's poster for the next event, from a fortnight before through the day (`KIOSK_POSTER`; the day before, somebody's drawn Pickles on it). For a week after an event: the comp's results (top 5 and you) or Gus's thank-you (Trail Day's names the reopened trail). Then a seasonal notice and a weekly one (`KIOSK_SEASON`, `KIOSK_NOTES`), and the notebook page.
     - The poster is drawn on the kiosk on the map while one's up (`setPoster` in `paint.js`: the class `poster-up` on `#mapwrap`).
     - Test: `scripts/browser/kiosk.js`.
+  - **Climbing trips** (`trips.js`, pure; tests: `node scripts/test_trips.js`, `scripts/browser/trips.js`).
+    - **Who and where:** a friend (tier friends or better, met, arrived) invites you away for two weeks to a real bouldering area in its season:
+      - Bea: Rocklands, late June to August. It's Bea's family's trip, with a spare seat (Bea is 17).
+      - Dez: Hueco Tanks, January to February.
+      - Rowan: Magic Wood, mid-July to mid-September (a sweeter note and a sweet story when you're together).
+      - Mags: Fontainebleau, April to May or September to mid-October.
+      - Ade: Joe's Valley, September to October, with the gym group.
+      - Hollis: Bishop, November to mid-December or January to February.
+      - Gus stays home and looks after Pickles. Otis and Juno have no trip yet.
+    - **The invitation** (`makeTripOffer`, `G.tripOffer`): about one a season (`Trips.GAP` days after the last, `G.tripLast`), a 30% roll a day. It's a windscreen note (no ordinary note that morning) and a card in the Here tab (`tripHtml`: Count me in / Not this time, then Change of plans). You leave on a Saturday 6–12 days ahead, and no event falls in the two weeks (`Trips.fits`). An invitation never answered lapses on the day.
+    - **Away** (`goAway` in `startDay`): the summary's card for the day you leave is the trip, with no days after it. The date jumps to the morning you're back (`back`, 14 days later), and the world catches up. The friend has no sessions at the crag while away (`awayOn` in `world.js`; their stream is still drawn).
+    - **What you send** (`Trips.plan`, seeded): first sends near your level until the trip's XP reaches about 8 climbing days at home (`Trips.DAYS` × `Trips.RATE`, from the balance simulator's steady climbers). So it's about the same as staying home, and far more for someone who's climbed out the park and only has repeats left. The sends are proof for your level (`player.tops`; `regrade` adds `Trips.tops(G.trips)` when it recounts from the ticks) and add 8 to your climbing days.
+      - Up to 6 of the hardest sends are named after the area's real problems at that grade. The names and grades are from published sources (listed in `trips.js`), leaving out any problem the sources disagreed about and avoiding crude names. No real people (no first ascensionists).
+      - Font-graded areas show "7A+ (V7)".
+      - Trip sends stay out of CragLog, the Rankings and the park's ticks.
+    - **Back** (`backFromTrip`, `tripModal`):
+      - A postcard: the named sends, "…and N more problems", the XP and any level-up, plus two stories from the place (with Rowan's sweet one if you're together, and one about Pickles if he's yours).
+      - A big `trip` moment (Social.KINDS, 6). A trip with Rowan counts as flirting, so the romance doesn't cool.
+      - The Climber page's "Climbing trips" list (`tripsHtml`).
+      - Talk: the friend's `.h.tripask`, `.h.tripgo` and `.h.tripback` lines (`c.tripAsk`, `c.tripGoing`, `c.tripBack`), and everyone else's `.h.away` (`c.away`, the week after).
+    - **Saves:** `G.trips`, `G.tripOffer` and `G.tripLast`, all optional and cleaned in `migrateSave` (`Trips.clean`).
   - Your climbing partner walks with you (see Partners). Pickles stays further back when they do, and is drawn under you when he's behind you (`placeDog`).
   - Less explanation on screen, on purpose; don't add these back:
     - no tagline under a name in the conversation box (no blurb, level or tier)

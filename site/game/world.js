@@ -433,6 +433,9 @@
     }
     return null;
   }
+  // A regular who's away on a climbing trip with you that day (G.trips, trips.js). Their own
+  // stream is still drawn, so no other day changes.
+  const awayOn = (G, w, d) => Array.isArray(G.trips) && G.trips.some(t => t && t.who === w && t.leave <= d && d < t.back);
   // One day of the regulars' lives. Sends of unclimbed projects are returned as
   // wishes; stepDay grants them out of the day's first-ascent budget.
   function regDay(D, G, d, ctx, wet) {
@@ -445,6 +448,7 @@
       const key = w.slice(2), r = stream(W.seed, "reg|" + w + "|" + d), rt = routineOn(key, d), n = NAMED[key];
       const out = r(), pa = r(), pb = r();                                // always drawn, in this order
       if (out >= rt.p * (wet && !rt.rain ? RP.wetOut : 1)) continue;
+      if (awayOn(G, w, d)) continue;                                      // away on a trip with you (after Phase 4)
       const L = levelOn(w, d);
       // A project they've finished some other way (a repeat), or one someone else climbed first: either is fine.
       if (R.proj && R.sent.includes(R.proj.p)) { R.done.unshift([R.proj.p, R.proj.since, d, R.proj.n, "sent"]); R.proj = null; }
