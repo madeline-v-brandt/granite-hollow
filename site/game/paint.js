@@ -406,6 +406,8 @@
     const far = world.append("g").attr("class", "far");
     const canopy = world.append("g").attr("class", "canopy tiled");
     const rings = world.append("g").attr("class", "rings");          // project rings, on the ground under the rocks
+    const trash = world.append("g").attr("class", "trash");          // the Clean-Up's litter (after Phase 4: setTrash)
+    const TRASH_K = 2.2;                                              // litter about a third of your height, so it's findable
     const stand = world.append("g").attr("class", "standing tiled");
     const over = world.append("g").attr("class", "over");            // your pads at the boulder you're at
     const people = world.append("g").attr("class", "people");        // the regulars, at their boulders today (Stage 6)
@@ -1659,6 +1661,7 @@
     const rockAt = e => { const el = e.target.closest && e.target.closest("g.boulder, g.far-rock"); return el ? +el.dataset.id : null; };
     const personOf = e => (e.target.closest && e.target.closest("g.person")) || null;
     const kioskOf = e => !!(opts.onKiosk && e.target.closest && e.target.closest("g.lm-kiosk"));
+    const trashOf = e => (opts.onTrash && e.target.closest && e.target.closest("g.trash-item")) || null;
     let tipTimer = null;
     function placeTip(e) {
       const r = wrap.getBoundingClientRect();
@@ -1679,6 +1682,12 @@
       const per = personOf(e);
       if (per && e.pointerType !== "touch" && personTip(e, per.dataset.who)) {
         if (ui.hover != null) { ui.hover = null; markBoulders(); placeLabels(); }
+        return;
+      }
+      const tr = trashOf(e);
+      if (tr && e.pointerType !== "touch" && tip && opts.trashTipHtml) {
+        if (ui.hover != null) { ui.hover = null; markBoulders(); placeLabels(); }
+        clearTimeout(tipTimer); tip.innerHTML = opts.trashTipHtml(+tr.dataset.id); tip.hidden = false; placeTip(e);
         return;
       }
       if (kioskOf(e) && e.pointerType !== "touch" && tip && opts.kioskTipHtml) {
@@ -1715,6 +1724,7 @@
           return opts.onPerson(who.dataset.who);
         }
         if (kioskOf(e)) { if (tip) tip.hidden = true; return opts.onKiosk(); }
+        const tr = trashOf(e); if (tr) { if (tip) tip.hidden = true; return opts.onTrash(+tr.dataset.id); }
         const id = rockAt(e);
         if (id == null) {
           const [gx, gy] = d3.pointer(e);
@@ -2059,6 +2069,7 @@
     function sizePeople() {
       const k = personK(); if (peopleK && Math.abs(k / peopleK - 1) < .01) return;
       peopleK = k;
+      trash.selectAll("g.trash-fig").attr("transform", `scale(${f2(k * TRASH_K)})`);
       people.selectAll("g.person").each(function () {
         const n = this, z = k * (+n.dataset.size || 1), f = +n.dataset.facing;
         d3.select(n).select(".person-fig").attr("transform", `scale(${f2(z * (f > 0 ? -1 : 1))},${f2(z)})`);
@@ -2085,6 +2096,32 @@
       if (Math.abs(x - t.x) < cr + 1 && [0, .5, .9].some(f => Math.abs(y - t.y + f * h - ch) < cr + .5)) hit = true;
       return hit; }); return hit; };
     const standable = (x, y) => !S.inWater([x, y], 1) && !S.boulders.some(b2 => Math.hypot(x - b2.b.x, y - b2.b.y) < b2.form.R * 1.05 + 1.2);
+    // The Clean-Up's litter (after Phase 4): small things on the ground, drawn your size at any
+    // zoom like the people, each a click away. list: [{ id, x, y, k }], the pieces still there.
+    const TRASH = {
+      can: '<path class="tr-ink" d="M-1.6,-0.2 L-1.6,-4.6 L1.6,-4.6 L1.6,-0.2 Z" fill="#c0412a"/><path d="M-1.6,-3.6 H1.6" stroke="#f3e9d1" stroke-width=".7"/>',
+      bottle: '<path class="tr-ink" d="M-1.4,-0.2 L-1.4,-4 C-1.4,-4.8 -0.6,-5 -0.6,-5.8 L-0.6,-6.8 L0.6,-6.8 L0.6,-5.8 C0.6,-5 1.4,-4.8 1.4,-4 L1.4,-0.2 Z" fill="#bfe0e8" fill-opacity=".9"/>',
+      wrapper: '<path class="tr-ink" d="M-3,-0.6 L-2.2,-2.8 L2.6,-3.2 L3,-0.4 Z" fill="#e5b93a"/><path d="M-1,-2.9 L-0.6,-0.6" stroke="#9b3b2f" stroke-width=".6"/>',
+      tape: '<circle class="tr-ink" cx="0" cy="-1.8" r="1.8" fill="#f3efe4"/><path d="M-1.4,-2.6 Q0,-1.2 1.5,-2.2" fill="none" stroke="#b8b0a0" stroke-width=".4"/>',
+      cup: '<path class="tr-ink" d="M-1.5,-0.2 L-2,-4.2 L2,-4.2 L1.5,-0.2 Z" fill="#f6f1e6"/><path d="M-1.9,-3.2 H1.9" stroke="#6b5136" stroke-width=".8"/>',
+      bag: '<path class="tr-ink" d="M-2.6,-0.2 C-3,-2.6 -2.2,-4.4 -1.2,-4.6 L-0.8,-5.6 M0.8,-5.6 L1.2,-4.6 C2.2,-4.4 3,-2.6 2.6,-0.2 Z" fill="#eef0f2"/>',
+      shoe: '<path class="tr-ink" d="M-3.2,-0.2 L-3.2,-2.4 C-2.4,-3.6 -1,-3.8 0,-3.4 L1,-1.8 C2,-1.6 3.2,-1.2 3.2,-0.2 Z" fill="#3f6f9a"/><path d="M-3.2,-0.6 H3.2" stroke="#2c2a26" stroke-width=".7"/>',
+      guide: '<path class="tr-ink" d="M-2.6,-0.4 L-2.2,-4.4 L2.4,-4 L2.2,0 Z" fill="#f3e2b0"/><path d="M-1.5,-3.2 L1.4,-3 M-1.6,-2.2 L1.2,-2 M-1.7,-1.2 L0.6,-1.1" stroke="#7a6a4e" stroke-width=".35"/>',
+      gnome: '<path class="tr-ink" d="M-1.8,-0.2 L-1.6,-3 L1.6,-3 L1.8,-0.2 Z" fill="#3f7a4a"/><circle cx="0" cy="-3.6" r="1.1" fill="#e8c4a0" stroke="#2c2a26" stroke-width=".3"/><path class="tr-ink" d="M-1.3,-4.1 L0,-7.4 L1.3,-4.1 Z" fill="#c0412a"/><path d="M-0.9,-3.2 Q0,-1.8 0.9,-3.2" fill="#f3efe4"/>',
+      sock: '<path class="tr-ink" d="M-1,-5 L1,-5 L1,-2 L2.8,-1.2 L2.4,-0.2 L-1,-0.4 Z" fill="#b0436e"/><path d="M-1,-4.2 H1" stroke="#f3efe4" stroke-width=".6"/>',
+      frisbee: '<ellipse class="tr-ink" cx="0" cy="-1" rx="3.2" ry="1.2" fill="#e08a3a"/>',
+      brush: '<path class="tr-ink" d="M-3,-0.6 L2,-1.8 L2.3,-1.1 L-2.8,0.1 Z" fill="#5f7fa6"/><path d="M1.2,-1.6 L1.4,-2.6 M1.8,-1.7 L2,-2.7" stroke="#f3efe4" stroke-width=".5"/>',
+    };
+    let trashKey = "";
+    function setTrash(list) {
+      const key = (list || []).map(t => t.id).join(","); if (key === trashKey) return; trashKey = key;
+      const sel = trash.selectAll("g.trash-item").data(list || [], d => d.id);
+      sel.exit().remove();
+      const g = sel.enter().append("g").attr("class", d => `trash-item tk-${d.k}`).attr("data-id", d => d.id).attr("transform", d => `translate(${f2(d.x)},${f2(-d.y)})`);
+      g.append("ellipse").attr("class", "trash-hit").attr("cx", 0).attr("cy", -1.5).attr("rx", 3).attr("ry", 2.4);
+      g.append("g").attr("class", "trash-fig").attr("transform", `scale(${f2(personK() * TRASH_K)})`).html(d => `<ellipse class="trash-glow" cx="0" cy="-1.4" rx="4.6" ry="3.4"/><ellipse class="trash-shadow" cx="0" cy="0" rx="3" ry=".9"/>${TRASH[d.k] || TRASH.can}`);
+      trash.selectAll("g.trash-item g.trash-fig").attr("transform", `scale(${f2(personK() * TRASH_K)})`);
+    }
     function setPeople(list) {
       people.selectAll("*").remove(); personAt.clear();
       for (const p of list) {
@@ -2195,7 +2232,7 @@
       if (t.k > T.k * 1.15 || !inView) go(t, 700);
     }
     draw();
-    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, setOldTrails, setPoster, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
+    return { setDate, setTime, flyTo, setMarks, setMe, setKnown, setOldTrails, setPoster, setTrash, centerOn, view: () => T, viewBox, focus, home: () => go(home()), scene: S,
       zoomBy: f => { commitSlide(); svg.transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, f); },
       setFollow, following: () => follow, setOutfit, setPeople, setDog, setPal, dogShown: () => !!dogSt,
       personAt: who => personAt.get(who) || (palSt && palSt.who === who ? { x: palSt.pos[0], y: palSt.pos[1], side: palSt.facing === "l" ? -1 : 1 } : null), toScreen: p => [T.applyX(p[0]) - pad + slide[0], T.applyY(-p[1]) - pad + slide[1]],

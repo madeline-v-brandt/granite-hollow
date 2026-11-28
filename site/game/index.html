@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="scene.css?v=64">
+<link rel="stylesheet" href="scene.css?v=65">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..800,0..100;1,9..144,400..800,0..100&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..800;1,6..12,400..600&display=swap">
 <style>
 /* Layout: a field guide you can walk around in. The status bar is the trail
@@ -597,6 +597,11 @@ g.person.crowd { pointer-events: none; }   /* Ade's group (after Phase 4): figur
 .kiosk-poster-ink { fill: none; stroke: #5a4a38; stroke-width: .07; stroke-linecap: round; }
 #mapwrap:not(.poster-up) :is(.kiosk-poster, .kiosk-poster-band, .kiosk-poster-ink) { display: none; }
 .kiosk-hit { fill: transparent; pointer-events: all; cursor: pointer; }
+/* the Clean-Up's litter (after Phase 4): small inked things on the ground, a click away */
+.trash-hit { fill: transparent; pointer-events: all; cursor: pointer; }
+.trash-shadow { fill: #2c2a26; fill-opacity: .18; } .trash-glow { fill: #fffaf0; fill-opacity: .55; }
+.trash-fig .tr-ink { stroke: #2c2a26; stroke-width: .4; stroke-linejoin: round; }
+.trash-item:hover .tr-ink { stroke: #c0412a; stroke-width: .7; }
 .bin { stroke: #2a2420; stroke-width: .5px; vector-effect: non-scaling-stroke; } .bin.bin0 { fill: #3f6a4a; } .bin.bin1 { fill: #6a5a4a; } .bin-lid { fill: #2f2a26; }
 .raccoon { fill: #7d7872; stroke: #2a2420; stroke-width: .4px; vector-effect: non-scaling-stroke; } .raccoon-mask { fill: #1e1c1a; }
 .dog { fill: #9c9a94; stroke: #34322e; stroke-width: .5px; vector-effect: non-scaling-stroke; } .dog-ear { fill: #6a6862; } .dog-patch { fill: #e8e6e0; } .dog-shadow { fill: #1e222c; opacity: .22; } .dog-line { fill: none; stroke: #34322e; stroke-width: .4px; stroke-linecap: round; vector-effect: non-scaling-stroke; } .dog-nose { fill: #34322e; }
@@ -1040,6 +1045,12 @@ tr.lb-me td { background: var(--gold-soft); }
     display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 14px; border-radius: 999px; background: var(--raised) var(--grain);
     border: 1px solid var(--rule-ink); box-shadow: var(--shadow); font-family: var(--hand); font-size: 20px; color: var(--ink); }
   .map-prompt[hidden], .map-hint[hidden] { display: none; }
+  /* the Clean-Up's bag counter (after Phase 4) */
+  .map-bag { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; display: flex; align-items: baseline; gap: 8px; padding: 5px 14px;
+    border-radius: 999px; background: var(--raised) var(--grain); border: 1px solid var(--rule-ink); box-shadow: var(--shadow); font-size: 13px; color: var(--ink-2); pointer-events: none; }
+  .map-bag b { font: 700 20px var(--serif); color: var(--ink); } .map-bag .mb-place { font-weight: 800; color: var(--gold); }
+  .map-bag[hidden] { display: none; }
+  @media (max-width: 700px) { .map-bag { top: auto; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); } }
   .map-prompt kbd, .map-hint kbd { font: 700 11px var(--body); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 4px; opacity: .8; }
   .map-hint { position: absolute; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 2; margin: 0; max-width: min(440px, calc(100% - 300px)); text-align: center;
     padding: 6px 12px; border-radius: 10px; background: color-mix(in srgb, var(--raised) 88%, transparent); border: 1px solid var(--rule-ink); font-size: 13px; color: var(--ink-2); pointer-events: none; }
@@ -1187,6 +1198,7 @@ tr.lb-me td { background: var(--gold-soft); }
         <svg id="map" role="img" aria-label="Illustrated map of the park. Select an area or a boulder to walk there."></svg>
         <div class="map-fade" id="map-fade" aria-hidden="true"></div>
         <div class="map-prompt" id="map-prompt" hidden></div>
+        <div class="map-bag" id="map-bag" hidden aria-live="polite"></div>
         <p class="map-hint" id="map-hint" hidden></p>
         <div class="tooltip" id="tip" hidden></div>
         <div class="talk-root" id="talk-root" hidden></div>
@@ -1219,17 +1231,18 @@ tr.lb-me td { background: var(--gold-soft); }
 
 <div id="paper-root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="mechanics.js?v=64"></script>
-<script src="art.js?v=64"></script>
-<script src="world.js?v=64"></script>
-<script src="knowledge.js?v=64"></script>
-<script src="social.js?v=64"></script>
-<script src="portraits.js?v=64"></script>
-<script src="talk.js?v=64"></script>
-<script src="trips.js?v=64"></script>
-<script src="illustrate.js?v=64"></script>
-<script src="paint.js?v=64"></script>
-<script src="paper.js?v=64"></script>
-<script src="travel.js?v=64"></script>
-<script src="scene.js?v=64"></script>
-<script src="game.js?v=64"></script>
+<script src="mechanics.js?v=65"></script>
+<script src="art.js?v=65"></script>
+<script src="world.js?v=65"></script>
+<script src="knowledge.js?v=65"></script>
+<script src="social.js?v=65"></script>
+<script src="portraits.js?v=65"></script>
+<script src="talk.js?v=65"></script>
+<script src="trips.js?v=65"></script>
+<script src="cleanup.js?v=65"></script>
+<script src="illustrate.js?v=65"></script>
+<script src="paint.js?v=65"></script>
+<script src="paper.js?v=65"></script>
+<script src="travel.js?v=65"></script>
+<script src="scene.js?v=65"></script>
+<script src="game.js?v=65"></script>

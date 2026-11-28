@@ -1116,6 +1116,7 @@
     bonfire: "It's the shortest day of the year, and the Solstice Bonfire: cold, crisp friction while the light lasts, then everyone gathers round the fire at The Tailgate at dusk.",
     spring: "It's the Granite Hollow Spring Comp, and no, Gus says, it isn't an April Fool. Every problem in the park counts, repeats too: your five best sends today score, 100 a V-grade and 50 more for a flash. Results by the lot at dusk.",
     trail: "It's Trail Day. Gus has a trailer full of loppers and rakes and a clipboard.",
+    cleanup: "It's the Great Granite Hollow Clean-Up! Gus is handing out grabbers and bin bags at the kiosk. The snowmelt's turned up a whole winter's litter all over the park, and whoever bags the most by dusk wins the Golden Grabber.",
     midsummer: "It's the longest day of the year, and the Midsummer Dusk Session: everyone's climbing until the light goes, then it's headlamps and sandwiches at The Tailgate.",
   };
   // The comp, live: your scorecard, and the leaders so far.
@@ -1144,6 +1145,7 @@
         <h4>Your card: ${me.score.toLocaleString("en-US")} points</h4>${card}
         <h4>Leaders so far</h4><ol class="comp-board">${top.map(row).join("")}${mine.length ? `<li class="gap">…</li>${row(mine[0], place - 1)}` : ""}</ol></div>`;
     }
+    if (e.cleanup) return cleanupHtml(e);
     if (e.key === "trail") {
       const w = G.day.weather, late = G.day.minute > w.dusk - 120;
       const done = G.day.trail ? `<p class="meta">You helped. Gus is delighted, and trying not to show it.</p>` : "";
@@ -1258,10 +1260,67 @@
       <div class="acts"><button type="button" class="btn primary" data-close>${there ? "Head home" : "Close"}</button></div>`, (root, close) => { root.querySelector("[data-close]").onclick = close; });
   }
   // The end of an event's day: the comp's results; a gathering if you were there at dusk.
+  // ---- the Great Granite Hollow Clean-Up (after Phase 4; cleanup.js) ----
+  // The litter is scattered by the map (M.litter: it needs the open ground); you pick up what
+  // you walk over (G.day.cleanup.mine: the pieces' ids); the regulars' race is worked out fresh
+  // from those and the clock (Cleanup.race), so nothing else is saved.
+  const litterNow = () => (M && M.litter ? M.litter() : []);
+  const racersToday = () => Cleanup.RACERS.filter(r => isAround(r.who) && G.world.npc[r.who]);
+  let csCache = {};
+  function cleanupState(minute = G.day.minute) {
+    const e = eventToday(); if (!e || !e.cleanup) return null;
+    const items = litterNow(); if (!items.length) return null;
+    const mine = (G.day.cleanup && G.day.cleanup.mine) || [], key = G.date + "|" + minute + "|" + mine.length;
+    if (csCache.key === key) return csCache.v;
+    const st = Cleanup.race(D, World, items, racersToday(), mine, minute, e.hours, G.date);
+    Object.assign(st, { items, mine, rows: Cleanup.standings(st.counts, mine.length) });
+    csCache = { key, v: st };
+    return st;
+  }
+  const litterOn = () => { const e = eventToday(); return !!(e && e.cleanup && !G.day.over && G.day.minute >= e.hours[0] && G.day.minute < Math.min(e.hours[1], G.day.weather.dusk)); };
+  const racerName = w => (w === "you" ? "You" : w === "n:ade" ? "Ade's gym group" : callName(w));
+  function cleanupHtml(e) {
+    const st = cleanupState(); if (!st) return "";
+    const rows = st.rows, place = rows.findIndex(r => r.who === "you") + 1;
+    const row = (x, i) => `<li class="${x.who === "you" ? "me" : ""}"><span>${i + 1}. ${esc(racerName(x.who))}</span><b>${x.n}</b></li>`;
+    const mine = rows[place - 1];
+    return `<div class="event-card comp cleanup"><span class="label-sm">Today</span><h3>${esc(e.name)}</h3>
+      <p class="meta">Walk over litter to bag it. Most pieces by dusk wins the Golden Grabber. Weigh-in by the lot at dusk, ${esc(clock(G.day.weather.dusk))}.</p>
+      <h4>Your bag: ${mine.n} ${mine.n === 1 ? "piece" : "pieces"}</h4>${st.left ? "" : `<p class="meta">The park's spotless.</p>`}
+      <h4>Leaders so far</h4><ol class="comp-board">${rows.slice(0, 5).map(row).join("")}${place > 5 ? `<li class="gap">…</li>${row(mine, place - 1)}` : ""}</ol></div>`;
+  }
+  // The weigh-in: everyone's bags at dusk (the regulars carry on till then if you go home early).
+  function cleanupAtEnd(e, there) {
+    const items = litterNow(); if (!items.length) return null;
+    const mine = (G.day.cleanup && G.day.cleanup.mine) || [];
+    const st = Cleanup.race(D, World, items, racersToday(), mine, e.hours[1], e.hours, G.date), rows = Cleanup.standings(st.counts, mine.length);
+    const place = rows.findIndex(r => r.who === "you") + 1;
+    G.events[G.date] = { k: e.key, score: mine.length, place, of: rows.length, top: rows.slice(0, 3).map(r => [r.who, r.n]), ...(there ? { there: true } : {}) };
+    note(mine.length ? `${e.name}: you came ${ordWord(place)} of ${rows.length}, with ${mine.length} pieces.` : `${e.name}: you didn't bag anything this year.`);
+    if (there) for (const x of peopleToday()) if (K.met(x.who)) bond(x.who, "event");
+    return cleanupModal(e, rows, there, items.length - st.left);
+  }
+  function cleanupModal(e, rows, there, total) {
+    const at = rows.findIndex(r => r.who === "you"), you = rows[at], win = rows[0];
+    const colour = x => (x.who === "you" ? outfitFor().shirt || "#3f7fa6" : (LOOKS[x.who.slice(2)] || {}).shirt || "#6b7a8f");
+    const lines = rows.slice(0, 8).map((x, i) => `<li class="${x.who === "you" ? "me" : ""}"><span>${i + 1}. ${esc(racerName(x.who))}</span><b>${x.n}</b></li>`).join("")
+      + (at >= 8 ? `<li class="gap">…</li><li class="me"><span>${at + 1}. You</span><b>${you.n}</b></li>` : "");
+    const lede = (there ? "At dusk Gus weighs everyone's bags on the old scale by the lot. The pile of litter ends up taller than Pickles, who is very proud of it."
+      : "You'd gone home by the weigh-in, but Gus texts the results round that evening, with a photo of a pile of bin bags taller than Pickles.")
+      + ` Between you, the park's ${total} pieces lighter.` + (win.who !== "you" ? ` ${racerName(win.who)} ${win.who === "n:ade" ? "win" : "wins"} the Golden Grabber.` : "");
+    const youLine = !you.n ? "You didn't bag anything this year. The park's grateful to everyone who did."
+      : at === 0 ? `You win the Golden Grabber, with ${you.n} pieces! It's a litter picker Gus has spray-painted gold, and he presents it with enormous ceremony.`
+      : at < 3 ? `You came ${ordWord(at + 1)}, with ${you.n} pieces. There's a ribbon for you on your Climber page.`
+      : `You came ${ordWord(at + 1)} of ${rows.length}, with ${you.n} pieces.`;
+    return () => modal(`<div class="event-scene">${eventArt("comp", rows.slice(0, 3).map(colour))}</div><span class="label-sm">${esc(e.name)}</span><h2>The weigh-in</h2>
+      <p class="lede">${esc(lede)}</p><ol class="comp-board final">${lines}</ol><p class="lede">${esc(youLine)}</p>
+      <div class="acts"><button type="button" class="btn primary" data-close>${there ? "Head home" : "Close"}</button></div>`, (root, close) => { root.querySelector("[data-close]").onclick = close; });
+  }
   function eventAtEnd(opts = {}) {
     const e = eventToday(); if (!e) return null;
     const there = !!opts.dusk || G.day.minute >= G.day.weather.dusk - 30;
     G.events = G.events || {};
+    if (e.cleanup) return cleanupAtEnd(e, there);
     if (e.comp) {
       const me = World.compScore(G.day.sends, compGrade);
       G.events[G.date] = { k: e.key, score: me.score, ...(there ? { there: true } : {}) };
@@ -1288,6 +1347,7 @@
       const e = World.eventOn(d); if (!e) return "";
       const yr = d.slice(0, 4);
       if (e.comp) return `<li>${r.place && r.place <= 3 ? `<span class="ribbon r${r.place}" aria-hidden="true"></span>` : `<span class="ribbon none" aria-hidden="true"></span>`}<div><b>${esc(e.name)} ${yr}</b><div class="meta" style="margin:0">${r.place ? `${upFirst(ordWord(r.place))} of ${r.of}, ${r.score.toLocaleString("en-US")} points` : "Went along, didn't score"}</div></div></li>`;
+      if (e.cleanup) return `<li>${r.place && r.place <= 3 && r.score ? `<span class="ribbon r${r.place}" aria-hidden="true"></span>` : `<span class="ribbon none" aria-hidden="true"></span>`}<div><b>${esc(e.name)} ${yr}</b><div class="meta" style="margin:0">${r.score ? `${r.place === 1 ? "The Golden Grabber! " : ""}${upFirst(ordWord(r.place))} of ${r.of}, ${r.score} ${r.score === 1 ? "piece" : "pieces"}` : "Didn't bag anything"}</div></div></li>`;
       if (r.k === "trail") { const t = World.OLD_TRAILS.find(x => x.id === r.trail); return `<li><span class="ribbon none" aria-hidden="true"></span><div><b>${esc(e.name)} ${yr}</b><div class="meta" style="margin:0">You helped${t ? ` reopen ${esc(t.name)}` : ""}</div></div></li>`; }
       return `<li><span class="ribbon none" aria-hidden="true"></span><div><b>${esc(e.name)} ${yr}</b><div class="meta" style="margin:0">You were there</div></div></li>`;
     }).join("");
@@ -1455,7 +1515,10 @@
   // Your partner is with you whatever the hour.
   function peopleNow() {
     const m = G.day.minute, pal = partnerNow();
-    return peopleToday().filter(x => x.who === pal || (m >= x.from && m < x.to));
+    const now = peopleToday().filter(x => x.who === pal || (m >= x.from && m < x.to));
+    if (!litterOn()) return now;
+    const st = cleanupState(); if (!st) return now;
+    return now.map(x => (x.who !== pal && st.last[x.who] != null ? { ...x, b: st.items[st.last[x.who]].b } : x));   // the Clean-Up: by their last find
   }
   // What someone's doing, in a few words (never names a place or a line).
   const ACT = {
@@ -1471,6 +1534,7 @@
   };
   function activity(p) {
     if (p.who === "n:bishop") return "Telling anyone who'll listen about 1977";
+    if (litterOn()) return p.who === "n:gus" ? "Handing out grabbers and bin bags" : p.who === "n:ade" ? "Litter-picking with the gym group" : "Litter-picking, bag in hand";
     const a = ACT[p.who.slice(2)] || {}, s = p.s;
     return !s ? "Climbing" : s.out === "wet" ? a.wet : s.p != null ? a.proj : a.mileage;
   }
@@ -2023,6 +2087,9 @@
         if (M.walking()) UI.toKiosk = true;
       },
       kioskTipHtml,
+      // The Clean-Up's litter (after Phase 4): a click walks you over, and you pick it up when you get there.
+      onTrash: id => { const it = litterNow()[id]; if (!it || G.day.over || climbing()) return; goToPoint([it.x, it.y]); },
+      trashTipHtml: id => { const it = litterNow()[id]; return it ? `<strong>${esc(Cleanup.KIND[it.k].name)}</strong><div class="sub">Litter for the Clean-Up</div>` : ""; },
       onFollow: on => { $("#map-me").classList.toggle("lost", !on); },
       tipHtml: b => {
         const mins0 = minutesTo({ sector: b.sector, boulder: b.id }, true);
@@ -2072,6 +2139,44 @@
       if (P.setOldTrails) P.setOldTrails(ids);
     }
     syncTrails();
+    // ---- the Clean-Up's litter (after Phase 4): scattered on open ground once a day, from cleanup.js.
+    let litterCache = null, bagKey = "";
+    function litter() {
+      const e = v2() && G && G.date ? World.eventOn(G.date) : null;
+      if (!e || !e.cleanup) return [];
+      if (litterCache && litterCache.date === G.date) return litterCache.items;
+      const ok = p => inPark(p) && !S.inWater(p, -1) && !solid(p);
+      const items = Cleanup.scatter(D, Cleanup.spots(D, S.trails.map(t => t.pts), ok, "spots|" + G.date), G.date);
+      for (const it of items) { let bd = Infinity; for (const b of D.boulders) { const d = (b.x - it.x) ** 2 + (b.y - it.y) ** 2; if (d < bd) { bd = d; it.b = b.id; } } }
+      litterCache = { date: G.date, items };
+      return items;
+    }
+    // What's still lying about: drawn on the map; the bag counter over the map.
+    function syncLitter() {
+      const st = litterOn() ? cleanupState() : null;
+      P.setTrash(st ? st.items.filter(it => !st.mine.includes(it.id) && !st.by.has(it.id)) : []);
+      const el = $("#map-bag"); if (!el) return;
+      const place = st ? st.rows.findIndex(r => r.who === "you") + 1 : 0, key = st ? `${st.mine.length}|${place}|${st.rows.length}` : "";
+      if (key === bagKey) return; bagKey = key;
+      el.hidden = !st;
+      if (st) el.innerHTML = `<span>Your bag</span><b>${st.mine.length}</b><span class="mb-place">${ordinal(place)} of ${st.rows.length}</span>`;
+    }
+    // Walking over litter picks it up (a couple of minutes each).
+    function pickLitter() {
+      if (!litterOn() || climbing() || !G.pos) return false;
+      const st = cleanupState(); if (!st) return false;
+      const near = st.items.filter(it => !st.mine.includes(it.id) && !st.by.has(it.id) && Math.hypot(it.x - G.pos[0], it.y - G.pos[1]) < Cleanup.REACH);
+      if (!near.length) return false;
+      const c = G.day.cleanup = G.day.cleanup || { mine: [] };
+      for (const it of near) {
+        c.mine.push(it.id);
+        const odd = Cleanup.ODD.find(o => o.k === it.k);
+        if (odd) { toast(odd.name, odd.text, "find"); note(`Found at the Clean-Up: ${odd.name.toLowerCase()}.`); }
+      }
+      spend(Cleanup.PICK * near.length);
+      syncLitter(); save();
+      return true;
+    }
     const SPEED = { trail: 20, off: 14 };                // metres a second on screen (about the clock's 50 : 35)
     const [bx0, bx1, by0, by1] = S.bounds, edge = 60;
     const inPark = p => p[0] > bx0 + edge && p[0] < bx1 - edge && p[1] > by0 + edge * .6 && p[1] < by1 - edge;
@@ -2213,6 +2318,7 @@
       if (!quiet && meetNearby(G.pos)) { save(); renderAll(); showPrompt(); }
       else if (G.day.encounter && walkedAway(G.day.encounter)) { G.day.encounter = null; renderTalk(); save(); }   // walked off mid-conversation
       if (nearKiosk(G.pos) !== kioskNear) showPrompt();
+      if (litterOn()) { if (!pickLitter()) syncLitter(); }
       const now = locAt(G.pos, G.loc);
       if (sameLoc(now, G.loc)) return;
       const prev = { ...G.loc };
@@ -2380,14 +2486,14 @@
       // Who's around at this hour (they come and go: Phase 4, Stage 1), with a name tag
       // over anyone you've met.
       const now = G.day.over ? [] : peopleNow(), dog = v2() && !G.day.over && dogMode() === "rock";
-      const pk = [G.date, ...now.map(x => x.who + (isKnown(x.who) ? "+" : "")), dog, dog && isKnown("n:pickles"), pal].join("|");
+      const pk = [G.date, ...now.map(x => x.who + (isKnown(x.who) ? "+" : "") + x.b), dog, dog && isKnown("n:pickles"), pal].join("|");
       if (pk !== peopleKey) {
         peopleKey = pk;
         const list = now.filter(x => x.who !== pal).map(x => ({ ...x, name: isKnown(x.who) ? x.name : "Someone you haven't met", tag: isKnown(x.who) ? firstName(x.who) : null }));
         P.setPeople([...list, ...(dog ? [{ who: "n:pickles", name: isKnown("n:pickles") ? "Pickles" : "A dog", dog: true, tag: isKnown("n:pickles") ? "Pickles" : null }] : [])]);
       }
       if (!walk && !keys.size) P.setMe(G.pos, pose(false));
-      syncDog(); syncPal();
+      syncDog(); syncPal(); syncLitter();
       const tipBoulders = new Set(G.tips.filter(t => !t.done).map(t => D.problems[t.p].b));
       P.setMarks({
         here: G.loc.boulder ?? null, sector: G.loc.sector ?? null, tip: tipBoulders,
@@ -2503,7 +2609,7 @@
       if (who === "n:pickles") { const d = dogLive() || (dogSpot() && [dogSpot().x, dogSpot().y]); if (!d) return; UI.talkTo = who; lookAtMe(400); goToPoint([d[0] + 3, d[1] - 1]); return; }
       const p = personSpot(who); if (!p) return; lookAtMe(400); goToPoint(p);
     };
-    return { update, paint: P, togglePaper, lookAtMe, goTo, minutesTo, findPerson, minutesToLot, toLot, walking: () => !!walk, locAt: p => locAt(p, G.loc), approach, dogLive,
+    return { update, paint: P, togglePaper, lookAtMe, goTo, minutesTo, findPerson, minutesToLot, toLot, walking: () => !!walk, locAt: p => locAt(p, G.loc), approach, dogLive, litter,
       teleport: to => { stop(); G.pos = pointOf(to); G.loc = { sector: to.sector, boulder: to.boulder }; P.setMe(G.pos, pose(false)); P.setFollow(true, 0); } };
   }
   const validPos = p => Array.isArray(p) && p.length === 2 && p.every(v => typeof v === "number" && isFinite(v) && Math.abs(v) < 5000);
@@ -3579,6 +3685,7 @@
     spring: "Every problem in the park counts, repeats too. Your five best sends score. Not an April Fool. Results by the lot at dusk.",
     bonfire: "The longest night of the year. Climb while the light lasts, then fire, cocoa and stories at The Tailgate from dusk. Bring a mug.",
     midsummer: "The longest day of the year. Climb till the light goes, then headlamps and sandwiches at The Tailgate.",
+    cleanup: "Grabbers and bin bags provided! The snowmelt's turned up a whole winter's litter. Whoever bags the most by dusk wins the Golden Grabber. Meet Gus at the kiosk from 9.",
     trail: "Volunteers wanted! Loppers, rakes and gloves provided. Something old is coming back. Meet Gus at the kiosk from 8.",
   };
   const KIOSK_SEASON = [
@@ -3616,6 +3723,13 @@
     return `<figure class="kiosk-poster-card"><div class="kp-band">${esc(n.name.replace(/^The /, ""))}</div><p class="kp-when">${esc(when)}</p><p>${esc(KIOSK_POSTER[n.key] || "")}</p>${doodle}</figure>`;
   }
   function kioskPastHtml(e) {
+    if (e.cleanup) {
+      const r = (G.events || {})[e.date];
+      if (!r || !r.top) return `<div class="kiosk-note"><p>${esc("Thank you, litter-pickers! Forty-one bin bags. The gnome is in the box under the bench if it's yours.")}</p><span class="kn-sign">Gus</span></div>`;
+      const rows = r.top.map(([w, n], i) => `<li class="${w === "you" ? "me" : ""}"><span>${i + 1}. ${esc(racerName(w))}</span><b>${n}</b></li>`).join("")
+        + (r.place > 3 && r.score ? `<li class="me"><span>${r.place}. You</span><b>${r.score}</b></li>` : "");
+      return `<div class="kiosk-note results"><span class="kn-head">The Clean-Up: the weigh-in</span><ol class="comp-board">${rows}</ol><span class="kn-sign">Gus</span></div>`;
+    }
     if (e.comp) {
       const f = K.compResults(e.date); if (f.length < 3) return "";
       const nm = x => (x.who === "you" ? "You" : x.who.startsWith("n:") ? callName(x.who) : x.name);
@@ -4258,6 +4372,7 @@
         if (int(r.score)) c.score = r.score; if (int(r.place) && r.place > 0) c.place = r.place; if (int(r.of) && r.of > 0) c.of = r.of;
         if (r.there === true) c.there = true; if (r.helped === true) c.helped = true;
         if (typeof r.trail === "string" && World.OLD_TRAILS.some(t => t.id === r.trail)) c.trail = r.trail;
+        if (Array.isArray(r.top)) { const top = r.top.filter(x => Array.isArray(x) && (x[0] === "you" || (typeof x[0] === "string" && World.NAMED[x[0].slice(2)])) && int(x[1])).slice(0, 3).map(x => [x[0], x[1]]); if (top.length) c.top = top; }
         ok[d] = c;
       }
       if (Object.keys(ok).length) g.events = ok; else delete g.events;
@@ -4269,6 +4384,8 @@
       if (ok) g.tripOffer = { key: o.key, who: o.who, leave: o.leave, back: o.back, made: o.made, ...(o.yes === true ? { yes: true } : {}) }; else delete g.tripOffer; }
     if (g.tripLast != null && !day_(g.tripLast)) delete g.tripLast;   // the event whose poster you've seen (Stage 8)
     if (g.day && g.day.trail != null && g.day.trail !== true) delete g.day.trail;
+    // The Clean-Up (after Phase 4): the pieces you've picked up today.
+    if (g.day && g.day.cleanup != null) { const m = g.day.cleanup && Array.isArray(g.day.cleanup.mine) ? [...new Set(g.day.cleanup.mine.filter(i => Number.isInteger(i) && i >= 0 && i < Cleanup.N))] : null; if (m && m.length) g.day.cleanup = { mine: m }; else delete g.day.cleanup; }
     if (g.day && g.day.busy != null && g.day.busy !== true) delete g.day.busy;
     // Rowan (Stage 6): G.romance checked and cleaned; today's sunset state only if it's one we know.
     if (g.romance != null) { const r = Social.cleanRomance(g.romance); if (r) g.romance = r; else delete g.romance; }

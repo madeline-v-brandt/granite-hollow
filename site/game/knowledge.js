@@ -261,6 +261,7 @@
           bonfire: "Half the Hollow turned up for the Solstice Bonfire. The Bishop's story about 1977 got longer again.",
           trail: (t => (t ? `On Trail Day, Gus and a crowd of volunteers reopened ${t.name}, the old path between ${area(t.a) >= 1 ? t.a : (World.AREAS[t.a] || {}).hint || "two of the areas"} and ${area(t.b) >= 1 ? t.b : (World.AREAS[t.b] || {}).hint || "further out"}. It's on the trail map.` : "Gus and a crowd of volunteers cut back the summer's growth along the trails on Trail Day."))(World.oldTrailOn(d)),
           midsummer: "The Midsummer Dusk Session went on until the headlamps came out. Otis made forty sandwiches.",
+          cleanup: (r => (r && r.top ? `${r.top[0][0] === "you" ? "You" : r.top[0][0] === "n:ade" ? "Ade's gym group" : short(r.top[0][0])} won the Golden Grabber at the Clean-Up, with ${r.top[0][1]} pieces. Nobody has claimed the garden gnome.` : "The Clean-Up filled more bin bags than Gus could count. Somebody found a garden gnome."))((g.events || {})[d]),
         }[e.key];
         out.push({ date: d, kind: "event", go: null, text });
       }

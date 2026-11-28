@@ -152,6 +152,22 @@ An illustrated, explorable map with hidden boulders and trails; seasonal changes
       - The Climber page's "Climbing trips" list (`tripsHtml`).
       - Talk: the friend's `.h.tripask`, `.h.tripgo` and `.h.tripback` lines (`c.tripAsk`, `c.tripGoing`, `c.tripBack`), and everyone else's `.h.away` (`c.away`, the week after).
     - **Saves:** `G.trips`, `G.tripOffer` and `G.tripLast`, all optional and cleaned in `migrateSave` (`Trips.clean`).
+  - **The Great Granite Hollow Clean-Up** (`cleanup.js`, pure; tests: `node scripts/test_cleanup.js` (`--show` prints the tuning), `scripts/browser/cleanup.js`). A seventh event, every Earth Day (April 22; `World.EVENTS.cleanup`, `cleanup: true`, hours 9:00 to dusk). Like the others: everyone's out, the day is dry, Gus's poster, and trips never overlap it.
+    - **The litter:** 300 pieces scattered once a day on open ground. The map adapter finds the places (`litter()`: along the trails, round the boulders) and `Cleanup.scatter` picks them, seeded by the date. There are six odd finds with their own toast: the single left climbing shoe, a 1980s guidebook page, a garden gnome, a sock, a frisbee, an old toothbrush.
+    - **On the map:** drawn in a layer under the standing things (`setTrash` in `paint.js`, `.trash`), at about a third of your height at any zoom (`TRASH_K`), on a pale patch so it can be found.
+    - **Picking up:** walking within `REACH` picks a piece up, at 2.5 game minutes each (`pickLitter`, from `moved_`). A click walks you there (`onTrash`), and hovering names it.
+      - `G.day.cleanup.mine` (the ids) is the only thing saved.
+      - The bag counter sits over the map (`#map-bag`; at the bottom on phones).
+    - **The race** (`Cleanup.race`): the regulars (`RACERS`, pieces an hour) start from their home areas and each takes the nearest piece still there, at a seeded pace. Ade's gym group counts as one team. Gus runs it, and Otis, Hollis and Rowan are slow on purpose.
+      - Your pieces are left out of their choices from the start, so the state is worked out fresh from your pieces and the clock and never contradicts what you saw.
+      - On the day they stand by their last find (`peopleNow`), and their activity is "Litter-picking".
+      - Tuned so a perfect route (the test's greedy player) comes about 8th with an hour, 3rd with two, and wins with four or more. Left alone, the regulars clear the park by about dusk.
+    - **The day:**
+      - The Here tab's card (`cleanupHtml`): your bag and the leaders.
+      - The weigh-in at the end of the day (`cleanupAtEnd`, `cleanupModal`; the regulars carry on to dusk if you leave early). It's recorded in `G.events[date]` as `{ k, score, place, of, top: [[who, n] × 3], there }`, with an `event` moment if you're there.
+      - The winner gets the Golden Grabber.
+      - Afterwards: ribbons on the Climber page, a kiosk note with the weigh-in, and Local Buzz.
+      - Every regular has a `cleanup` line in `.h.ev`. There's no XP: cleaning isn't climbing.
   - Your climbing partner walks with you (see Partners). Pickles stays further back when they do, and is drawn under you when he's behind you (`placeDog`).
   - Less explanation on screen, on purpose; don't add these back:
     - no tagline under a name in the conversation box (no blurb, level or tier)

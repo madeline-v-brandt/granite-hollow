@@ -304,6 +304,7 @@
     bonfire: { name: "The Solstice Bonfire", short: "the Solstice Bonfire", season: "winter", gather: true, on: y => `${y}-12-21`, hours: [600, 1260] },
     spring: { name: "The Granite Hollow Spring Comp", short: "the spring comp", season: "spring", comp: true, gather: true, on: y => `${y}-04-01`, hours: [540, 1260] },
     trail: { name: "Trail Day", short: "Trail Day", season: "summer", gather: false, on: y => firstSat(y, 8), hours: [480, 1020] },
+    cleanup: { name: "The Great Granite Hollow Clean-Up", short: "the Clean-Up", season: "spring", cleanup: true, gather: false, on: y => `${y}-04-22`, hours: [540, 1200] },   // Earth Day (after Phase 4; cleanup.js)
     midsummer: { name: "The Midsummer Dusk Session", short: "the Midsummer Dusk Session", season: "summer", gather: true, on: y => `${y}-06-21`, hours: [660, 1320] },
   };
   // The event on a day ({ key, date, name, short, season, gather, hours }), or null.
